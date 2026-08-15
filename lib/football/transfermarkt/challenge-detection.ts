@@ -1,0 +1,1 @@
+export function isTransfermarktChallenge(html:string){const s=html.toLowerCase();return ["captcha","robot verification","access denied","cf-chl-","verify you are human","unusual traffic"].some(x=>s.includes(x));}

@@ -1,0 +1,2 @@
+import { describe, expect, it } from "vitest"; import { visibleRoundFixtures } from "@/lib/football/rounds";
+describe("round boundaries",()=>it("excludes fixtures beyond the configured gap",()=>{const base=new Date("2026-08-15T12:00:00Z"); const items=[{matchday:1,kickoffAt:base},{matchday:1,kickoffAt:new Date("2026-08-16T12:00:00Z")},{matchday:1,kickoffAt:new Date("2026-08-18T12:00:00Z")}]; expect(visibleRoundFixtures(items,48*60)).toHaveLength(2);}));

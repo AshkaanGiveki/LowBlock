@@ -1,0 +1,2 @@
+import { env } from "../lib/env"; import { ensureIndexes } from "../lib/db/mongo"; import { LEAGUES } from "../lib/football/leagues";
+async function main(){if(!env.MONGODB_URI)throw new Error("MONGODB_URI is required for a real season sync");await ensureIndexes();console.log(`Prepared MongoDB indexes for ${LEAGUES.length} competitions. Provider sync is conservative and challenge-aware.`);} main().catch(e=>{console.error(e instanceof Error?e.message:"sync failed");process.exit(1)});

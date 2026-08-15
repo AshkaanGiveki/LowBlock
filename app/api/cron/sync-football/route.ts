@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"; import { env } from "@/lib/env"; import { LEAGUES } from "@/lib/football/leagues";
+export async function POST(req:Request){if(!env.CRON_SECRET||req.headers.get("authorization")!==`Bearer ${env.CRON_SECRET}`)return NextResponse.json({error:"غیرمجاز"},{status:401});return NextResponse.json({ok:true,queued:LEAGUES.map(l=>l.code),message:"درخواست همگام‌سازی در صف قرار گرفت"});}

@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
+describe("authoritative score",()=>{ const cases:[[number|null,number|null,number|null,number|null,number],...Array<[number|null,number|null,number|null,number|null,number]>]=[[2,1,2,1,10],[0,0,1,1,5],[1,3,0,2,7],[1,0,3,0,5],[3,0,0,2,2],[null,null,2,1,0]]; for(const [ph,pa,h,a,p] of cases) it(`${ph}-${pa} vs ${h}-${a} => ${p}`,()=>expect(calculatePredictionScore(ph,pa,h,a).points).toBe(p)); it("does not stack categories",()=>expect(calculatePredictionScore(2,1,2,1)).toEqual({points:10,category:"EXACT_SCORE"})); });
