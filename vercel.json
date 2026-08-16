@@ -1,1 +1,1 @@
-{"crons":[{"path":"/api/cron/sync-football","schedule":"0 5 * * *"}]}
+{"crons":[{"path":"/api/cron/sync-football","schedule":"30 23 * * *"}]}
