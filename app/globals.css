@@ -14,7 +14,11 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 .pitch-lines { position:relative; overflow:hidden; }
 .pitch-lines:before { content:""; position:absolute; inset:0; opacity:.22; pointer-events:none; background-image:linear-gradient(90deg,transparent 49.8%,rgba(18,160,105,.18) 50%,transparent 50.2%), linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px); background-size:100% 100%,72px 72px,72px 72px; mask-image:linear-gradient(to bottom,black,transparent 85%); }
 .panel { border:1px solid var(--border); background:linear-gradient(145deg,rgba(24,31,28,.96),rgba(11,15,13,.96)); border-radius:24px; box-shadow:0 18px 60px rgba(0,0,0,.3); }
-.match-card-notch:after { content:""; position:absolute; z-index:10; bottom:-1px; left:50%; width:148px; height:24px; transform:translateX(-50%); background:var(--background); clip-path:ellipse(48% 100% at 50% 100%); box-shadow:0 -1px 0 rgba(255,255,255,.12); }
+.glow-card:before { content:""; position:absolute; inset:-110%; z-index:0; background:conic-gradient(from var(--glow-angle), transparent 0deg, transparent 42deg, rgba(93,255,183,.9) 70deg, rgba(255,255,255,.4) 92deg, transparent 125deg, transparent 360deg); animation:card-glow 5s linear infinite; }
+.glow-card:after { content:""; position:absolute; z-index:0; inset:1px; border-radius:15px; background:linear-gradient(135deg,#164f3b,#06150f); }
+.glow-card > * { z-index:1; }
+@property --glow-angle { syntax:"<angle>"; initial-value:0deg; inherits:false; }
+@keyframes card-glow { to { --glow-angle:360deg; } }
 .focus-ring:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
