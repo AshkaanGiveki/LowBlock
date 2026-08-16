@@ -16,7 +16,8 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 .panel { border:1px solid var(--border); background:linear-gradient(145deg,rgba(24,31,28,.96),rgba(11,15,13,.96)); border-radius:24px; box-shadow:0 18px 60px rgba(0,0,0,.3); }
 .glow-card:before { content:""; position:absolute; inset:-110%; z-index:0; background:conic-gradient(from var(--glow-angle), transparent 0deg, transparent 42deg, rgba(93,255,183,.9) 70deg, rgba(255,255,255,.4) 92deg, transparent 125deg, transparent 360deg); }
 .glow-card:hover:before { animation:card-glow 7s linear infinite; }
-.glow-card:after { content:""; position:absolute; z-index:0; inset:1px; border-radius:15px; background:linear-gradient(135deg,#164f3b,#06150f); }
+.glow-card { background-image:linear-gradient(135deg,rgba(18,79,58,.94),rgba(6,21,15,.97)),url("data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='a' width='40' height='69.282' patternUnits='userSpaceOnUse'%3E%3Crect width='40' height='69.282' fill='%2309130f'/%3E%3Cpath d='M20 0L40 11.547v23.094L20 46.188 0 34.641V11.547zM20 46.188L40 57.735v23.094L20 92.376 0 80.829V57.735zM0 34.641L20 46.188M40 34.641L20 46.188M20 0v23.094M6.667 7.698v23.094M33.333 7.698v23.094' fill='none' stroke='%23308462' stroke-opacity='.38' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23a)'/%3E%3C/svg%3E") !important; background-size:cover,80px 138.564px; }
+.glow-card:after { content:""; position:absolute; z-index:0; inset:1px; border-radius:15px; background:linear-gradient(135deg,rgba(12,43,31,.2),rgba(0,0,0,.28)); }
 .glow-card > * { z-index:1; }
 @property --glow-angle { syntax:"<angle>"; initial-value:0deg; inherits:false; }
 @keyframes card-glow { to { --glow-angle:360deg; } }
@@ -24,6 +25,8 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 .logo-loop-track:hover { animation-play-state:paused; }
 @keyframes logo-loop { to { transform:translateX(-33.333%); } }
 .logo-loop-track img { opacity:.72; }
+.league-logo { filter:brightness(0) invert(1); }
+div[class*="z-[80]"] > div:last-child { background-color:#0b1711; background-image:linear-gradient(145deg,rgba(9,28,19,.93),rgba(3,10,7,.97)),url("data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='a' width='50.41' height='87' patternUnits='userSpaceOnUse'%3E%3Crect width='50.41' height='87' fill='%23060c09'/%3E%3Cpath d='M25.2 0L50.4 43.5 25.2 87 0 43.5zM0 43.5h50.4M12.6 21.75h25.2m-25.2 43.5h25.2M25.2 0v87' fill='none' stroke='%2320754d' stroke-opacity='.3' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23a)'/%3E%3C/svg%3E"); background-size:cover,101px 174px; }
 body:has([class*="z-[80]"]) nav.fixed.bottom-3 { display:none !important; }
 nav.fixed.bottom-3 a > span { inset:0 !important; width:auto !important; height:auto !important; border-radius:.5rem !important; }
 @media (max-width:767px) { .glow-card:before { animation:none !important; } }
