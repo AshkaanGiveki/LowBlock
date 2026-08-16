@@ -1,26 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, BarChart3, LockKeyhole, Trophy } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getMatches } from "@/lib/football/data";
-import { Brand } from "@/components/Brand";
 import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
 import { LogoLoop } from "@/components/LogoLoop";
 import { T } from "@/components/LanguageProvider";
 
 export default async function Home() {
   const matches = await getMatches({ limit: 5 });
-  return <main className="min-h-screen pb-24 pt-24 md:mr-72 md:pb-8 md:pt-24">
-    <section className="mx-auto max-w-7xl px-5 py-8 md:px-10 md:py-16">
-      <div className="relative overflow-hidden rounded-[38px] border border-white/[.08] bg-[radial-gradient(circle_at_12%_25%,rgba(18,160,105,.32),transparent_28%),linear-gradient(135deg,#111914,#050706)] p-7 md:p-12">
-        <div className="pointer-events-none absolute -left-28 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full border border-brand/15" />
-        <div className="relative grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr]">
-          <div><Brand variant="stacked" className="mb-8 w-fit items-start" /><h1 className="max-w-3xl text-4xl font-black leading-[1.2] md:text-7xl"><T fa="تو فقط نتیجه را حدس نمی‌زنی؛" en="You don't just guess the score;" /><br /><span className="text-brand"><T fa="آینده بازی را می‌خوانی." en="you read the future of the match." /></span></h1><p className="mt-6 max-w-xl text-base leading-8 text-[var(--muted)]"><T fa="پلتفرم پیش‌بینی پنج لیگ بزرگ اروپا با مسابقه‌های واقعی، امتیازدهی شفاف و رقابتی که هر هفته جدی‌تر می‌شود." en="Predict Europe's top five leagues with real fixtures, transparent scoring, and a competition that gets sharper every week." /></p><div className="mt-8 flex flex-wrap gap-3"><Link href="/signup" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-6 py-3.5 text-sm font-black text-white"><T fa="ساخت حساب رایگان" en="Create free account" /><ArrowLeft size={17} /></Link><Link href="/app" className="rounded-2xl border border-white/10 bg-white/[.04] px-6 py-3.5 text-sm font-black"><T fa="دیدن مسابقه‌ها" en="Browse fixtures" /></Link></div></div>
-          <HomeFixtureSlider matches={matches} />
-        </div>
-      </div>
-    </section>
-    <LogoLoop />
-    <section className="border-t border-white/[.06]"><div className="mx-auto grid max-w-7xl gap-6 px-5 py-10 text-sm text-[var(--muted)] md:grid-cols-3 md:px-10"><Feature icon={<LockKeyhole />} title={<T fa="امن و شفاف" en="Safe and transparent" />} /><Feature icon={<Trophy />} title={<T fa="رقابت واقعی" en="Real competition" />} /><Feature icon={<BarChart3 />} title={<T fa="پیشرفت قابل اندازه‌گیری" en="Measurable progress" />} /></div></section>
-  </main>;
+  return <main className="min-h-screen pb-24 pt-20"><section className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10"><div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-white/[.1] bg-[#08120e] md:min-h-[420px]"><img src="/hero-footballer.png" alt="Footballer preparing for a match" className="absolute inset-0 h-full w-full object-cover object-right"/><div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,8,.98)_0%,rgba(5,10,8,.83)_38%,rgba(5,10,8,.2)_70%,rgba(5,10,8,.05)_100%)]"/><div className="relative flex min-h-[360px] max-w-lg flex-col justify-center p-7 md:min-h-[420px] md:p-12"><h1 className="text-4xl font-black tracking-tight md:text-6xl"><T fa="\u067e\u06cc\u0634\u200c\u0628\u06cc\u0646\u06cc \u0628\u0627\u0632\u06cc\u200c\u0647\u0627" en="Predict the match."/></h1><p className="mt-4 text-base text-white/70"><T fa="\u062f\u0648\u0631 \u0628\u0639\u062f\u06cc \u0631\u0627 \u0627\u0646\u062a\u062e\u0627\u0628 \u06a9\u0646\u06cc\u062f \u0648 \u0646\u062a\u06cc\u062c\u0647 \u062e\u0648\u062f \u0631\u0627 \u062b\u0628\u062a \u06a9\u0646\u06cc\u062f." en="Choose a round and submit your score."/></p><Link href="/leagues/GB1" className="mt-7 inline-flex w-fit items-center gap-2 rounded-lg bg-brand px-5 py-3.5 text-sm font-black text-white shadow-[0_10px_30px_rgba(32,184,121,.25)] transition hover:bg-brand-hover"><T fa="\u0634\u0631\u06a9\u062a \u062f\u0631 \u062f\u0648\u0631" en="Join a round"/><ArrowLeft size={17}/></Link></div></div></section><LogoLoop/><section className="mx-auto max-w-7xl px-4 pt-8 md:px-8 md:pt-12"><div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-black tracking-[.16em] text-brand"><T fa="\u0645\u0633\u0627\u0628\u0642\u0647\u200c\u0647\u0627\u06cc \u067e\u06cc\u0634 \u0631\u0648" en="UPCOMING FIXTURES"/></p><h2 className="mt-1 text-2xl font-black"><T fa="\u0627\u0646\u062a\u062e\u0627\u0628 \u067e\u06cc\u0634\u200c\u0628\u06cc\u0646\u06cc" en="Make your pick"/></h2></div></div><HomeFixtureSlider matches={matches}/></section></main>;
 }
-
-function Feature({ icon, title }: { icon: React.ReactNode; title: React.ReactNode }) { return <div className="flex items-center gap-3"><span className="text-brand">{icon}</span><b className="text-white">{title}</b></div>; }
