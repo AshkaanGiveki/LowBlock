@@ -1,8 +1,2 @@
-import Link from "next/link";
-
-export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return <main className="grid min-h-screen place-items-center px-5 py-12"><div className="w-full max-w-md">
-    <Link href="/" className="mx-auto mb-10 flex w-fit items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-brand font-black text-ink">ل</span><span className="text-lg font-black">لوبلاک<span className="text-brand">.</span></span></Link>
-    <div className="panel p-6 md:p-9"><div className="mb-8"><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p></div>{children}</div>
-  </div></main>;
-}
+import { Brand } from "@/components/Brand";
+export function AuthShell({title,subtitle,children}:{title:React.ReactNode;subtitle:React.ReactNode;children:React.ReactNode}){return <main className="grid min-h-screen place-items-center px-5 py-24"><div className="w-full max-w-md"><Brand variant="stacked" className="mx-auto mb-8"/><div className="panel p-6 md:p-9"><div className="mb-8"><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p></div>{children}</div></div></main>}
