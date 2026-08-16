@@ -23,6 +23,8 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 .logo-loop-track:hover { animation-play-state:paused; }
 @keyframes logo-loop { to { transform:translateX(-33.333%); } }
 .logo-loop-track img, button img[src*="api-sports.io/football/leagues"] { filter:brightness(0) invert(1) grayscale(1); opacity:.72; }
+body:has([class*="z-[80]"]) nav.fixed.bottom-3 { z-index:1 !important; }
+nav.fixed.bottom-3 a > span { left:4px !important; top:4px !important; width:40px !important; height:40px !important; border-radius:9999px !important; }
 html[dir="rtl"] main { direction:rtl; }
 html[dir="rtl"] main > section:first-child > div > div:last-child { margin-left:auto; text-align:right; }
 html[dir="rtl"] main > section:first-child > div > div:nth-child(2) { transform:scaleX(-1); }
