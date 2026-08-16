@@ -9,7 +9,7 @@ import { TeamCrest } from "@/components/TeamCrest";
 
 export default async function Home() {
   const [match] = await getMatches({ limit: 1 });
-  return <main className="min-h-screen"><Nav />
+  return <main className="min-h-screen pb-24 pt-24 md:mr-72 md:pb-0 md:pt-20"><Nav />
     <section className="pitch-lines mx-auto max-w-7xl px-5 pb-20 pt-12 md:px-10 md:pt-24"><div className="relative grid items-center gap-12 lg:grid-cols-[1.15fr_.85fr]">
       <MotionIn><div><div className="mb-7 inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand-subtle px-3 py-1.5 text-xs font-semibold text-brand"><CircleDot size={14}/> فصل جدید رقابت از همین‌جا شروع می‌شود</div>
         <h1 className="max-w-3xl text-4xl font-black leading-[1.25] tracking-tight md:text-7xl">هر مسابقه،<br/><span className="text-brand">یک تصمیم</span> تازه.</h1>
