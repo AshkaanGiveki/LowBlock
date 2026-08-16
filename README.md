@@ -44,10 +44,9 @@ Telegram sends `window.Telegram.WebApp.initData`. LowBlock sends that untouched 
 
 1. Create or select a bot using Bale's `@Bot_Father` and configure the production HTTPS URL as its web app.
 2. Set `BALE_BOT_TOKEN` in Vercel.
-3. If Bale's current developer panel requires an explicit WebApp SDK script, set the exact documented URL as `NEXT_PUBLIC_BALE_WEBAPP_SCRIPT_URL`. Otherwise leave it empty when the host injects `window.Bale.WebApp`.
-4. Redeploy and test from the real Bale client, not only a desktop browser.
+3. Redeploy and test from the real Bale client, not only a desktop browser. LowBlock loads Bale's official `https://tapi.bale.ai/miniapp.js?3` SDK before the application scripts.
 
-Bale's public Mini App documentation is less complete than Telegram's. This project isolates Bale behind its own adapter and token while validating the Telegram-compatible signed `initData` envelope currently exposed as `window.Bale.WebApp.initData`. Confirm the SDK URL and signing contract shown in the Bale developer panel before production launch; do not weaken or bypass validation if Bale changes that contract.
+Bale exposes signed launch data as `window.Bale.WebApp.initData`. LowBlock validates its HMAC-SHA-256 signature and `auth_date` on the server according to Bale's official Mini App specification.
 
 ## Required production configuration
 

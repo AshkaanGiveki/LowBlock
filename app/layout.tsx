@@ -20,6 +20,5 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "LowBlock | Football Predictions", description: "Predict football scores and compete with LowBlock." },
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const baleScript = process.env.NEXT_PUBLIC_BALE_WEBAPP_SCRIPT_URL;
-  return <html lang="fa" dir="rtl"><body><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/>{baleScript&&<Script src={baleScript} strategy="beforeInteractive"/>}<Providers><DesktopNotice/><Nav/><PageTransition>{children}</PageTransition></Providers></body></html>;
+  return <html lang="fa" dir="rtl"><body><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/><Script src="https://tapi.bale.ai/miniapp.js?3" strategy="beforeInteractive"/><Providers><DesktopNotice/><Nav/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
