@@ -1,14 +1,26 @@
 import Link from "next/link";
 import { ArrowLeft, BarChart3, LockKeyhole, Trophy } from "lucide-react";
-import { LEAGUES } from "@/lib/football/leagues";
 import { getMatches } from "@/lib/football/data";
 import { Brand } from "@/components/Brand";
-import { PredictionCard } from "@/components/PredictionCard";
+import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
+import { LogoLoop } from "@/components/LogoLoop";
 import { T } from "@/components/LanguageProvider";
 
-export default async function Home() { const [match] = await getMatches({ limit: 1 }); return <main className="min-h-screen pb-24 pt-24 md:mr-72 md:pb-8 md:pt-24">
-  <section className="mx-auto max-w-7xl px-5 py-10 md:px-10 md:py-16"><div className="relative overflow-hidden rounded-[38px] border border-white/[.08] bg-[radial-gradient(circle_at_12%_25%,rgba(18,160,105,.32),transparent_28%),linear-gradient(135deg,#111914,#050706)] p-7 md:p-12"><div className="absolute -left-28 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full border border-brand/15"/><div className="relative grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr]"><div><Brand variant="stacked" className="mb-8 w-fit items-start"/><h1 className="max-w-3xl text-4xl font-black leading-[1.2] md:text-7xl"><T fa="تو فقط نتیجه را حدس نمی‌زنی؛" en="You don't just guess the score;"/><br/><span className="text-brand"><T fa="آینده بازی را می‌خوانی." en="you read the future of the match."/></span></h1><p className="mt-6 max-w-xl text-base leading-8 text-[var(--muted)]"><T fa="پلتفرم پیش‌بینی پنج لیگ بزرگ اروپا با مسابقه‌های واقعی، امتیازدهی شفاف و رقابتی که هر هفته جدی‌تر می‌شود." en="Predict Europe's top five leagues with real fixtures, transparent scoring, and a competition that gets sharper every week."/></p><div className="mt-8 flex flex-wrap gap-3"><Link href="/signup" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-6 py-3.5 text-sm font-black text-white"><T fa="ساخت حساب رایگان" en="Create free account"/><ArrowLeft size={17}/></Link><Link href="/app" className="rounded-2xl border border-white/10 bg-white/[.04] px-6 py-3.5 text-sm font-black"><T fa="دیدن مسابقه‌ها" en="Browse fixtures"/></Link></div></div><div>{match?<PredictionCard match={match}/>:<div className="rounded-[30px] border border-dashed border-white/10 p-12 text-center text-[var(--muted)]"><T fa="در انتظار مسابقه رسمی بعدی" en="Waiting for the next official fixture"/></div>}</div></div></div></section>
-  <section className="mx-auto max-w-7xl px-5 pb-20 md:px-10"><div className="mb-5"><span className="text-xs font-black text-brand"><T fa="مسیر رقابت" en="THE COMPETITION"/></span><h2 className="mt-2 text-2xl font-black md:text-4xl"><T fa="پنج لیگ، یک قهرمان" en="Five leagues, one champion"/></h2></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{LEAGUES.map((league,index)=><Link href={`/leagues/${league.code}`} key={league.code} className="group rounded-[24px] border border-white/[.08] bg-[#111116] p-5 transition hover:-translate-y-1 hover:border-brand/45"><span className="text-xs font-black text-brand">0{index+1}</span><h3 className="mt-8 font-black"><T fa={league.faName} en={league.enName}/></h3><p className="mt-2 text-[10px] text-[var(--muted)]"><T fa="داده رسمی فوتبال" en="Official football data"/></p></Link>)}</div></section>
-  <section className="border-t border-white/[.06]"><div className="mx-auto grid max-w-7xl gap-6 px-5 py-10 text-sm text-[var(--muted)] md:grid-cols-3 md:px-10"><Feature icon={<LockKeyhole/>} title={<T fa="امن و شفاف" en="Safe and transparent"/>}/><Feature icon={<Trophy/>} title={<T fa="رقابت واقعی" en="Real competition"/>}/><Feature icon={<BarChart3/>} title={<T fa="رشد قابل اندازه‌گیری" en="Measurable progress"/>}/></div></section>
- </main> }
-function Feature({icon,title}:{icon:React.ReactNode;title:React.ReactNode}){return <div className="flex items-center gap-3"><span className="text-brand">{icon}</span><b className="text-white">{title}</b></div>}
+export default async function Home() {
+  const matches = await getMatches({ limit: 5 });
+  return <main className="min-h-screen pb-24 pt-24 md:mr-72 md:pb-8 md:pt-24">
+    <section className="mx-auto max-w-7xl px-5 py-8 md:px-10 md:py-16">
+      <div className="relative overflow-hidden rounded-[38px] border border-white/[.08] bg-[radial-gradient(circle_at_12%_25%,rgba(18,160,105,.32),transparent_28%),linear-gradient(135deg,#111914,#050706)] p-7 md:p-12">
+        <div className="pointer-events-none absolute -left-28 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full border border-brand/15" />
+        <div className="relative grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr]">
+          <div><Brand variant="stacked" className="mb-8 w-fit items-start" /><h1 className="max-w-3xl text-4xl font-black leading-[1.2] md:text-7xl"><T fa="تو فقط نتیجه را حدس نمی‌زنی؛" en="You don't just guess the score;" /><br /><span className="text-brand"><T fa="آینده بازی را می‌خوانی." en="you read the future of the match." /></span></h1><p className="mt-6 max-w-xl text-base leading-8 text-[var(--muted)]"><T fa="پلتفرم پیش‌بینی پنج لیگ بزرگ اروپا با مسابقه‌های واقعی، امتیازدهی شفاف و رقابتی که هر هفته جدی‌تر می‌شود." en="Predict Europe's top five leagues with real fixtures, transparent scoring, and a competition that gets sharper every week." /></p><div className="mt-8 flex flex-wrap gap-3"><Link href="/signup" className="inline-flex items-center gap-2 rounded-2xl bg-brand px-6 py-3.5 text-sm font-black text-white"><T fa="ساخت حساب رایگان" en="Create free account" /><ArrowLeft size={17} /></Link><Link href="/app" className="rounded-2xl border border-white/10 bg-white/[.04] px-6 py-3.5 text-sm font-black"><T fa="دیدن مسابقه‌ها" en="Browse fixtures" /></Link></div></div>
+          <HomeFixtureSlider matches={matches} />
+        </div>
+      </div>
+    </section>
+    <LogoLoop />
+    <section className="border-t border-white/[.06]"><div className="mx-auto grid max-w-7xl gap-6 px-5 py-10 text-sm text-[var(--muted)] md:grid-cols-3 md:px-10"><Feature icon={<LockKeyhole />} title={<T fa="امن و شفاف" en="Safe and transparent" />} /><Feature icon={<Trophy />} title={<T fa="رقابت واقعی" en="Real competition" />} /><Feature icon={<BarChart3 />} title={<T fa="پیشرفت قابل اندازه‌گیری" en="Measurable progress" />} /></div></section>
+  </main>;
+}
+
+function Feature({ icon, title }: { icon: React.ReactNode; title: React.ReactNode }) { return <div className="flex items-center gap-3"><span className="text-brand">{icon}</span><b className="text-white">{title}</b></div>; }
