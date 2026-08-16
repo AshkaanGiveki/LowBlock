@@ -18,7 +18,7 @@ export function HomeFixtureSlider({ matches }: { matches: MatchRecord[] }) {
   }, [count, predictionOpen]);
   if (!count) return <div className="rounded-[30px] border border-dashed border-white/10 bg-black/20 p-12 text-center text-sm text-white/50"><T fa="در انتظار مسابقه رسمی بعدی" en="Waiting for the next official fixture" /></div>;
   const go = (direction: number) => setIndex((current) => (current + direction + count) % count);
-  return <div className="relative mx-auto w-full max-w-xl">
+  return <div className="relative mx-auto w-full max-w-2xl">
     <AnimatePresence mode="wait" initial={false}>
       <motion.div key={matches[index].providerMatchId} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: .35, ease: [0.22, 1, .36, 1] }}>
         <PredictionCard match={matches[index]} index={index} onDrawerChange={setPredictionOpen} />

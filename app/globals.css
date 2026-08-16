@@ -19,6 +19,9 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 .glow-card > * { z-index:1; }
 @property --glow-angle { syntax:"<angle>"; initial-value:0deg; inherits:false; }
 @keyframes card-glow { to { --glow-angle:360deg; } }
+.logo-loop-track { animation:logo-loop 28s linear infinite; }
+.logo-loop-track:hover { animation-play-state:paused; }
+@keyframes logo-loop { to { transform:translateX(-33.333%); } }
 .focus-ring:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
