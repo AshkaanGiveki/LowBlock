@@ -42,3 +42,5 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid v
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
 @media (min-width:768px) { main[class*="md:mr-72"] { margin-right:0 !important; padding-right:2rem !important; padding-left:2rem !important; padding-top:8rem !important; } }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important; } }
+.glow-card { background-image:radial-gradient(circle at 12% 0%,rgba(42,153,105,.2),transparent 34%),radial-gradient(circle at 95% 100%,rgba(17,79,54,.28),transparent 38%),repeating-linear-gradient(135deg,rgba(255,255,255,.018) 0,rgba(255,255,255,.018) 1px,transparent 1px,transparent 14px),linear-gradient(145deg,#12251b,#08110c 72%) !important; background-size:auto !important; }
+.ltr-arrow { display:none; } html[dir="ltr"] .rtl-arrow { display:none; } html[dir="ltr"] .ltr-arrow { display:inline-flex; }
