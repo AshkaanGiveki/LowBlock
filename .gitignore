@@ -7,6 +7,16 @@ out
 !.env.example
 coverage
 *.log
+*.tsbuildinfo
+
+# Local source artwork; production copies live under public/.
+/LOWBLOCK.png
+/LOWBLOCKtypo.png
+/Ligue-1-Logo.png
+/Serie-A-Logo.png
+/bundesliga-logo-200x200.png
+/laliga.png
+/premier-league.jpg
 
 .vercel
 .env*
