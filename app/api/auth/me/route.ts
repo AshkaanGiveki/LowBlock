@@ -9,8 +9,8 @@ export async function GET() {
   if (!userId || !ObjectId.isValid(userId)) return NextResponse.json({ user: null });
   const db = await getDb();
   const [user, providers] = await Promise.all([
-    db.collection<{ username: string; avatarUrl?: string | null }>("users").findOne({ _id: new ObjectId(userId) }, { projection: { username: 1, avatarUrl: 1 } }),
+    db.collection<{ username: string; avatarUrl?: string | null; passwordHash?: string | null }>("users").findOne({ _id: new ObjectId(userId) }, { projection: { username: 1, avatarUrl: 1, passwordHash: 1 } }),
     connectedProviders(db, userId),
   ]);
-  return NextResponse.json({ user: user ? { username: user.username, avatarUrl: user.avatarUrl ?? null, connectedAccounts: providers } : null });
+  return NextResponse.json({ user: user ? { username: user.username, avatarUrl: user.avatarUrl ?? null, hasPassword: Boolean(user.passwordHash), connectedAccounts: providers } : null });
 }

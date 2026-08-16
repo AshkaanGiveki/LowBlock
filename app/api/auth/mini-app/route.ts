@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { getDb } from "@/lib/db/mongo";
+import { getMongoClient } from "@/lib/db/mongo";
 import { verifyPassword } from "@/lib/auth/password";
 import { normalizeUsername } from "@/lib/auth/username";
 import { createSession, currentUserId, setSessionCookie } from "@/lib/auth/session";
 import { MiniAppAuthError, miniAppToken, verifyMiniAppInitData } from "@/lib/auth/mini-app";
-import { createPlatformUser, ensureIdentityIndexes, findIdentity, linkIdentity } from "@/lib/auth/external-identity";
+import { createPlatformUser, ensureIdentityIndexes, findIdentity, linkIdentity, mergePlatformAccount } from "@/lib/auth/external-identity";
 
 const inputSchema = z.object({
   provider: z.enum(["telegram", "bale"]),
   initData: z.string().min(1).max(16_384),
-  action: z.enum(["authenticate", "create", "linkCredentials"]).default("authenticate"),
+  action: z.enum(["authenticate", "create", "linkCredentials", "mergeCredentials"]).default("authenticate"),
   username: z.string().min(3).max(24).optional(),
   password: z.string().min(8).max(128).optional(),
+  confirmMerge: z.literal(true).optional(),
 });
 
 function maxAgeSeconds() {
@@ -36,7 +37,8 @@ export async function POST(request: Request) {
 
   try {
     const launch = verifyMiniAppInitData(parsed.data.provider, parsed.data.initData, token, { maxAgeSeconds: maxAgeSeconds() });
-    const db = await getDb();
+    const client = await getMongoClient();
+    const db = client.db();
     await ensureIdentityIndexes(db);
     const identity = await findIdentity(db, launch.provider, launch.user.id);
 
@@ -45,13 +47,28 @@ export async function POST(request: Request) {
     let targetUserId = await currentUserId();
     if (targetUserId && !ObjectId.isValid(targetUserId)) targetUserId = null;
 
-    if (parsed.data.action === "linkCredentials") {
+    if (parsed.data.action === "linkCredentials" || parsed.data.action === "mergeCredentials") {
       if (!parsed.data.username || !parsed.data.password) return NextResponse.json({ error: "Username and password are required" }, { status: 400 });
       const user = await db.collection<{ passwordHash?: string | null }>("users").findOne({ normalizedUsername: normalizeUsername(parsed.data.username) });
       if (!user?.passwordHash || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
         return NextResponse.json({ error: "Username or password is incorrect" }, { status: 401 });
       }
       targetUserId = user._id.toHexString();
+    }
+
+    if (parsed.data.action === "mergeCredentials") {
+      if (!parsed.data.confirmMerge || !targetUserId) return NextResponse.json({ error: "Explicit merge confirmation is required" }, { status: 400 });
+      const mongoSession = client.startSession();
+      try {
+        let merged: Awaited<ReturnType<typeof mergePlatformAccount>> | undefined;
+        await mongoSession.withTransaction(async () => {
+          merged = await mergePlatformAccount(db, launch, targetUserId!, mongoSession);
+        });
+        if (!merged?.ok) return NextResponse.json({ error: "These accounts have conflicting messenger connections", code: merged?.reason }, { status: 409 });
+        return sessionResponse(targetUserId);
+      } finally {
+        await mongoSession.endSession();
+      }
     }
 
     if (targetUserId) {

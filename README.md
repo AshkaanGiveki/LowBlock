@@ -29,6 +29,8 @@ On first launch, a Mini App user chooses one of two explicit paths:
 
 Returning users are signed into the canonical LowBlock account automatically. A browser session that opens an unlinked Mini App can also link that verified identity to the already signed-in account. Platform-created accounts can set a password later from Profile if they also want normal website login.
 
+Profile includes a **Connected accounts** control center. It shows Telegram and Bale connection status, opens configured Mini App deep links, disconnects identities only when another sign-in method remains, and provides an explicit duplicate-account merge flow. Merging requires both a currently signed platform launch and the destination LowBlock username/password. Predictions and all messenger identities move in one MongoDB transaction; if both accounts predicted the same match, the destination account's prediction is retained.
+
 ## Telegram Mini App setup
 
 1. Create or select a bot in Telegram's `@BotFather`.
@@ -56,6 +58,8 @@ NEXT_PUBLIC_APP_URL=https://your-domain.example
 TELEGRAM_BOT_TOKEN=...
 BALE_BOT_TOKEN=...
 MINI_APP_AUTH_MAX_AGE_SECONDS=600
+NEXT_PUBLIC_TELEGRAM_MINI_APP_URL=https://t.me/your_bot/your_app
+NEXT_PUBLIC_BALE_MINI_APP_URL=...
 ```
 
 Run `ensureIndexes()` during season sync/deployment initialization so the identity and session uniqueness constraints exist. Configure Vercel Preview with test bot tokens and Production with production bot tokens; never expose either token through a `NEXT_PUBLIC_` variable.
@@ -65,5 +69,5 @@ Run `ensureIndexes()` during season sync/deployment initialization so the identi
 - Both Mini Apps must use HTTPS.
 - Restrict bot/web-app domains in each platform's bot settings.
 - Keep the validation replay window short (the default is 10 minutes).
-- Test create, existing-account link, returning sign-in, wrong password, tampered payload, and expired payload on both platforms.
+- Test create, existing-account link, returning sign-in, duplicate-account merge, safe disconnection, wrong password, tampered payload, and expired payload on both platforms.
 - Publish this feature to `develop` first. Merge `develop` into `main` only after real-client acceptance testing.
