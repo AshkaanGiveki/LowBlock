@@ -5,11 +5,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MatchRecord } from "@/lib/football/data";
 import { PredictionCard } from "@/components/PredictionCard";
-import { T } from "@/components/LanguageProvider";
+import { T, useLanguage } from "@/components/LanguageProvider";
 
 export function HomeFixtureSlider({ matches }: { matches: MatchRecord[] }) {
   const [index, setIndex] = useState(0);
   const [predictionOpen, setPredictionOpen] = useState(false);
+  const { language } = useLanguage();
   const count = matches.length;
   useEffect(() => {
     if (count < 2 || predictionOpen) return;
@@ -24,6 +25,6 @@ export function HomeFixtureSlider({ matches }: { matches: MatchRecord[] }) {
         <PredictionCard match={matches[index]} initial={{ homeGoals: 0, awayGoals: 0 }} index={index} onDrawerChange={setPredictionOpen} />
       </motion.div>
     </AnimatePresence>
-    {count > 1 && <div className="mt-1 flex items-center justify-between px-2"><button type="button" onClick={() => go(1)} aria-label="Previous fixture" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[.06] text-white transition hover:border-brand/60 hover:text-brand"><ChevronRight size={16} /></button><div className="flex items-center gap-1.5">{matches.map((match, dot) => <button key={match.providerMatchId} type="button" aria-label={`Fixture ${dot + 1}`} onClick={() => setIndex(dot)} className={`h-1.5 rounded-full transition-all ${dot === index ? "w-7 bg-brand" : "w-1.5 bg-white/25"}`} />)}</div><button type="button" onClick={() => go(-1)} aria-label="Next fixture" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[.06] text-white transition hover:border-brand/60 hover:text-brand"><ChevronLeft size={16} /></button></div>}
+    {count > 1 && <div className="mt-1 flex items-center justify-between px-2"><button type="button" onClick={() => go(language === "en" ? -1 : 1)} aria-label="Previous fixture" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[.06] text-white transition hover:border-brand/60 hover:text-brand">{language === "en" ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}</button><div className="flex items-center gap-1.5">{matches.map((match, dot) => <button key={match.providerMatchId} type="button" aria-label={`Fixture ${dot + 1}`} onClick={() => setIndex(dot)} className={`h-1.5 rounded-full transition-all ${dot === index ? "w-7 bg-brand" : "w-1.5 bg-white/25"}`} />)}</div><button type="button" onClick={() => go(language === "en" ? 1 : -1)} aria-label="Next fixture" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[.06] text-white transition hover:border-brand/60 hover:text-brand">{language === "en" ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button></div>}
   </div>;
 }
