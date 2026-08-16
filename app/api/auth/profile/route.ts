@@ -9,7 +9,8 @@ export async function PUT(request: Request) {
   const userId = await currentUserId();
   if (!userId || !ObjectId.isValid(userId)) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const input = await request.json().catch(() => null) as { username?: unknown; password?: unknown; avatarData?: unknown } | null;
-  const username = typeof input?.username === "string" ? input.username.trim() : "";
+  const existing = await getDb().then((db) => db.collection<{ username: string; avatarUrl?: string | null }>("users").findOne({ _id: new ObjectId(userId) }, { projection: { username: 1, avatarUrl: 1 } }));
+  const username = typeof input?.username === "string" && input.username.trim() ? input.username.trim() : existing?.username ?? "";
   const password = typeof input?.password === "string" ? input.password : "";
   const avatarUrl = typeof input?.avatarData === "string" ? input.avatarData.trim() : "";
   if (!isValidUsername(username)) return NextResponse.json({ error: "Choose a valid username" }, { status: 400 });
