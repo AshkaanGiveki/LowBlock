@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/mongo";
+import { unstable_cache } from "next/cache";
 
 export type MatchRecord = {
   _id?: unknown;
@@ -16,19 +17,23 @@ export type MatchRecord = {
   rawApiResponse?: unknown;
 };
 
-export async function getMatches(filters: { leagueCode?: string; matchday?: number; limit?: number } = {}) {
+const getCachedMatches = unstable_cache(async (leagueCode: string, matchday: number | null, limit: number, from: number, to: number) => {
   const db = await getDb();
-  const now = new Date();
   const query = {
     provider: "football-api" as const,
     // Only expose records written from a verified Football API response.
     rawApiResponse: { $exists: true },
     status: { $nin: ["POSTPONED"] },
-    kickoffAt: { $gte: new Date(now.getTime() - 2 * 60 * 60 * 1000), $lte: new Date(now.getTime() + 14 * 864e5) },
-    ...(filters.leagueCode ? { leagueCode: filters.leagueCode } : {}),
-    ...(filters.matchday !== undefined ? { matchday: filters.matchday } : {}),
+    kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
+    ...(leagueCode ? { leagueCode } : {}),
+    ...(matchday !== null ? { matchday } : {}),
   };
-  return db.collection<MatchRecord>("matches").find(query).sort({ kickoffAt: 1 }).limit(filters.limit ?? 50).toArray();
+  return db.collection<MatchRecord>("matches").find(query).sort({ kickoffAt: 1 }).limit(limit).toArray();
+}, ["lowblock-matches"], { revalidate: 60, tags: ["matches"] });
+
+export async function getMatches(filters: { leagueCode?: string; matchday?: number; limit?: number } = {}) {
+  const now = Date.now();
+  return getCachedMatches(filters.leagueCode ?? "", filters.matchday ?? null, filters.limit ?? 50, now - 2 * 60 * 60 * 1000, now + 14 * 864e5);
 }
 
 export async function getPredictions(matchIds: string[], userId = "guest") {
