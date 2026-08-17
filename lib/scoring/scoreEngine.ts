@@ -1,0 +1,13 @@
+import { getDb } from "@/lib/db/mongo";
+import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
+type Match = { providerMatchId:string; leagueCode:string; seasonStartYear:number; matchday:number; status:string; homeGoals:number|null; awayGoals:number|null };
+type Prediction = { userId:string; matchId:string; homeGoals:number; awayGoals:number };
+export async function runScoreEngine() {
+ const db=await getDb(); const matches=await db.collection<Match>("matches").find({provider:"football-api",status:"FINISHED",homeGoals:{$ne:null},awayGoals:{$ne:null}}).toArray(); if(!matches.length)return {matches:0,scores:0,leaderboards:0};
+ const predictions=await db.collection<Prediction>("predictions").find({matchId:{$in:matches.map(m=>m.providerMatchId)},userId:{$ne:"guest"}}).toArray(); const byMatch=new Map(matches.map(m=>[m.providerMatchId,m])); const now=new Date();
+ const scoreOps=predictions.map(p=>{const m=byMatch.get(p.matchId)!; const s=calculatePredictionScore(p.homeGoals,p.awayGoals,m.homeGoals,m.awayGoals); return {updateOne:{filter:{userId:p.userId,matchId:p.matchId},update:{$set:{userId:p.userId,matchId:p.matchId,leagueCode:m.leagueCode,seasonStartYear:m.seasonStartYear,matchday:m.matchday,points:s.points,category:s.category,predictedHomeGoals:p.homeGoals,predictedAwayGoals:p.awayGoals,actualHomeGoals:m.homeGoals,actualAwayGoals:m.awayGoals,updatedAt:now},$setOnInsert:{createdAt:now}},upsert:true}}});
+ if(scoreOps.length)await db.collection("predictionScores").bulkWrite(scoreOps,{ordered:false});
+ const aggregates=new Map<string,{userId:string;scope:string;points:number;predictions:number;exact:number}>();
+ for(const p of predictions){const m=byMatch.get(p.matchId)!;const s=calculatePredictionScore(p.homeGoals,p.awayGoals,m.homeGoals,m.awayGoals);for(const scope of [`LEAGUE:${m.leagueCode}:${m.seasonStartYear}`,`ROUND:${m.leagueCode}:${m.seasonStartYear}:${m.matchday}`,`SEASON:${m.seasonStartYear}`,"GLOBAL"]){const key=`${p.userId}:${scope}`;const row=aggregates.get(key)??{userId:p.userId,scope,points:0,predictions:0,exact:0};row.points+=s.points;row.predictions++;row.exact+=s.category==="EXACT_SCORE"?1:0;aggregates.set(key,row);}}
+ const statOps=[...aggregates.values()].map(row=>({updateOne:{filter:{userId:row.userId,scope:row.scope},update:{$set:{...row,totalPoints:row.points,predictionCount:row.predictions,exactScores:row.exact,updatedAt:now}},upsert:true}})); if(statOps.length)await db.collection("leaderboardStats").bulkWrite(statOps,{ordered:false}); return {matches:matches.length,scores:scoreOps.length,leaderboards:aggregates.size};
+}
