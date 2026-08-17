@@ -5,6 +5,7 @@ import { Nav } from "@/components/Nav";
 import { PageTransition } from "@/components/PageTransition";
 import { DesktopNotice } from "@/components/DesktopNotice";
 import Script from "next/script";
+import { MiniAppBridge } from "@/components/MiniAppBridge";
 
 export const metadata: Metadata = {
   title: { default: "LowBlock | Football Predictions", template: "%s | LowBlock" },
@@ -20,5 +21,5 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "LowBlock | Football Predictions", description: "Predict football scores and compete with LowBlock." },
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="fa" dir="rtl"><body><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/><Script src="https://tapi.bale.ai/miniapp.js?3" strategy="beforeInteractive"/><Providers><DesktopNotice/><Nav/><PageTransition>{children}</PageTransition></Providers></body></html>;
+  return <html lang="fa" dir="rtl"><body><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/><Script src="https://tapi.bale.ai/miniapp.js?3" strategy="beforeInteractive"/><Providers><DesktopNotice/><Nav/><MiniAppBridge/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
