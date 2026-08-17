@@ -1,0 +1,3 @@
+"use client";
+import { useEffect } from "react";
+export default function Error({error,reset}:{error:Error&{digest?:string};reset:()=>void}){useEffect(()=>{console.error(error)},[error]);return <main className="grid min-h-screen place-items-center px-6 pb-24 pt-24"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111713] p-8 text-center"><h1 className="text-2xl font-black">Something went wrong</h1><p className="mt-3 text-sm text-[var(--muted)]">Please try loading this page again.</p><button onClick={reset} className="mt-6 rounded-xl bg-brand px-5 py-3 text-sm font-black">Try again</button></section></main>}
