@@ -6,3 +6,7 @@ export function readableFa(value: string) {
   const bytes = Uint8Array.from([...value].map((char) => windows1252[char.charCodeAt(0)] ?? char.charCodeAt(0)));
   try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { return value; }
 }
+
+export function formatNumber(value: number, language: "fa" | "en", options?: Intl.NumberFormatOptions) {
+  return new Intl.NumberFormat(language === "fa" ? "fa-IR" : "en-US", options).format(value);
+}
