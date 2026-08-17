@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Nav } from "@/components/Nav";
@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   openGraph: { type: "website", siteName: "LowBlock", title: "LowBlock | Football Predictions", description: "Predict scores, track fixtures, and compete on the LowBlock leaderboard. پیش‌بینی فوتبال و رقابت در جدول امتیازات." },
   twitter: { card: "summary_large_image", title: "LowBlock | Football Predictions", description: "Predict football scores and compete with LowBlock." },
 };
+export const viewport: Viewport = { themeColor: "#20b879" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return <html lang="fa" dir="rtl"><body><Providers><DesktopNotice/><Nav/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
