@@ -4,6 +4,7 @@ import { Providers } from "@/components/Providers";
 import { Nav } from "@/components/Nav";
 import { PageTransition } from "@/components/PageTransition";
 import { DesktopNotice } from "@/components/DesktopNotice";
+import { SwipeNavigation } from "@/components/SwipeNavigation";
 
 export const metadata: Metadata = {
   title: { default: "LowBlock | Football Predictions", template: "%s | LowBlock" },
@@ -19,5 +20,5 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "LowBlock | Football Predictions", description: "Predict football scores and compete with LowBlock." },
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="fa" dir="rtl"><body><Providers><DesktopNotice/><Nav/><PageTransition>{children}</PageTransition></Providers></body></html>;
+  return <html lang="fa" dir="rtl"><body><Providers><DesktopNotice/><Nav/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
