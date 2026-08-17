@@ -17,6 +17,43 @@ LowBlock is a bilingual (English / فارسی) football score-prediction platfor
   <img src="/public/lowblock.png" alt="LowBlock mark" width="96" />
 </p>
 
+## See LowBlock in action
+
+The interface is designed around a calm, focused matchday flow: join the competition, discover a league, lock in a prediction, and return after kick-off for transparent analytics.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="Screenshot/1.PNG" alt="LowBlock account creation screen" />
+      <br />
+      <strong>01 · Start competing</strong><br />
+      <sub>Create an account in seconds and enter the competition with a username and password.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="Screenshot/2.PNG" alt="LowBlock home screen with league cards" />
+      <br />
+      <strong>02 · Discover leagues</strong><br />
+      <sub>Explore the major European leagues and move from the home feed into the competition that matters to you.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="Screenshot/3.PNG" alt="LowBlock match prediction screen" />
+      <br />
+      <strong>03 · Make your pick</strong><br />
+      <sub>Review the fixture, team crests, kick-off time, and your saved score prediction in one clear match card.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="Screenshot/4.PNG" alt="LowBlock match analytics modal" />
+      <br />
+      <strong>04 · Read the match</strong><br />
+      <sub>After kick-off, inspect prediction distribution, average points, the final result, and eligible player predictions.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Mobile-first screens · bilingual-ready interface · analytics become available after the match starts</sub></p>
+
 ## What LowBlock feels like
 
 | Before kick-off | During the round | After the whistle |
