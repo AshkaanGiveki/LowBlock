@@ -2,17 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Thin.woff2') format('woff2'); font-weight:100; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-UltraLight.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Regular.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-DemiBold.woff2') format('woff2'); font-weight:600; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Bold.woff2') format('woff2'); font-weight:700; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-ExtraBold.woff2') format('woff2'); font-weight:800; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Black.woff2') format('woff2'); font-weight:900; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-ExtraBlack.woff2') format('woff2'); font-weight:950; font-style:normal; font-display:swap; }
-@font-face { font-family:IRANSansXFaNum; src:url('/assets/fonts/IRANSansXFaNum-Heavy.woff2') format('woff2'); font-weight:1000; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Thin.woff2') format('woff2'); font-weight:100; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-UltraLight.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Regular.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-DemiBold.woff2') format('woff2'); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Bold.woff2') format('woff2'); font-weight:700; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-ExtraBold.woff2') format('woff2'); font-weight:800; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Black.woff2') format('woff2'); font-weight:900; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-ExtraBlack.woff2') format('woff2'); font-weight:950; font-style:normal; font-display:swap; }
+@font-face { font-family:IranSans; src:url('/assets/fonts/IRANSansXFaNum-Heavy.woff2') format('woff2'); font-weight:1000; font-style:normal; font-display:swap; }
 
 :root { --background:#080b0a; --foreground:#f5f8f6; --surface:#111614; --surface-raised:#181f1c; --surface-hover:#212a25; --border:#2a3530; --border-strong:#44534b; --muted:#98a59e; --brand:#20b879; --brand-hover:#34cc8d; --brand-subtle:rgba(32,184,121,.14); --danger:#ff627a; }
 * { box-sizing:border-box; scrollbar-width:none; }
@@ -22,8 +22,8 @@
 .scrollbar-thin::-webkit-scrollbar-track { background:transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background:var(--brand); border-radius:5px; }
 html { width:100%; overflow-x:hidden; background:var(--background); }
-body { margin:0; min-width:0; width:100%; overflow-x:hidden; background:radial-gradient(circle at 82% -12%,rgba(32,184,121,.16),transparent 32%), radial-gradient(circle at 10% 45%,rgba(18,89,60,.11),transparent 30%), var(--background); color:var(--foreground); font-family:IRANSansXFaNum, Tahoma, sans-serif; text-rendering:optimizeLegibility; }
-html[dir="rtl"] body { font-family:IRANSansXFaNum, Tahoma, sans-serif; }
+body { margin:0; min-width:0; width:100%; overflow-x:hidden; background:radial-gradient(circle at 82% -12%,rgba(32,184,121,.16),transparent 32%), radial-gradient(circle at 10% 45%,rgba(18,89,60,.11),transparent 30%), var(--background); color:var(--foreground); font-family:IranSans, Tahoma, sans-serif; text-rendering:optimizeLegibility; }
+html[dir="rtl"] body { font-family:IranSans, Tahoma, sans-serif; }
 a { color:inherit; text-decoration:none; }
 button,input { font:inherit; }
 button { cursor:pointer; } button:disabled { cursor:not-allowed; }
