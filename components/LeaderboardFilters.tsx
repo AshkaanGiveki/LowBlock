@@ -1,0 +1,14 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "motion/react";
+import { Globe2 } from "lucide-react";
+import { LEAGUES } from "@/lib/football/leagues";
+import { useLanguage, T } from "@/components/LanguageProvider";
+
+export function LeaderboardFilters({ lifetime, leagueCode, onNavigate }: { lifetime: boolean; leagueCode?: string; onNavigate?: () => void }) {
+  const { t } = useLanguage();
+  const href = (scope: string, league?: string) => `/lowblock?scope=${scope}${league ? `&league=${league}` : ""}`;
+  const go = (event: React.MouseEvent<HTMLAnchorElement>) => { onNavigate?.(); if (event.defaultPrevented) event.preventDefault(); };
+  return <section className="mt-6 space-y-3 rounded-[1.75rem] border border-white/[.08] bg-[#101512] p-3 shadow-[0_16px_50px_rgba(0,0,0,.16)] md:p-4"><div className="flex items-center justify-between px-1"><p className="text-[10px] font-black tracking-[.18em] text-[var(--muted)]">{t("بازه امتیازها", "TIME RANGE")}</p><span className="text-xs text-brand">{lifetime ? t("تمام دوران", "Lifetime") : t("فصل جاری", "Current season")}</span></div><div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/[.07] bg-black/20 p-1"><Link onClick={go} href={href("season", leagueCode)} className={`relative rounded-xl px-4 py-3 text-center text-sm font-black ${!lifetime ? "text-white" : "text-[var(--muted)]"}`}>{!lifetime && <motion.span layoutId="leaderboard-scope" className="absolute inset-0 rounded-xl bg-brand"/>}<span className="relative z-10"><T fa="فصل" en="Season"/></span></Link><Link onClick={go} href={href("lifetime", leagueCode)} className={`relative rounded-xl px-4 py-3 text-center text-sm font-black ${lifetime ? "text-white" : "text-[var(--muted)]"}`}>{lifetime && <motion.span layoutId="leaderboard-scope" className="absolute inset-0 rounded-xl bg-brand"/>}<span className="relative z-10"><T fa="تمام دوران" en="Lifetime"/></span></Link></div><div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]"><Link onClick={go} href={href(lifetime ? "lifetime" : "season")} aria-label={t("همه لیگ‌ها", "All leagues")} className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl border ${!leagueCode ? "border-brand bg-brand/15" : "border-white/10 bg-white/[.03]"}`}><Globe2 size={19} className={!leagueCode ? "text-brand" : "text-[var(--muted)]"}/></Link>{LEAGUES.map(league => <Link onClick={go} key={league.code} href={href(lifetime ? "lifetime" : "season", league.code)} aria-label={league.enName} aria-pressed={leagueCode === league.code} className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl border p-2 ${leagueCode === league.code ? "border-brand bg-brand/15" : "border-white/10 bg-white/[.03]"}`}><img src={league.logo} alt="" className="league-logo h-full w-full object-contain"/></Link>)}</div></section>;
+}

@@ -1,0 +1,23 @@
+import { currentUserId } from "@/lib/auth/session";
+import { getDb } from "@/lib/db/mongo";
+import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { LeaderboardExplorer } from "@/components/LeaderboardExplorer";
+import { T } from "@/components/LanguageProvider";
+import { LEAGUES } from "@/lib/football/leagues";
+
+export const dynamic = "force-dynamic";
+
+export default async function LowBlockPage({ searchParams }: { searchParams: Promise<{ scope?: string; league?: string }> }) {
+  const query = await searchParams;
+  const lifetime = query.scope === "lifetime";
+  const league = LEAGUES.find(item => item.code === query.league);
+  const db = await getDb();
+  const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
+  const rows = await getCanonicalLeaderboard(db, { seasonStartYear: lifetime ? null : year, leagueCode: league?.code ?? null }, 100);
+  const usersCount = await db.collection("users").countDocuments();
+  const picksCount = await db.collection("predictions").countDocuments({ userId: { $ne: "guest" } });
+  const roundsCount = await db.collection("rounds").countDocuments({ status: "FINAL" });
+  return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-6xl"><section className="relative overflow-hidden rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-7 md:p-10"><p className="text-xs font-black tracking-[.2em] text-brand">LOWBLOCK</p><h1 className="mt-2 text-4xl font-black"><T fa="رقابت جهانی" en="The universal competition"/></h1><p className="mt-3 text-sm text-white/60"><T fa={lifetime ? "از آغاز تا امروز" : `فصل ${year}/${String(year + 1).slice(-2)}`} en={lifetime ? "From the beginning" : `Season ${year}/${String(year + 1).slice(-2)}`}/></p><div className="mt-7 grid grid-cols-3 gap-3 text-center"><Metric value={usersCount} fa="کاربر" en="Users"/><Metric value={picksCount} fa="پیش‌بینی" en="Predictions"/><Metric value={roundsCount} fa="دور نهایی" en="Final rounds"/></div></section><LeaderboardExplorer initialRows={rows} seasonStartYear={year} leagueCode={league?.code} lifetime={lifetime} me={await currentUserId()}/></div></main>;
+}
+
+function Metric({ value, fa, en }: { value: number; fa: string; en: string }) { return <div className="rounded-2xl bg-black/20 p-3"><b className="block text-2xl">{value}</b><small className="text-[var(--muted)]"><T fa={fa} en={en}/></small></div>; }
