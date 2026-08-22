@@ -9,7 +9,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 
-export function MatchAnalytics({ matchId, clubId, onClose }: { matchId: string; clubId?: string; onClose: () => void }) {
+export function MatchAnalytics({ matchId, onClose }: { matchId: string; onClose: () => void }) {
   const { language, t } = useLanguage();
   const [data, setData] = useState<any>(null);
   const [visible, setVisible] = useState(true);
@@ -17,7 +17,7 @@ export function MatchAnalytics({ matchId, clubId, onClose }: { matchId: string; 
   const touchStartY = useRef<number | null>(null);
   const number = (value: number) => formatNumber(value, language, { maximumFractionDigits: 1 });
   const score = (home: number | null, away: number | null) => home === null || away === null ? "—" : `${number(home)} - ${number(away)}`;
-  useEffect(() => { const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : ""; fetch(`/api/matches/${matchId}/analytics${query}`).then((response) => response.ok ? response.json() : null).then(setData).catch(() => setData(null)); }, [matchId, clubId]);
+  useEffect(() => { fetch(`/api/matches/${matchId}/analytics`).then((response) => response.ok ? response.json() : null).then(setData).catch(() => setData(null)); }, [matchId]);
   const close = () => { setVisible(false); window.setTimeout(onClose, 280); };
   const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => { touchStartY.current = event.touches[0]?.clientY ?? null; };
   const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => { const start = touchStartY.current; touchStartY.current = null; if (start === null || !drawerRef.current || drawerRef.current.scrollTop > 2) return; const distance = (event.changedTouches[0]?.clientY ?? start) - start; if (distance > 110) close(); };
