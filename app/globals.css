@@ -45,6 +45,10 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 html[dir="rtl"] .logo-loop-track { animation-name:logo-loop-rtl; }
 .logo-loop-track img { opacity:.72; }
 .league-logo { filter:brightness(0) invert(1) !important; }
+.club-crest-glow { position:relative; isolation:isolate; box-shadow:0 0 14px rgba(32,184,121,.55),0 0 28px rgba(32,184,121,.18); }
+.club-crest-glow::before { content:""; position:absolute; inset:0; z-index:-1; border-radius:inherit; background:conic-gradient(from 0deg,#20b879,#b8ffda,#20b879,#0d5c3d,#20b879); animation:club-crest-glow 3.4s linear infinite; }
+.club-crest-glow > span { position:relative; z-index:1; }
+@keyframes club-crest-glow { to { transform:rotate(360deg); } }
 
 /* Club overview leaderboard rows are informational; they are not links. */
 main .group.flex.items-center.gap-3.rounded-2xl.border.px-3.py-3 > svg { display: none; }
