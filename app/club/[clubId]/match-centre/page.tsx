@@ -1,0 +1,8 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ObjectId } from "mongodb";
+import { getDb } from "@/lib/db/mongo";
+import { LEAGUES } from "@/lib/football/leagues";
+export const dynamic = "force-dynamic";
+export default async function ClubMatchCentre({ params }: { params: Promise<{ clubId: string }> }) { const { clubId } = await params; if (!ObjectId.isValid(clubId)) notFound(); const db = await getDb(); const club = await db.collection<any>("clubs").findOne({ _id: new ObjectId(clubId) }); if (!club) notFound(); const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear()); return <main className="min-h-screen px-5 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-4xl"><section className="rounded-3xl border border-white/10 bg-[linear-gradient(145deg,#14251c,#0a0f0c)] p-7"><p className="text-xs font-black tracking-[.2em] text-brand">MATCH CENTRE</p><h1 className="mt-2 text-4xl font-black">{club.name}</h1><p className="mt-2 text-sm text-[var(--muted)]">{year}/{String(year + 1).slice(-2)}</p></section><div className="mt-5 grid gap-3 sm:grid-cols-2">{LEAGUES.map(league => <Link key={league.code} href={`/club/${clubId}/league/${league.code}`} className="rounded-2xl border border-white/10 bg-[#101512] p-5"><img src={league.logo} alt="" className="h-10 w-10 rounded-lg object-cover"/><b className="mt-4 block text-xl">{league.enName}</b><span className="mt-1 block text-xs text-[var(--muted)]">All Club leagues are enabled automatically</span></Link>)}</div></div></main>; }
+

@@ -11,6 +11,7 @@
     "sync:season": "tsx scripts/sync-season.ts",
     "seed": "tsx scripts/sync-season.ts",
     "data:check": "tsx scripts/data-check.ts"
+    ,"migrate:foundation": "tsx scripts/migrate-foundation.ts"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.5.0",
