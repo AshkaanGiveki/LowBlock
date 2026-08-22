@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { getDb, withMongoTransaction } from "../lib/db/mongo";
+import { closeMongo, getDb, withMongoTransaction } from "../lib/db/mongo";
 
 const CLUB_NAME = "ACMPersian";
 
@@ -43,4 +43,4 @@ async function main() {
   console.log(JSON.stringify({ ...result, club: finalClub?.name, state: finalClub?.state, activeMembers }, null, 2));
 }
 
-main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exit(1); });
+main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }).finally(() => closeMongo());
