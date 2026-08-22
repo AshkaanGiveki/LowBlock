@@ -12,7 +12,8 @@ export async function GET() {
   const db = await getDb();
   const membership = await currentMembership(db, userId);
   const club = membership ? await db.collection("clubs").findOne({ _id: new (await import("mongodb")).ObjectId(membership.clubId) }) : null;
-  return NextResponse.json({ club, membership });
+  const members = membership ? await db.collection("clubMemberships").countDocuments({ clubId: membership.clubId, leftAt: null }) : 0;
+  return NextResponse.json({ club, membership, members });
 }
 
 export async function POST(req: Request) {
@@ -23,4 +24,3 @@ export async function POST(req: Request) {
   try { return NextResponse.json({ club: await createClub(await getDb(), userId, { ...parsed.data, imageUrl: parsed.data.imageUrl ?? null }) }, { status: 201 }); }
   catch (error) { const code = error instanceof Error ? error.message : "CLUB_CREATE_FAILED"; return NextResponse.json({ error: code }, { status: code === "USER_ALREADY_OWNS_CLUB" || code === "USER_ALREADY_IN_CLUB" ? 409 : 400 }); }
 }
-

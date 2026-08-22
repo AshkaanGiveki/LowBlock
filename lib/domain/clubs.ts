@@ -27,3 +27,13 @@ export async function refreshClubState(db: Db, clubId: string) {
   return members;
 }
 
+export async function transferOwnership(db: Db, clubId: string, currentOwnerId: string, nextOwnerId: string) {
+  const club = await db.collection<ClubRecord>("clubs").findOne({ _id: new ObjectId(clubId), ownerId: currentOwnerId });
+  if (!club) throw new Error("OWNER_PERMISSION_REQUIRED");
+  const member = await db.collection<ClubMembershipRecord>("clubMemberships").findOne({ clubId, userId: nextOwnerId, leftAt: null });
+  if (!member) throw new Error("NEW_OWNER_MUST_BE_MEMBER");
+  const now = new Date();
+  await db.collection("clubs").updateOne({ _id: new ObjectId(clubId), ownerId: currentOwnerId }, { $set: { ownerId: nextOwnerId, updatedAt: now } });
+  await db.collection("clubMemberships").updateOne({ _id: member._id }, { $set: { role: "OWNER" } });
+  await db.collection("clubMemberships").updateOne({ clubId, userId: currentOwnerId, leftAt: null }, { $set: { role: "MEMBER" } });
+}

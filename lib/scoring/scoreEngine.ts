@@ -5,6 +5,16 @@ import { createLockSnapshot, isPredictionLocked, SCORING_VERSION } from "@/lib/d
 type Match = { _id?: unknown; providerMatchId: string; leagueCode: string; seasonStartYear: number; matchday: number; roundId?: string | null; status: string; kickoffAt: Date; homeGoals: number | null; awayGoals: number | null };
 type Prediction = { _id?: unknown; userId: string; matchId: string; homeGoals: number; awayGoals: number };
 
+async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
+  const rounds = await db.collection<any>("rounds").find({ status: "FINAL" }).toArray();
+  for (const round of rounds) {
+    const rows = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear: Number(round.seasonId), matchday: round.number } }, { $group: { _id: "$userId", points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } }, { $sort: { points: -1, exact: -1, predictions: -1, _id: 1 } }, { $limit: 1 }]).toArray();
+    await db.collection("roundWinners").deleteMany({ roundId: round.id });
+    if (rows[0]) await db.collection("roundWinners").insertOne({ roundId: round.id, userId: String(rows[0]._id), points: Number(rows[0].points ?? 0), exact: Number(rows[0].exact ?? 0), predictions: Number(rows[0].predictions ?? 0), createdAt: new Date() });
+  }
+  return rounds.length;
+}
+
 /**
  * The only write path for prediction scores. It is safe to run repeatedly:
  * each score is replaced for the same prediction/match and stats are rebuilt
@@ -40,6 +50,6 @@ export async function runScoreEngine() {
   }
   const statOps = [...aggregates.values()].map(row => ({ updateOne: { filter: { userId: row.userId, scope: row.scope }, update: { $set: { ...row, totalPoints: row.points, predictionCount: row.predictions, exactScores: row.exact, updatedAt: now } }, upsert: true } }));
   if (statOps.length) await db.collection("leaderboardStats").bulkWrite(statOps, { ordered: false });
-  return { matches: matches.length, scores: scoreOps.length, leaderboards: aggregates.size };
+  const roundWinners = await rebuildRoundWinners(db);
+  return { matches: matches.length, scores: scoreOps.length, leaderboards: aggregates.size, roundWinners };
 }
-
