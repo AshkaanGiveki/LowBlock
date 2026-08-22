@@ -7,6 +7,14 @@ export async function currentMembership(db: Db, userId: string) {
   return db.collection<ClubMembershipRecord>("clubMemberships").findOne({ userId, leftAt: null }, { sort: { joinedAt: -1 } });
 }
 
+export async function requireClubMember(db: Db, clubId: string, userId: string) {
+  const club = await db.collection<ClubRecord>("clubs").findOne({ _id: new ObjectId(clubId) });
+  if (!club) throw new Error("CLUB_NOT_FOUND");
+  const membership = await currentMembership(db, userId);
+  if (!membership || membership.clubId !== clubId) throw new Error("CLUB_MEMBERSHIP_REQUIRED");
+  return { club, membership };
+}
+
 export async function ownedClub(db: Db, userId: string) {
   return db.collection<ClubRecord>("clubs").findOne({ ownerId: userId });
 }
