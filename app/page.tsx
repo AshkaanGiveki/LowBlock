@@ -11,7 +11,7 @@ import { T } from "@/components/LanguageProvider";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const userId = await currentUserId(); const matches = await getMatches({ limit: 5 }); const predictions = await getPredictions(matches.map((match) => match.providerMatchId), userId ?? "guest");
+  const userId = await currentUserId(); const fetchedMatches = await getMatches({ limit: 20 }); const matches = fetchedMatches.filter((match) => match.status === "SCHEDULED" && new Date(match.kickoffAt).getTime() > Date.now()).slice(0, 5); const predictions = await getPredictions(matches.map((match) => match.providerMatchId), userId ?? "guest");
   let username = ""; let rank: number | string = "—"; let points = 0; let exact = 0; let club: any = null;
   if (userId) { const db = await getDb(); const user = await db.collection<any>("users").findOne({ _id: new ObjectId(userId) }, { projection: { username: 1 } }); username = user?.username ?? ""; const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear()); const mine = (await getCanonicalLeaderboard(db, { seasonStartYear: year }, 1000)).find((row) => row.userId === userId); rank = mine?.rank ?? "—"; points = mine?.points ?? 0; exact = mine?.exact ?? 0; const membership = await db.collection<any>("clubMemberships").findOne({ userId, leftAt: null }); club = membership ? await db.collection<any>("clubs").findOne({ _id: new ObjectId(membership.clubId) }, { projection: { name: 1 } }) : null; }
   return <main className="min-h-screen pb-24 pt-20"><div className="mx-auto max-w-7xl px-4 md:px-8">
