@@ -25,6 +25,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange }: Pr
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { const stopScoreControlBubble = (event: Event) => { const target = event.target as HTMLElement | null; if (target?.closest("button[aria-label='Increase score'],button[aria-label='Decrease score']")) event.stopPropagation(); }; document.addEventListener("pointerdown", stopScoreControlBubble, true); document.addEventListener("click", stopScoreControlBubble, true); return () => { document.removeEventListener("pointerdown", stopScoreControlBubble, true); document.removeEventListener("click", stopScoreControlBubble, true); }; }, []);
   const kickoff = new Date(match.kickoffAt).getTime();
   const hasResult = match.homeGoals != null && match.awayGoals != null;
   const finished = match.status === "FINISHED" || (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED");
