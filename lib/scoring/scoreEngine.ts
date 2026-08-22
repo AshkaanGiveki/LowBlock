@@ -8,9 +8,15 @@ type Prediction = { _id?: unknown; userId: string; matchId: string; homeGoals: n
 async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
   const rounds = await db.collection<any>("rounds").find({ status: "FINAL" }).toArray();
   for (const round of rounds) {
-    const rows = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear: Number(round.seasonId), matchday: round.number } }, { $group: { _id: "$userId", points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } }, { $sort: { points: -1, exact: -1, predictions: -1, _id: 1 } }, { $limit: 1 }]).toArray();
+    const rows = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear: Number(round.seasonId), matchday: round.number } }, { $group: { _id: { userId: "$userId", clubId: "$clubIdAtLock" }, points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } }, { $sort: { points: -1, exact: -1, predictions: -1, "_id.userId": 1 } }]).toArray();
     await db.collection("roundWinners").deleteMany({ roundId: round.id });
-    if (rows[0]) await db.collection("roundWinners").insertOne({ roundId: round.id, userId: String(rows[0]._id), points: Number(rows[0].points ?? 0), exact: Number(rows[0].exact ?? 0), predictions: Number(rows[0].predictions ?? 0), createdAt: new Date() });
+    const scopes = new Map<string, any>();
+    for (const row of rows) {
+      const clubId = row._id.clubId ?? null;
+      const key = clubId ?? "GLOBAL";
+      if (!scopes.has(key)) scopes.set(key, row);
+    }
+    if (scopes.size) await db.collection("roundWinners").insertMany([...scopes.values()].map((row) => ({ roundId: round.id, userId: String(row._id.userId), clubId: row._id.clubId ?? null, points: Number(row.points ?? 0), exact: Number(row.exact ?? 0), predictions: Number(row.predictions ?? 0), createdAt: new Date() })));
   }
   return rounds.length;
 }

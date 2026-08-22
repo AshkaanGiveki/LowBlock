@@ -3,6 +3,7 @@ import { z } from "zod";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { createClub, currentMembership } from "@/lib/domain/clubs";
+import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 
 const body = z.object({ name: z.string().trim().min(2).max(60), imageUrl: z.string().url().nullable().optional(), discoveryMode: z.enum(["INVITE_ONLY", "RECRUITING"]).default("INVITE_ONLY"), visibility: z.enum(["PUBLIC", "PRIVATE"]).default("PUBLIC") });
 
@@ -13,7 +14,9 @@ export async function GET() {
   const membership = await currentMembership(db, userId);
   const club = membership ? await db.collection("clubs").findOne({ _id: new (await import("mongodb")).ObjectId(membership.clubId) }) : null;
   const members = membership ? await db.collection("clubMemberships").countDocuments({ clubId: membership.clubId, leftAt: null }) : 0;
-  return NextResponse.json({ club, membership, members });
+  let performance = null;
+  if (membership && club) { const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear()); const rows = await getCanonicalLeaderboard(db, { clubId: membership.clubId, seasonStartYear: year }, 100); const mine = rows.find(row => row.userId === userId); const totals = await db.collection<any>("predictionScores").aggregate([{ $match: { userId, clubIdAtLock: membership.clubId, seasonStartYear: year } }, { $group: { _id: null, points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } }]).toArray(); const roundWins = await db.collection("roundWinners").countDocuments({ userId, clubId: membership.clubId }); performance = { rank: mine?.rank ?? null, points: Number(totals[0]?.points ?? 0), exact: Number(totals[0]?.exact ?? 0), predictions: Number(totals[0]?.predictions ?? 0), roundWins, season: year }; }
+  return NextResponse.json({ club, membership, members, performance });
 }
 
 export async function POST(req: Request) {
