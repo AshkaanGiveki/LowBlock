@@ -23,7 +23,7 @@ const getCachedMatches = unstable_cache(async (leagueCode: string, matchday: num
     provider: "football-api" as const,
     // Only expose records written from a verified Football API response.
     rawApiResponse: { $exists: true },
-    status: { $nin: ["VOID", "CANCELLED"] },
+    status: { $nin: ["POSTPONED"] },
     kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
     ...(leagueCode ? { leagueCode } : {}),
     ...(matchday !== null ? { matchday } : {}),

@@ -1,4 +1,4 @@
 "use client";
-
-/** Gesture-driven route changes are temporarily disabled so swipes remain available for scrolling and drawers. */
-export function SwipeNavigation() { return null; }
+import{useEffect}from"react";import{usePathname,useRouter}from"next/navigation";import{useLanguage}from"@/components/LanguageProvider";
+const mainPages=["/","/matches","/predictions","/leaderboard","/profile"];
+export function SwipeNavigation(){const pathname=usePathname(),router=useRouter(),{language}=useLanguage();useEffect(()=>{let startX=0,startY=0;const down=(e:TouchEvent)=>{if((e.target as HTMLElement)?.closest("input,textarea,button,[role=dialog]"))return;startX=e.touches[0].clientX;startY=e.touches[0].clientY};const up=(e:TouchEvent)=>{const dx=e.changedTouches[0].clientX-startX,dy=e.changedTouches[0].clientY-startY;if(Math.abs(dx)<120||Math.abs(dy)>Math.abs(dx)*.55)return;const logicalDx=language==="fa"?-dx:dx,index=mainPages.indexOf(pathname);if(index>=0){const next=logicalDx<0?index+1:index-1;if(next>=0&&next<mainPages.length)router.push(mainPages[next])}else if(logicalDx>0)router.back()};window.addEventListener("touchstart",down,{passive:true});window.addEventListener("touchend",up,{passive:true});return()=>{window.removeEventListener("touchstart",down);window.removeEventListener("touchend",up)}},[pathname,router,language]);return null}
