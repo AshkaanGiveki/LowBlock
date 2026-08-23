@@ -116,6 +116,10 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .prediction-error-inline { border-color:rgba(248,113,113,.35) !important; background:linear-gradient(135deg,rgba(127,29,29,.34),rgba(69,10,10,.22)) !important; box-shadow:0 10px 25px rgba(0,0,0,.16); }
 .prediction-drawer-submit { position:sticky; bottom:calc(env(safe-area-inset-bottom) + .45rem); z-index:6; margin-bottom:env(safe-area-inset-bottom); padding-block:.95rem !important; box-shadow:0 -14px 32px rgba(13,23,18,.82),0 12px 30px rgba(32,184,121,.24); }
 .prediction-drawer-submit::before { content:""; position:absolute; inset:-.8rem -.25rem -.45rem; z-index:-1; border-radius:1.25rem; background:linear-gradient(to bottom,rgba(13,23,18,0),rgba(13,23,18,.96) 42%); pointer-events:none; }
+.countdown-display { display:inline-grid; grid-template-columns:repeat(4,minmax(2.05rem,1fr)); gap:.22rem; min-width:10rem; padding:.18rem; border:1px solid rgba(32,184,121,.28); border-radius:.75rem; background:linear-gradient(145deg,rgba(4,19,14,.92),rgba(12,34,24,.78)); box-shadow:inset 0 1px 0 rgba(184,255,218,.12),0 0 18px rgba(32,184,121,.1); }
+.countdown-unit { display:grid; justify-items:center; gap:.05rem; min-width:0; }
+.countdown-unit b { display:block; color:#aaffdb; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; font-variant-numeric:tabular-nums; letter-spacing:-.08em; line-height:1; text-shadow:0 0 10px rgba(32,220,153,.72); }
+.countdown-unit small { color:rgba(255,255,255,.42); font-size:.38rem; font-weight:900; letter-spacing:.08em; line-height:1; }
 .fixed.z-\[90\] section h2 { font-size:.9rem !important; font-weight:500 !important; color:rgba(255,255,255,.72); }
 @media (max-width:767px) { .glow-card:before { animation:none !important; } }
 html[dir="rtl"] { unicode-bidi:plaintext; }
@@ -149,6 +153,9 @@ main > div.max-w-6xl > section:first-child > div.mt-7.grid > div:nth-child(3) > 
 /* LowBlock summit cards: preserve the dashed orbit outside the colored top edge. */
 main > div.max-w-6xl > section.mt-8 > div.relative { overflow:visible !important; padding-top:1.55rem !important; }
 main > div.max-w-6xl > section.mt-8 > div.relative > div.relative.grid > div > a { overflow:visible !important; padding-top:1.25rem; }
+main > div.max-w-6xl > section.mt-8 > div.relative { overflow:hidden !important; padding-top:1.55rem !important; }
+main > div.max-w-6xl > section.mt-8 > div.relative > div.relative.grid > div > a { overflow:hidden !important; padding-top:1.4rem; }
+main > div.max-w-6xl > section:nth-child(2) > div.relative.grid > div > a { overflow:hidden !important; padding-top:1.4rem; }
 
 /* Keep the podium ornaments clear of the card's top border. */
 main > div.max-w-6xl > section:nth-child(2) { overflow:visible !important; padding-top:1.6rem !important; }
