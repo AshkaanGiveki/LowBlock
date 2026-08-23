@@ -114,6 +114,8 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .auth-footnote span { padding-inline:.4rem; color:var(--brand); }
 .prediction-auth-toast { direction:inherit; }
 .prediction-error-inline { border-color:rgba(248,113,113,.35) !important; background:linear-gradient(135deg,rgba(127,29,29,.34),rgba(69,10,10,.22)) !important; box-shadow:0 10px 25px rgba(0,0,0,.16); }
+.prediction-drawer-submit { position:sticky; bottom:calc(env(safe-area-inset-bottom) + .45rem); z-index:6; margin-bottom:env(safe-area-inset-bottom); padding-block:.95rem !important; box-shadow:0 -14px 32px rgba(13,23,18,.82),0 12px 30px rgba(32,184,121,.24); }
+.prediction-drawer-submit::before { content:""; position:absolute; inset:-.8rem -.25rem -.45rem; z-index:-1; border-radius:1.25rem; background:linear-gradient(to bottom,rgba(13,23,18,0),rgba(13,23,18,.96) 42%); pointer-events:none; }
 .fixed.z-\[90\] section h2 { font-size:.9rem !important; font-weight:500 !important; color:rgba(255,255,255,.72); }
 @media (max-width:767px) { .glow-card:before { animation:none !important; } }
 html[dir="rtl"] { unicode-bidi:plaintext; }
