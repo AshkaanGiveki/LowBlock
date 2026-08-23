@@ -13,10 +13,10 @@ import { MatchInsightsPanel } from "./MatchInsights";
 
 type Team = { id: number; name: string; logoUrl: string | null };
 type Match = { providerMatchId: string; kickoffAt: Date | string; status: string; homeGoals?: number | null; awayGoals?: number | null; homeTeam: Team; awayTeam: Team };
-type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number }; index?: number; onDrawerChange?: (open: boolean) => void };
+type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number }; index?: number; onDrawerChange?: (open: boolean) => void; onPredictionSaved?: (prediction: { homeGoals: number; awayGoals: number }) => void };
 type DrawerTeam = { name: string; logo: string | null };
 
-export function PredictionCard({ match, initial, index = 0, onDrawerChange }: Props) {
+export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPredictionSaved }: Props) {
   const { language, t } = useLanguage(); const router = useRouter();
   const [now, setNow] = useState(Date.now());
   const [home, setHome] = useState(initial?.homeGoals?.toString() ?? "");
@@ -38,7 +38,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange }: Pr
   const closeDrawer = () => { setDrawerOpen(false); setInsightsOpen(false); onDrawerChange?.(false); };
   const open = () => { if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
   const update = (setter: (value: string) => void) => (value: string) => { setter(value); };
-  async function submit() { if (home === "" || away === "" || locked) return; setBusy(true); setError(""); try { const response = await fetch("/api/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ matchId: match.providerMatchId, homeGoals: Number(home), awayGoals: Number(away) }) }); const data = await response.json().catch(() => ({})); if (!response.ok) { if (response.status === 401 || data.error === "AUTH_REQUIRED") { setError(""); setAuthToast(true); return; } throw new Error(getPredictionError(data.error, t)); } setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) }); closeDrawer(); } catch (reason) { setError(reason instanceof Error ? reason.message : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.")); } finally { setBusy(false); } }
+  async function submit() { if (home === "" || away === "" || locked) return; setBusy(true); setError(""); try { const response = await fetch("/api/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ matchId: match.providerMatchId, homeGoals: Number(home), awayGoals: Number(away) }) }); const data = await response.json().catch(() => ({})); if (!response.ok) { if (response.status === 401 || data.error === "AUTH_REQUIRED") { setError(""); setAuthToast(true); return; } throw new Error(getPredictionError(data.error, t)); } setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) }); onPredictionSaved?.({ homeGoals: Number(home), awayGoals: Number(away) }); closeDrawer(); } catch (reason) { setError(reason instanceof Error ? reason.message : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.")); } finally { setBusy(false); } }
   const statusText = live ? "LIVE" : finished ? `FT${hasResult ? ` · ${formatNumber(match.homeGoals ?? 0, language)} - ${formatNumber(match.awayGoals ?? 0, language)}` : ""}` : `${t("شروع تا", "STARTS IN")} ${formatCountdown(Math.max(0, kickoff - now), language)}`;
   const handleCardClick = (event: React.MouseEvent<HTMLElement>) => { const target = event.target as HTMLElement; if (window.innerWidth < 768 && !target.closest("button, input")) open(); };
   return <>{authToast && <AuthRedirectToast language={language} />}
