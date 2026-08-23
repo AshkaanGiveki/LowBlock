@@ -135,8 +135,10 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .home-hero-slang-fa { line-height:1.35; padding-top:.16em; padding-bottom:.2em; }
 .home-hero-slang-suffix { color:#fff; }
 .home-hero { isolation:isolate; background:linear-gradient(145deg,#14251c,#0a0f0c); box-shadow:inset 0 1px 0 rgba(184,255,218,.1),0 24px 70px rgba(0,0,0,.24); }
-.home-hero::before { content:""; position:absolute; inset:0; z-index:-2; background:url('/hero-footballer-optimized.jpg') center/cover no-repeat; }
-.home-hero::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(90deg,rgba(7,15,11,.98) 0%,rgba(7,15,11,.9) 37%,rgba(7,15,11,.35) 72%,rgba(7,15,11,.54) 100%); }
+.home-hero::before { content:""; position:absolute; inset:0; z-index:0; background:url('/hero-footballer-optimized.jpg') center/cover no-repeat; }
+.home-hero::after { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; background:linear-gradient(90deg,rgba(7,15,11,.98) 0%,rgba(7,15,11,.9) 37%,rgba(7,15,11,.35) 72%,rgba(7,15,11,.54) 100%); }
+.home-hero > .relative { position:relative; z-index:1; }
+.home-hero > .absolute { z-index:1; }
 @media (max-width:767px) { .home-hero::before { background-position:center 62%; } }
 html[dir="rtl"] .home-hero::before { transform:scaleX(-1); }
 html[dir="rtl"] .home-hero-slang-wrap { direction:rtl; }
