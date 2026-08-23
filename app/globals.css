@@ -120,6 +120,8 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .countdown-unit { display:grid; justify-items:center; gap:.05rem; min-width:0; }
 .countdown-unit b { display:block; color:#aaffdb; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; font-variant-numeric:tabular-nums; letter-spacing:-.08em; line-height:1; text-shadow:0 0 10px rgba(32,220,153,.72); }
 .countdown-unit small { color:rgba(255,255,255,.42); font-size:.38rem; font-weight:900; letter-spacing:.08em; line-height:1; }
+.home-all-predicted-icon { animation:home-check-pulse 3.2s ease-in-out infinite; }
+@keyframes home-check-pulse { 0%,100% { transform:translateY(0); box-shadow:0 0 35px rgba(32,184,121,.18); } 50% { transform:translateY(-4px); box-shadow:0 0 46px rgba(32,184,121,.34); } }
 .fixed.z-\[90\] section h2 { font-size:.9rem !important; font-weight:500 !important; color:rgba(255,255,255,.72); }
 @media (max-width:767px) { .glow-card:before { animation:none !important; } }
 html[dir="rtl"] { unicode-bidi:plaintext; }
