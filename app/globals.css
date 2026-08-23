@@ -130,6 +130,7 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .countdown-unit b { display:block; color:#aaffdb; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; font-variant-numeric:tabular-nums; letter-spacing:-.08em; line-height:1; text-shadow:0 0 10px rgba(32,220,153,.72); }
 .countdown-unit small { color:rgba(255,255,255,.42); font-size:.38rem; font-weight:900; letter-spacing:.08em; line-height:1; }
 .prediction-score-controls { direction:ltr; unicode-bidi:isolate; }
+.home-all-predicted { margin-top:1rem; }
 /* The drawer follows the document direction: home is left in LTR and right in RTL. */
 .prediction-score-controls { flex-direction:row !important; }
 [dir="ltr"] .drawer-team-card:first-child .prediction-score-controls { flex-direction:row-reverse !important; }
