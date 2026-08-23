@@ -128,6 +128,8 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .countdown-unit { position:relative; display:grid; justify-items:center; gap:.05rem; min-width:0; }
 .countdown-unit:not(:last-child)::after { content:""; position:absolute; top:0; right:-.13rem; height:100%; border-right:1px solid rgba(184,255,218,.11); }
 .countdown-unit b { display:block; color:#aaffdb; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; font-variant-numeric:tabular-nums; letter-spacing:-.08em; line-height:1; text-shadow:0 0 10px rgba(32,220,153,.72); }
+html[lang="fa"] .countdown-unit b { font-family:IranSans,Tahoma,sans-serif; font-weight:300; letter-spacing:-.03em; }
+html[lang="en"] .countdown-unit b { font-family:Inter,ui-sans-serif,system-ui,sans-serif; font-weight:700; letter-spacing:-.06em; }
 .countdown-unit small { color:rgba(255,255,255,.42); font-size:.38rem; font-weight:900; letter-spacing:.08em; line-height:1; }
 .prediction-score-controls { direction:ltr; unicode-bidi:isolate; }
 .home-all-predicted { margin-top:1rem; }
@@ -240,6 +242,7 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid v
 .help-answer { overflow:hidden; border:1px solid rgba(255,255,255,.08); border-radius:1.2rem; background:linear-gradient(145deg,rgba(18,29,22,.88),rgba(10,16,12,.9)); transition:border-color .2s ease,box-shadow .2s ease; }
 .help-answer:hover,.help-answer.is-open { border-color:rgba(32,184,121,.32); box-shadow:0 12px 35px rgba(0,0,0,.14); }
 .help-answer-icon { display:grid; width:2.35rem; height:2.35rem; flex:0 0 auto; place-items:center; border-radius:.8rem; background:rgba(32,184,121,.11); color:var(--brand); }
+.help-answer button, .help-answer p, .help-answer b { min-width:0; overflow-wrap:anywhere; word-break:normal; }
 .help-answer button > span:nth-child(2) small { display:block; color:rgba(184,255,218,.42); font-size:.57rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
 @media (max-width:1023px) { .help-hero-mark { opacity:.55; transform:scale(.75) rotate(8deg); inset-inline-end:-.5rem; top:18%; } .help-category-panel { position:static; } }
 /* Desktop command rail: a focused workspace shell while preserving the mobile dock below it. */
