@@ -279,6 +279,20 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid v
   .auth-panel { border-color:rgba(32,184,121,.18); box-shadow:0 28px 90px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06); }
   main > div[class*="max-w-5xl"], main > div[class*="max-w-6xl"], main > div[class*="max-w-7xl"] { position:relative; }
   main > div[class*="max-w-5xl"] > section:first-child, main > div[class*="max-w-6xl"] > section:first-child { box-shadow:0 22px 75px rgba(0,0,0,.18); }
+  main > div[class*="max-w-5xl"] { width:min(100%,72rem); }
+  main > div[class*="max-w-4xl"] { width:min(100%,68rem); }
+  main > div[class*="max-w-3xl"] { width:min(100%,58rem); }
+  main > div[class*="max-w-xl"] { width:min(100%,50rem); }
+  main > div[class*="max-w-5xl"] > nav { max-width:54rem; margin-inline:auto; }
+  main > div[class*="max-w-5xl"] > section:first-child { min-height:14rem; }
+  main > div[class*="max-w-5xl"] > section:first-child + section { margin-top:1.5rem; }
+  main > div[class*="max-w-3xl"] > section:first-child { min-height:13rem; }
+  main > div[class*="max-w-3xl"] > section + section { margin-top:1.25rem; }
+  main > div[class*="max-w-4xl"] > section:first-child { min-height:26rem; display:grid; align-content:center; }
+  main > div[class*="max-w-4xl"] > section:first-child + section { margin-top:1rem; }
+  main > form[class*="max-w-xl"] { width:min(100%,50rem); border-radius:2rem; box-shadow:0 26px 80px rgba(0,0,0,.24); }
+  main[class*="place-items-center"] > section { box-shadow:0 28px 90px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.07); }
+  .desktop-rail + header { backdrop-filter:blur(24px); }
 }
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
 @media (min-width:768px) { main[class*="md:mr-72"] { margin-right:0 !important; padding-right:2rem !important; padding-left:2rem !important; padding-top:8rem !important; } }
