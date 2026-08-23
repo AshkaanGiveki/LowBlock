@@ -1,4 +1,4 @@
 "use client";
-import { Smartphone } from "lucide-react";
-import { useLanguage } from "@/components/LanguageProvider";
-export function DesktopNotice(){const{language}=useLanguage();return <div className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#080b0a]/96 px-6 text-center backdrop-blur-xl md:flex"><div className="max-w-md rounded-3xl border border-brand/25 bg-[linear-gradient(145deg,#12251b,#08100c)] p-10 shadow-[0_24px_90px_rgba(0,0,0,.5)]"><Smartphone className="mx-auto mb-5 text-brand" size={44}/><h1 className="text-3xl font-black">{language==="fa"?"لطفاً از تلفن همراه استفاده کنید":"Please use a mobile phone"}</h1><p className="mt-3 text-sm leading-7 text-[var(--muted)]">{language==="fa"?"طراحی دسکتاپ در حال توسعه است.":"Desktop design is under development."}</p></div></div>}
+
+/** Desktop is now a supported responsive experience. */
+export function DesktopNotice() { return null; }
