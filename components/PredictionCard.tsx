@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, Check, ChevronDown, Crown, Minus, Plus, Radio, Sparkles, X } from "lucide-react";
+import { BarChart3, Check, ChevronDown, Clock3, Crown, Minus, Plus, Radio, Sparkles, X } from "lucide-react";
 import { formatIranDate, formatIranTime } from "@/lib/football/time";
 import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
@@ -39,7 +39,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange }: Pr
   const open = () => { if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
   const update = (setter: (value: string) => void) => (value: string) => { setSaved(false); setter(value); };
   async function submit() { if (home === "" || away === "" || locked) return; setBusy(true); setError(""); try { const response = await fetch("/api/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ matchId: match.providerMatchId, homeGoals: Number(home), awayGoals: Number(away) }) }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error ?? t("ثبت پیش‌بینی انجام نشد.", "Prediction could not be saved.")); setSaved(true); closeDrawer(); } catch (reason) { setError(reason instanceof Error ? reason.message : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.")); } finally { setBusy(false); } }
-  const statusText = live ? "LIVE" : finished ? `FT${hasResult ? ` · ${formatNumber(match.homeGoals ?? 0, language)} - ${formatNumber(match.awayGoals ?? 0, language)}` : ""}` : t("فعال", "OPEN");
+  const statusText = live ? "LIVE" : finished ? `FT${hasResult ? ` · ${formatNumber(match.homeGoals ?? 0, language)} - ${formatNumber(match.awayGoals ?? 0, language)}` : ""}` : `${t("شروع تا", "STARTS IN")} ${formatCountdown(Math.max(0, kickoff - now), language)}`;
   const handleCardClick = (event: React.MouseEvent<HTMLElement>) => { const target = event.target as HTMLElement; if (window.innerWidth < 768 && !target.closest("button, input")) open(); };
   return <>
     <motion.article initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: index * .05 }} whileHover={{ y: -4 }} onClick={handleCardClick} className="glow-card relative mb-5 overflow-hidden rounded-2xl border border-brand/55 bg-transparent shadow-[0_18px_55px_rgba(0,0,0,.24)] transition-colors hover:border-brand">
@@ -52,6 +52,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange }: Pr
 
 function TeamBlock({ name, sourceName, logo }: { name: string; sourceName: string; logo: string | null }) { return <div className="flex min-w-0 flex-col items-center gap-2 text-center"><div className="grid h-16 w-16 place-items-center"><TeamCrest name={sourceName} logo={logo}/></div><span className="line-clamp-2 max-w-28 text-xs font-black text-white">{name}</span></div>; }
 function ScoreInput({ value, setValue, disabled }: { value: string; setValue: (value: string) => void; disabled: boolean }) { return <input disabled={disabled} value={value} onChange={(event) => setValue(event.target.value.replace(/\D/g, "").slice(0, 2))} className="h-10 w-10 rounded-md border border-brand/40 bg-transparent text-center text-xl font-black text-white outline-none focus:ring-2 focus:ring-brand"/>; }
+function formatCountdown(milliseconds: number, language: "fa" | "en") { const totalMinutes = Math.max(0, Math.floor(milliseconds / 60_000)); const days = Math.floor(totalMinutes / 1440); const hours = Math.floor((totalMinutes % 1440) / 60); const minutes = totalMinutes % 60; if (days) return `${formatNumber(days, language)}${language === "fa" ? "روز" : "d"} ${formatNumber(hours, language)}${language === "fa" ? "ساعت" : "h"}`; if (hours) return `${formatNumber(hours, language)}${language === "fa" ? "ساعت" : "h"} ${formatNumber(minutes, language)}${language === "fa" ? "دقیقه" : "m"}`; return `${formatNumber(minutes, language)}${language === "fa" ? "دقیقه" : "m"}`; }
 
 function PredictionDrawer({ home, away, homeValue, awayValue, setHome, setAway, onClose, onSubmit, matchId, insightsOpen, onToggleInsights, busy, saved, error, language }: { home: DrawerTeam; away: DrawerTeam; homeValue: string; awayValue: string; setHome: (value: string) => void; setAway: (value: string) => void; onClose: () => void; onSubmit: () => void; matchId: string; insightsOpen: boolean; onToggleInsights: () => void; busy: boolean; saved: boolean; error: string; language: "fa" | "en" }) {
   const t = (fa: string, en: string) => language === "fa" ? fa : en;

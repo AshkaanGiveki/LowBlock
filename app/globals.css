@@ -68,6 +68,14 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid v
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
 @media (min-width:768px) { main[class*="md:mr-72"] { margin-right:0 !important; padding-right:2rem !important; padding-left:2rem !important; padding-top:8rem !important; } }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important; } }
+@media (max-width:767px) {
+  div[class*="z-[80]"] div[class*="grid-cols-2"] > div:nth-child(1) div[class*="mt-5"][class*="items-center"],
+  div[class*="z-[80]"] div[class*="grid-cols-2"] > div:nth-child(2) div[class*="mt-5"][class*="items-center"] { direction:ltr; }
+  div[class*="z-[80]"] div[class*="grid-cols-2"] > div:nth-child(2) div[class*="mt-5"][class*="items-center"] { flex-direction:row-reverse; }
+  div[class*="z-[80]"] button[aria-label="Increase score"], div[class*="z-[80]"] button[aria-label="Decrease score"] { width:2.25rem !important; height:2.25rem !important; }
+  div[class*="z-[80]"] button[aria-label="Increase score"] { border-color:rgba(32,184,121,.75) !important; background:linear-gradient(145deg,#20b879,#138356) !important; color:#fff !important; box-shadow:0 7px 22px rgba(32,184,121,.3),inset 0 1px 0 rgba(255,255,255,.25) !important; }
+  div[class*="z-[80]"] button[aria-label="Decrease score"] { border-color:rgba(255,255,255,.14) !important; background:rgba(255,255,255,.04) !important; color:rgba(255,255,255,.72) !important; }
+}
 @media (max-width:767px) { main section.mt-8.grid.items-end.gap-3 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .glow-card { background-color:#10251b !important; background-image:repeating-linear-gradient(135deg,rgba(32,184,121,.07) 0,rgba(32,184,121,.07) 1px,transparent 1px,transparent 16px) !important; background-size:auto !important; }
 .ltr-arrow { display:none; } html[dir="ltr"] .rtl-arrow { display:none; } html[dir="ltr"] .ltr-arrow { display:inline-flex; }
