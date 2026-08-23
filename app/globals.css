@@ -64,6 +64,8 @@ html[dir="rtl"] main { direction:rtl; }
 html[dir="rtl"] main > section:first-child > div > div:last-child { margin-left:auto; text-align:right; }
 html[dir="rtl"] main > section:first-child > div > div:nth-child(2) { transform:scaleX(-1); }
 .focus-ring:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+.metric-tile-glow { position:absolute; inset:-35% auto auto -12%; width:8rem; height:8rem; border-radius:999px; background:rgba(32,184,121,.14); filter:blur(28px); pointer-events:none; transition:transform .5s ease,opacity .5s ease; }
+.metric-tile:hover .metric-tile-glow { transform:translate(18px,10px) scale(1.15); opacity:.9; }
 input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
 @media (min-width:768px) { main[class*="md:mr-72"] { margin-right:0 !important; padding-right:2rem !important; padding-left:2rem !important; padding-top:8rem !important; } }
