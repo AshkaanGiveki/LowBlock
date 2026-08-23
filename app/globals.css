@@ -130,6 +130,9 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .countdown-unit b { display:block; color:#aaffdb; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; font-variant-numeric:tabular-nums; letter-spacing:-.08em; line-height:1; text-shadow:0 0 10px rgba(32,220,153,.72); }
 .countdown-unit small { color:rgba(255,255,255,.42); font-size:.38rem; font-weight:900; letter-spacing:.08em; line-height:1; }
 .prediction-score-controls { direction:ltr; unicode-bidi:isolate; }
+/* Keep the minus control on the inward side of each team, regardless of locale direction. */
+.prediction-score-controls { flex-direction:row; }
+.drawer-team-card:first-child .prediction-score-controls { flex-direction:row-reverse; }
 .text-rotate { display:inline-flex; position:relative; flex-wrap:wrap; white-space:pre-wrap; }
 .text-rotate-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .text-rotate-word { display:inline-flex; overflow:hidden; }
