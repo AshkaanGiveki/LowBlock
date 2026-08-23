@@ -112,6 +112,8 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .auth-panel form button:hover { transform:translateY(-2px); box-shadow:0 16px 34px rgba(32,184,121,.25); }
 .auth-footnote { margin-top:1.2rem; text-align:center; color:rgba(255,255,255,.28); font-size:.68rem; }
 .auth-footnote span { padding-inline:.4rem; color:var(--brand); }
+.prediction-auth-toast { direction:inherit; }
+.prediction-error-inline { border-color:rgba(248,113,113,.35) !important; background:linear-gradient(135deg,rgba(127,29,29,.34),rgba(69,10,10,.22)) !important; box-shadow:0 10px 25px rgba(0,0,0,.16); }
 .fixed.z-\[90\] section h2 { font-size:.9rem !important; font-weight:500 !important; color:rgba(255,255,255,.72); }
 @media (max-width:767px) { .glow-card:before { animation:none !important; } }
 html[dir="rtl"] { unicode-bidi:plaintext; }
