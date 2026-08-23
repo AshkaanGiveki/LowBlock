@@ -74,7 +74,7 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid v
 
 /* Match prediction bottom drawer: full-width, calm, and intentionally spacious. */
 @media (max-width:767px) {
-  div[class*="z-[80]"] > div:last-child { left:0 !important; right:0 !important; bottom:0 !important; width:100% !important; max-height:88vh; overflow:hidden; border-radius:2rem 2rem 0 0 !important; border-bottom:0 !important; padding:4.25rem 1.25rem 1.75rem !important; background:linear-gradient(145deg,#142a20,#0b100d) !important; box-shadow:0 -24px 90px rgba(0,0,0,.65) !important; }
+  div[class*="z-[80]"] > div:last-child { left:0 !important; right:0 !important; bottom:0 !important; width:100% !important; max-height:min(88dvh,88vh); overflow-y:auto; overscroll-behavior:contain; scroll-padding-bottom:calc(2rem + env(safe-area-inset-bottom, 0px)); border-radius:2rem 2rem 0 0 !important; border-bottom:0 !important; padding:4.25rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom, 0px)) !important; background:linear-gradient(145deg,#142a20,#0b100d) !important; box-shadow:0 -24px 90px rgba(0,0,0,.65) !important; }
   div[class*="z-[80]"] > div:last-child:before { content:""; position:absolute; top:.8rem; left:50%; width:3rem; height:.35rem; transform:translateX(-50%); border-radius:999px; background:rgba(255,255,255,.25); }
   div[class*="z-[80]"] > div:last-child > div:first-of-type { position:relative; margin-bottom:1.5rem !important; display:block !important; }
   div[class*="z-[80]"] > div:last-child > div:first-of-type > button { position:absolute; left:0; top:-.3rem; width:2.5rem; height:2.5rem; border:1px solid rgba(255,255,255,.1); border-radius:1rem; background:rgba(255,255,255,.08); }
