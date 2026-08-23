@@ -74,6 +74,7 @@ nav.fixed.bottom-3 { background:rgba(0,0,0,.68) !important; backdrop-filter:blur
 .bottom-nav-dock > a > span { position:relative !important; inset:auto !important; z-index:1; display:grid; width:auto !important; height:auto !important; min-height:1.45rem; place-items:center; border-radius:0 !important; }
 .bottom-nav-dock > a > span.absolute { display:none !important; }
 .bottom-nav-dock > a > span.club-crest-glow { position:relative !important; display:grid; height:2rem !important; width:2rem !important; min-height:0; padding:2px; }
+.bottom-nav-dock > a > span.club-crest-glow { border-radius:999px !important; }
 .bottom-nav-dock > a > span.club-crest-glow > span { min-height:0; }
 .bottom-nav-dock > a > img { position:relative; z-index:1; }
 .fixed.z-\[90\] section h2 { font-size:.9rem !important; font-weight:500 !important; color:rgba(255,255,255,.72); }
@@ -85,6 +86,38 @@ html[dir="rtl"] main > section:first-child > div > div:nth-child(2) { transform:
 .focus-ring:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 .metric-tile-glow { position:absolute; inset:-35% auto auto -12%; width:8rem; height:8rem; border-radius:999px; background:rgba(32,184,121,.14); filter:blur(28px); pointer-events:none; transition:transform .5s ease,opacity .5s ease; }
 .metric-tile:hover .metric-tile-glow { transform:translate(18px,10px) scale(1.15); opacity:.9; }
+
+/* Universal leaderboard hero: a denser, more premium metric rail. */
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid { gap:.65rem !important; }
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid > div { position:relative; overflow:hidden; min-height:6.9rem; border:1px solid rgba(255,255,255,.12); border-radius:1.35rem; background:linear-gradient(145deg,rgba(31,65,47,.72),rgba(7,16,11,.82)); padding:1rem !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 14px 35px rgba(0,0,0,.16); transition:transform .3s ease,border-color .3s ease,background .3s ease; }
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid > div::before { content:""; position:absolute; width:6rem; height:6rem; top:-2.4rem; inset-inline-end:-1.3rem; border-radius:999px; background:rgba(32,184,121,.18); filter:blur(20px); pointer-events:none; }
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid > div:hover { transform:translateY(-3px); border-color:rgba(32,184,121,.42); background:linear-gradient(145deg,rgba(37,83,59,.8),rgba(8,18,12,.88)); }
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid > div > span:first-child { position:relative; display:grid; width:2.25rem; height:2.25rem; place-items:center; border:1px solid rgba(32,184,121,.3); border-radius:.8rem; background:rgba(32,184,121,.12); }
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid > div > b { position:relative; margin-top:.65rem; font-size:1.55rem; line-height:1; }
+main > div.max-w-6xl > section:first-child > div.relative > div.mt-7.grid > div > small { position:relative; display:block; margin-top:.38rem; font-size:.62rem; font-weight:800; color:rgba(255,255,255,.54); }
+
+/* Keep the podium ornaments clear of the card's top border. */
+main > div.max-w-6xl > section:nth-child(2) { overflow:visible !important; padding-top:1.6rem !important; }
+main > div.max-w-6xl > section:nth-child(2) > div.relative.grid > div > a { overflow:visible !important; padding-top:1.25rem; }
+
+/* Public profile: align the shell with the dashboard's layered visual language. */
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:first-child { border-color:rgba(32,184,121,.34); background:radial-gradient(circle at 50% -20%,rgba(32,184,121,.4),transparent 42%),radial-gradient(circle at 5% 100%,rgba(232,198,106,.12),transparent 30%),linear-gradient(145deg,#183425,#070d09); box-shadow:0 30px 100px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.1); }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:first-child::after { content:""; position:absolute; inset:1rem; border:1px solid rgba(255,255,255,.06); border-radius:1.75rem; pointer-events:none; }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:first-child > div.relative.mx-auto { filter:drop-shadow(0 18px 26px rgba(0,0,0,.28)); }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:first-child h1 { text-shadow:0 8px 28px rgba(0,0,0,.28); }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(2) { gap:.65rem !important; }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(2) > div { min-height:7rem; border-color:rgba(255,255,255,.13); border-radius:1.45rem; background:linear-gradient(145deg,rgba(28,61,44,.82),rgba(7,15,10,.92)); box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 16px 40px rgba(0,0,0,.18); }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(2) > div > div:first-of-type > span:first-child { width:2.45rem; height:2.45rem; border-radius:.85rem; background:linear-gradient(145deg,rgba(32,184,121,.25),rgba(32,184,121,.08)); box-shadow:0 0 22px rgba(32,184,121,.12); }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(2) > div > b { font-size:1.8rem; }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(3) { border-color:rgba(232,198,106,.34); box-shadow:0 18px 60px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.08); }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(3) > div.relative { padding:.15rem; }
+main:has(> div.max-w-4xl) > div.max-w-4xl > section:nth-child(4) > div { border-color:rgba(32,184,121,.14); background:linear-gradient(145deg,rgba(23,49,35,.74),rgba(8,15,10,.9)); box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 14px 35px rgba(0,0,0,.16); }
+
+/* Club tabs: the centre tab gets enough room and never wraps its label. */
+nav.mt-4.grid.grid-cols-3 { grid-template-columns:.9fr 1.2fr .9fr !important; gap:.25rem !important; }
+nav.mt-4.grid.grid-cols-3 > a { min-width:0; gap:.3rem; padding-inline:.2rem; white-space:nowrap; font-size:.68rem; }
+nav.mt-4.grid.grid-cols-3 > a > span { white-space:nowrap; }
+@media (min-width:640px) { nav.mt-4.grid.grid-cols-3 > a { font-size:.75rem; } }
 input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 /* Legacy pages used a fixed right rail. The responsive header owns navigation now. */
 @media (min-width:768px) { main[class*="md:mr-72"] { margin-right:0 !important; padding-right:2rem !important; padding-left:2rem !important; padding-top:8rem !important; } }
