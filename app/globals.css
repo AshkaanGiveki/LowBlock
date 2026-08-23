@@ -141,6 +141,7 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .home-hero > .absolute { z-index:1; }
 @media (max-width:767px) { .home-hero::before { background-position:center 62%; } }
 html[dir="rtl"] .home-hero::before { transform:scaleX(-1); }
+html[dir="rtl"] .home-hero::after { background:linear-gradient(270deg,rgba(7,15,11,.98) 0%,rgba(7,15,11,.9) 37%,rgba(7,15,11,.35) 72%,rgba(7,15,11,.54) 100%); }
 html[dir="rtl"] .home-hero-slang-wrap { direction:rtl; }
 .home-all-predicted-icon { animation:home-check-pulse 3.2s ease-in-out infinite; }
 @keyframes home-check-pulse { 0%,100% { transform:translateY(0); box-shadow:0 0 35px rgba(32,184,121,.18); } 50% { transform:translateY(-4px); box-shadow:0 0 46px rgba(32,184,121,.34); } }
