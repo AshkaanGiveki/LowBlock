@@ -9,6 +9,7 @@ export type RotatingTextHandle = { next: () => void; previous: () => void; jumpT
 
 const RotatingText = forwardRef<RotatingTextHandle, RotatingTextProps>(function RotatingText({ texts, rotationInterval = 2200, staggerDuration = .025, staggerFrom = "last", splitBy = "characters", mainClassName = "", splitLevelClassName = "" }, ref) {
   const [current, setCurrent] = useState(0);
+  const containerRef = useRef<HTMLSpanElement>(null);
   const measurementRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const [contentWidth, setContentWidth] = useState<number | null>(null);
   const safeTexts = texts.length ? texts : [""];
@@ -20,12 +21,18 @@ const RotatingText = forwardRef<RotatingTextHandle, RotatingTextProps>(function 
   useEffect(() => { const timer = window.setInterval(next, rotationInterval); return () => window.clearInterval(timer); }, [next, rotationInterval]);
   useLayoutEffect(() => {
     const measurement = measurementRefs.current[current];
-    if (measurement) setContentWidth(Math.ceil(measurement.getBoundingClientRect().width));
+    const container = containerRef.current;
+    if (!measurement || !container) return;
+    const styles = window.getComputedStyle(container);
+    const boxExtras = styles.boxSizing === "border-box"
+      ? [styles.paddingLeft, styles.paddingRight, styles.borderLeftWidth, styles.borderRightWidth].reduce((total, value) => total + Number.parseFloat(value || "0"), 0)
+      : 0;
+    setContentWidth(Math.ceil(measurement.getBoundingClientRect().width + boxExtras));
   }, [current, safeTexts, splitBy]);
   const elements = useMemo(() => { const text = safeTexts[current] ?? ""; if (splitBy === "lines") return text.split("\n").map(line => [line]); if (splitBy === "words") return text.split(" ").map(word => [word]); return text.split(" ").map(word => Array.from(word)); }, [current, safeTexts, splitBy]);
   const total = elements.reduce((sum, element) => sum + element.length, 0);
   const delayFor = (index: number) => staggerFrom === "last" ? (total - 1 - index) * staggerDuration : staggerFrom === "center" ? Math.abs(Math.floor(total / 2) - index) * staggerDuration : index * staggerDuration;
-  return <motion.span className={`text-rotate ${mainClassName}`} layout animate={{ width: contentWidth == null ? "auto" : contentWidth }} transition={{ type: "spring", damping: 30, stiffness: 400 }}><span className="text-rotate-sr-only">{safeTexts[current]}</span><span className="text-rotate-measure-layer" aria-hidden="true">{safeTexts.map((text, index) => <span key={`${index}-${text}`} ref={(node) => { measurementRefs.current[index] = node; }}>{text}</span>)}</span><AnimatePresence mode="wait" initial={false}><motion.span key={current} className={splitBy === "lines" ? "text-rotate-lines" : "text-rotate"} layout transition={{ type: "spring", damping: 30, stiffness: 400 }} aria-hidden="true">{elements.map((element, wordIndex) => <span key={wordIndex} className={`text-rotate-word ${splitLevelClassName}`}>{element.map((part, partIndex) => <motion.span key={partIndex} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "-120%" }} transition={{ type: "spring", damping: 30, stiffness: 400, delay: delayFor(elements.slice(0, wordIndex).reduce((sum, item) => sum + item.length, 0) + partIndex) }} className="text-rotate-element">{part}</motion.span>)}{wordIndex < elements.length - 1 && <span className="text-rotate-space"> </span>}</span>)}</motion.span></AnimatePresence></motion.span>;
+  return <motion.span ref={containerRef} className={`text-rotate ${mainClassName}`} layout animate={{ width: contentWidth == null ? "auto" : contentWidth }} transition={{ type: "spring", damping: 30, stiffness: 400 }}><span className="text-rotate-sr-only">{safeTexts[current]}</span><span className="text-rotate-measure-layer" aria-hidden="true">{safeTexts.map((text, index) => <span key={`${index}-${text}`} ref={(node) => { measurementRefs.current[index] = node; }}>{text}</span>)}</span><AnimatePresence mode="wait" initial={false}><motion.span key={current} className={splitBy === "lines" ? "text-rotate-lines" : "text-rotate"} layout transition={{ type: "spring", damping: 30, stiffness: 400 }} aria-hidden="true">{elements.map((element, wordIndex) => <span key={wordIndex} className={`text-rotate-word ${splitLevelClassName}`}>{element.map((part, partIndex) => <motion.span key={partIndex} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "-120%" }} transition={{ type: "spring", damping: 30, stiffness: 400, delay: delayFor(elements.slice(0, wordIndex).reduce((sum, item) => sum + item.length, 0) + partIndex) }} className="text-rotate-element">{part}</motion.span>)}{wordIndex < elements.length - 1 && <span className="text-rotate-space"> </span>}</span>)}</motion.span></AnimatePresence></motion.span>;
 });
 
 RotatingText.displayName = "RotatingText";
