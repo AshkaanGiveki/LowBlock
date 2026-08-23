@@ -1,29 +1,183 @@
 import type { Db } from "mongodb";
 import { apiRequest, remainingApiRequests } from "./client";
 
-type ProviderFixture = { fixture: { id: number; date: string; status: { short: string } }; league?: { name?: string | null }; teams: { home: { id: number; name: string; logo: string | null }; away: { id: number; name: string; logo: string | null } }; goals: { home: number | null; away: number | null } };
-type Result = { fixtureId: string; date: string; opponent: { id: number; name: string; logoUrl: string | null }; home: boolean; teamGoals: number; opponentGoals: number; outcome: "W" | "D" | "L"; league: string };
-const finished = (item: any) => ["FINISHED", "FT", "AET", "PEN"].includes(String(item.status?.short ?? item.status));
+type ProviderFixture = {
+  fixture: { id: number; date: string; status: { short: string } };
+  league?: { id?: number; name?: string | null; season?: number };
+  teams: {
+    home: { id: number; name: string; logo: string | null };
+    away: { id: number; name: string; logo: string | null };
+  };
+  goals: { home: number | null; away: number | null };
+};
+
+type ProviderStanding = {
+  rank: number;
+  team: { id: number; name: string; logo: string | null };
+  points: number;
+  form?: string | null;
+  description?: string | null;
+  all?: { played: number; win: number; draw: number; lose: number };
+  goals?: { for: number; against: number };
+};
+
+type InsightOptions = { force?: boolean };
 const dayKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: process.env.APP_TIMEZONE || "Asia/Tehran" }).format(date);
+const finished = (status: string) => ["FT", "AET", "PEN"].includes(status);
 
-function result(item: any, teamId: number): Result | null { if (!finished(item) || item.homeGoals == null || item.awayGoals == null) return null; const home = Number(item.homeTeamProviderId ?? item.homeTeam?.id) === teamId; const teamGoals = home ? Number(item.homeGoals) : Number(item.awayGoals); const opponentGoals = home ? Number(item.awayGoals) : Number(item.homeGoals); return { fixtureId: String(item.providerMatchId ?? item.fixture?.id), date: new Date(item.kickoffAt ?? item.fixture?.date).toISOString(), opponent: home ? { id: Number(item.awayTeamProviderId ?? item.awayTeam?.id), name: item.awayTeam?.name ?? "", logoUrl: item.awayTeam?.logoUrl ?? item.awayTeam?.logo ?? null } : { id: Number(item.homeTeamProviderId ?? item.homeTeam?.id), name: item.homeTeam?.name ?? "", logoUrl: item.homeTeam?.logoUrl ?? item.homeTeam?.logo ?? null }, home, teamGoals, opponentGoals, outcome: teamGoals > opponentGoals ? "W" : teamGoals === opponentGoals ? "D" : "L", league: item.league?.name ?? item.leagueCode ?? "" }; }
-async function localForm(db: Db, teamId: number) { const matches = await db.collection<any>("matches").find({ $or: [{ homeTeamProviderId: String(teamId) }, { awayTeamProviderId: String(teamId) }], status: "FINISHED", kickoffAt: { $lt: new Date() } }).sort({ kickoffAt: -1 }).limit(5).toArray(); return matches.map((match) => result(match, teamId)).filter(Boolean) as Result[]; }
-async function localStandings(db: Db, leagueCode: string, season: number) { const matches = await db.collection<any>("matches").find({ leagueCode, seasonStartYear: season, status: "FINISHED", homeGoals: { $ne: null }, awayGoals: { $ne: null } }).toArray(); const table = new Map<number, any>(); for (const match of matches) { for (const side of ["home", "away"] as const) { const id = Number(side === "home" ? match.homeTeamProviderId : match.awayTeamProviderId); const team = side === "home" ? match.homeTeam : match.awayTeam; const row = table.get(id) ?? { team: { id, name: team.name, logoUrl: team.logoUrl }, points: 0, goalDiff: 0, played: 0, wins: 0 }; const goals = Number(side === "home" ? match.homeGoals : match.awayGoals); const conceded = Number(side === "home" ? match.awayGoals : match.homeGoals); row.played++; row.goalDiff += goals - conceded; row.points += goals > conceded ? 3 : goals === conceded ? 1 : 0; row.wins += goals > conceded ? 1 : 0; table.set(id, row); } } return [...table.values()].sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.wins - a.wins || a.team.name.localeCompare(b.team.name)).map((row, index) => ({ ...row, rank: index + 1 })); }
+function normalizeStanding(row: ProviderStanding) {
+  return {
+    rank: Number(row.rank),
+    team: { id: Number(row.team.id), name: row.team.name, logoUrl: row.team.logo ?? null },
+    points: Number(row.points ?? 0),
+    form: String(row.form ?? "").replace(/[^WDL]/gi, "").toUpperCase().slice(-5),
+    description: row.description ?? null,
+    played: Number(row.all?.played ?? 0),
+    wins: Number(row.all?.win ?? 0),
+    draws: Number(row.all?.draw ?? 0),
+    losses: Number(row.all?.lose ?? 0),
+    goalsFor: Number(row.goals?.for ?? 0),
+    goalsAgainst: Number(row.goals?.against ?? 0),
+    goalDifference: Number(row.goals?.for ?? 0) - Number(row.goals?.against ?? 0),
+  };
+}
 
-export async function syncMatchInsights(db: Db) {
-  const now = new Date(); const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000); const currentDay = dayKey(now);
-  const upcoming = await db.collection<any>("matches").find({ status: "SCHEDULED", kickoffAt: { $gte: now, $lte: horizon } }, { projection: { providerMatchId: 1, leagueCode: 1, seasonStartYear: 1, homeTeamProviderId: 1, awayTeamProviderId: 1, homeTeam: 1, awayTeam: 1 } }).toArray();
-  const pairs = [...new Map(upcoming.map((match) => { const ids = [Number(match.homeTeamProviderId), Number(match.awayTeamProviderId)].sort((a, b) => a - b); return [`${ids[0]}-${ids[1]}`, { key: `${ids[0]}-${ids[1]}` }]; })).values()];
-  let providerRequests = 0; let h2hRequests = 0; const standingsRequests = 0; const quota = await remainingApiRequests();
-  for (const pair of pairs) {
-    const cached = await db.collection<any>("h2hInsights").findOne({ pairKey: pair.key });
-    if (cached?.updatedAt && now.getTime() - new Date(cached.updatedAt).getTime() < 24 * 60 * 60 * 1000) continue;
-    if (providerRequests >= quota) break;
-    providerRequests++;
-    try { const response = await apiRequest<ProviderFixture>({ h2h: pair.key }, "fixtures/headtohead"); const meetings = response.response.filter((item) => ["FT", "AET", "PEN"].includes(item.fixture.status.short) && item.goals.home != null && item.goals.away != null).sort((a, b) => new Date(b.fixture.date).getTime() - new Date(a.fixture.date).getTime()).slice(0, 5).map((item) => ({ fixtureId: String(item.fixture.id), date: new Date(item.fixture.date).toISOString(), homeTeam: { id: item.teams.home.id, name: item.teams.home.name, logoUrl: item.teams.home.logo }, awayTeam: { id: item.teams.away.id, name: item.teams.away.name, logoUrl: item.teams.away.logo }, homeGoals: item.goals.home, awayGoals: item.goals.away, league: item.league?.name ?? "" })); await db.collection("h2hInsights").updateOne({ pairKey: pair.key }, { $set: { pairKey: pair.key, meetings, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true }); h2hRequests++; } catch { /* Optional H2H must never fail the football sync. */ }
+function normalizeH2H(item: ProviderFixture) {
+  return {
+    fixtureId: String(item.fixture.id),
+    date: new Date(item.fixture.date).toISOString(),
+    homeTeam: { id: item.teams.home.id, name: item.teams.home.name, logoUrl: item.teams.home.logo },
+    awayTeam: { id: item.teams.away.id, name: item.teams.away.name, logoUrl: item.teams.away.logo },
+    homeGoals: item.goals.home,
+    awayGoals: item.goals.away,
+    league: item.league?.name ?? "",
+  };
+}
+
+async function fetchStandings(db: Db, leagueCode: string, leagueId: number, season: number, now: Date, force: boolean) {
+  const day = dayKey(now);
+  if (!force) {
+    const cached = await db.collection<any>("leagueInsightStandings").findOne({ leagueCode, season, day });
+    if (cached?.status === "UNAVAILABLE" || cached?.rows?.length) return cached.rows ?? [];
   }
+  const response = await apiRequest<{ league?: { standings?: ProviderStanding[][] } }>({ league: String(leagueId), season: String(season) }, "standings");
+  const rows = response.response[0]?.league?.standings?.flatMap((group) => group.map(normalizeStanding)) ?? [];
+  await db.collection("leagueInsightStandings").updateOne(
+    { leagueCode, season, day },
+    { $set: { leagueCode, season, day, rows, provider: "football-api", fetchedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } },
+    { upsert: true },
+  );
+  return rows;
+}
+
+export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
+  const now = new Date();
+  const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const force = options.force === true;
+  const upcoming = await db.collection<any>("matches").find(
+    { status: "SCHEDULED", kickoffAt: { $gte: now, $lte: horizon } },
+    { projection: { providerMatchId: 1, leagueCode: 1, seasonStartYear: 1, homeTeamProviderId: 1, awayTeamProviderId: 1, homeTeam: 1, awayTeam: 1 } },
+  ).sort({ kickoffAt: 1 }).toArray();
+
+  const leagueIds = new Map<string, number>([
+    ["GB1", 39], ["ES1", 140], ["L1", 78], ["IT1", 135], ["FR1", 61],
+  ]);
+  const standings = new Map<string, any[]>();
+  let standingsRequests = 0;
+  let h2hRequests = 0;
+  let providerRequests = 0;
+  const providerErrors: string[] = [];
+  let lastProviderRequestAt = 0;
+  const throttleProvider = async () => {
+    const wait = Math.max(0, 6200 - (Date.now() - lastProviderRequestAt));
+    if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastProviderRequestAt = Date.now();
+  };
+  const available = await remainingApiRequests();
+
+  for (const match of upcoming) {
+    const key = `${match.leagueCode}:${Number(match.seasonStartYear)}`;
+    if (standings.has(key)) continue;
+    const leagueId = leagueIds.get(match.leagueCode);
+    if (!leagueId || providerRequests >= available) continue;
+    try {
+      await throttleProvider();
+      standings.set(key, await fetchStandings(db, match.leagueCode, leagueId, Number(match.seasonStartYear), now, force));
+      standingsRequests++;
+      providerRequests++;
+    } catch (error) {
+      providerRequests++;
+      const message = error instanceof Error ? error.message : "request failed";
+      providerErrors.push(`standings:${match.leagueCode}:${String(match.seasonStartYear)}:${message}`);
+      standings.set(key, []);
+      await db.collection("leagueInsightStandings").updateOne(
+        { leagueCode: match.leagueCode, season: Number(match.seasonStartYear), day: dayKey(now) },
+        { $set: { leagueCode: match.leagueCode, season: Number(match.seasonStartYear), day: dayKey(now), rows: [], status: "UNAVAILABLE", error: message, fetchedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } },
+        { upsert: true },
+      );
+    }
+  }
+
+  const pairs = [...new Map(upcoming.map((match) => {
+    const ids = [Number(match.homeTeamProviderId), Number(match.awayTeamProviderId)].sort((a, b) => a - b);
+    return [`${ids[0]}-${ids[1]}`, `${ids[0]}-${ids[1]}`];
+  })).values()];
+
+  for (const pairKey of pairs) {
+    const cached = await db.collection<any>("h2hInsights").findOne({ pairKey });
+    const fresh = cached?.updatedAt && now.getTime() - new Date(cached.updatedAt).getTime() < 24 * 60 * 60 * 1000;
+    if (!force && fresh) continue;
+    if (providerRequests >= available) break;
+    try {
+      await throttleProvider();
+      const response = await apiRequest<ProviderFixture>({ h2h: pairKey }, "fixtures/headtohead");
+      const meetings = response.response
+        .filter((item) => finished(item.fixture.status.short) && item.goals.home != null && item.goals.away != null)
+        .sort((a, b) => new Date(b.fixture.date).getTime() - new Date(a.fixture.date).getTime())
+        .slice(0, 5)
+        .map(normalizeH2H);
+      await db.collection("h2hInsights").updateOne(
+        { pairKey },
+        { $set: { pairKey, meetings, provider: "football-api", fetchedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } },
+        { upsert: true },
+      );
+      h2hRequests++;
+      providerRequests++;
+    } catch (error) {
+      providerRequests++;
+      providerErrors.push(`h2h:${pairKey}:${error instanceof Error ? error.message : "request failed"}`);
+      // Insights are optional. Preserve a previous snapshot when the provider fails.
+    }
+  }
+
   let snapshots = 0;
-  const standingsCache = new Map<string, any>(); for (const match of upcoming) { const key = `${match.leagueCode}:${Number(match.seasonStartYear)}`; if (!standingsCache.has(key)) standingsCache.set(key, { leagueCode: match.leagueCode, season: Number(match.seasonStartYear), rows: await localStandings(db, match.leagueCode, Number(match.seasonStartYear)) }); }
-  for (const match of upcoming) { const homeId = Number(match.homeTeamProviderId); const awayId = Number(match.awayTeamProviderId); const ids = [homeId, awayId].sort((a, b) => a - b); const h2h = await db.collection<any>("h2hInsights").findOne({ pairKey: `${ids[0]}-${ids[1]}` }); const table = standingsCache.get(`${match.leagueCode}:${Number(match.seasonStartYear)}`); await db.collection("matchInsights").updateOne({ matchId: String(match.providerMatchId) }, { $set: { matchId: String(match.providerMatchId), home: { id: homeId, name: match.homeTeam.name, logoUrl: match.homeTeam.logoUrl, form: await localForm(db, homeId) }, away: { id: awayId, name: match.awayTeam.name, logoUrl: match.awayTeam.logoUrl, form: await localForm(db, awayId) }, h2h: h2h?.meetings ?? [], standings: table ?? null, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true }); snapshots++; }
-  return { providerRequests, h2hRequests, standingsRequests, snapshots };
+  for (const match of upcoming) {
+    const homeId = Number(match.homeTeamProviderId);
+    const awayId = Number(match.awayTeamProviderId);
+    const ids = [homeId, awayId].sort((a, b) => a - b);
+    const h2h = await db.collection<any>("h2hInsights").findOne({ pairKey: `${ids[0]}-${ids[1]}` });
+    const table = standings.get(`${match.leagueCode}:${Number(match.seasonStartYear)}`) ?? [];
+    const homeStanding = table.find((row) => row.team.id === homeId) ?? null;
+    const awayStanding = table.find((row) => row.team.id === awayId) ?? null;
+    await db.collection("matchInsights").updateOne(
+      { matchId: String(match.providerMatchId) },
+      {
+        $set: {
+          matchId: String(match.providerMatchId),
+          provider: "football-api",
+          fetchedAt: now,
+          home: { id: homeId, name: match.homeTeam.name, logoUrl: match.homeTeam.logoUrl, form: homeStanding?.form ?? "", standing: homeStanding },
+          away: { id: awayId, name: match.awayTeam.name, logoUrl: match.awayTeam.logoUrl, form: awayStanding?.form ?? "", standing: awayStanding },
+          standings: table,
+          h2h: h2h?.meetings ?? [],
+          updatedAt: now,
+        },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true },
+    );
+    snapshots++;
+  }
+
+  return { providerRequests, h2hRequests, standingsRequests, snapshots, availableAtStart: available, matches: upcoming.length, providerErrors };
 }
