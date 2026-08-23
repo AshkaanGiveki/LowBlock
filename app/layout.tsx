@@ -5,6 +5,7 @@ import { Nav } from "@/components/Nav";
 import { PageTransition } from "@/components/PageTransition";
 import { SwipeNavigation } from "@/components/SwipeNavigation";
 import { DesktopNavigation } from "@/components/DesktopNavigation";
+import { HelpShortcut } from "@/components/HelpShortcut";
 
 export const metadata: Metadata = {
   title: { default: "LowBlock | Football Predictions", template: "%s | LowBlock" },
@@ -21,5 +22,5 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { themeColor: "#20b879" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="fa" dir="rtl"><body><Providers><DesktopNavigation/><Nav/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
+  return <html lang="fa" dir="rtl"><body><Providers><DesktopNavigation/><Nav/><HelpShortcut/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
