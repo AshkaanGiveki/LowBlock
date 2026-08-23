@@ -128,6 +128,8 @@ main > div.max-w-2xl:has(form) > form > div:last-child button:hover { transform:
 .text-rotate-lines { display:flex; flex-direction:column; width:100%; }
 .text-rotate-element { display:inline-block; }
 .text-rotate-space { white-space:pre; }
+.text-rotate-measure-layer { position:absolute; inset:0 auto auto 0; visibility:hidden; pointer-events:none; white-space:nowrap; }
+.text-rotate-measure-layer > span { display:inline-block; white-space:pre; }
 .home-hero-slang-wrap { display:inline-flex; align-items:center; gap:.45rem; flex-wrap:wrap; }
 .home-hero-slang { overflow:hidden; border:1px solid rgba(184,255,218,.32); border-radius:.85rem; background:var(--brand); padding:.08em .28em .13em; color:#fff; box-shadow:0 0 28px rgba(32,184,121,.22),inset 0 1px 0 rgba(255,255,255,.22); }
 .home-hero-slang-fa { line-height:1.35; padding-top:.16em; padding-bottom:.2em; }
