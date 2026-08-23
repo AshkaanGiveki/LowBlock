@@ -18,7 +18,7 @@ export function Nav() {
   const [clubImage, setClubImage] = useState<string | null>(null);
   const fa = language === "fa";
   const authPage = pathname === "/login" || pathname === "/signup";
-  const bottomPage = ["/", "/matches", "/club", "/lowblock", "/profile"].includes(pathname);
+  const bottomPage = ["/", "/matches", "/club", "/lowblock", "/profile", "/help"].includes(pathname);
   useEffect(() => setLoading(false), [pathname]);
   useEffect(() => { if (authPage) return; Promise.all([fetch("/api/auth/me").then(response => response.json()), fetch("/api/clubs").then(response => response.json())]).then(([me, club]) => { setAvatar(me.user?.avatarUrl ?? null); setClubImage(club.club?.imageUrl ?? null); }).catch(() => undefined); }, [authPage, pathname]);
   const active = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
