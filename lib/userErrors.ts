@@ -17,6 +17,7 @@ export function friendlyError(code: unknown, t: (fa: string, en: string) => stri
     OWNER_PERMISSION_REQUIRED: ["فقط مالک باشگاه می‌تواند این کار را انجام دهد.", "Only the Club owner can do this."],
     NEW_OWNER_MUST_BE_MEMBER: ["مالک جدید باید یکی از اعضای فعلی باشگاه باشد.", "The new owner must already be a Club member."],
     INVALID_CLUB_NAME: ["نام باشگاه را به شکل معتبر وارد کنید.", "Please enter a valid Club name."],
+    CLUB_HAS_MEMBERS: ["تا وقتی اعضای دیگری در باشگاه هستند، حذف آن ممکن نیست.", "You cannot delete a Club while other members are still in it."],
   };
   const message = messages[key];
   return message ? t(message[0], message[1]) : t("عملیات انجام نشد. لطفاً دوباره تلاش کنید.", "Something went wrong. Please try again.");
