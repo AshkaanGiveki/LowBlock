@@ -226,8 +226,8 @@ input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid v
 body > header > div > a[href="/"]:first-of-type { display:none !important; }
 body > header > div > a[href="/"]:nth-of-type(2) { display:none !important; }
 body > header > div > div { z-index:61; }
-html[dir="rtl"] body > header > div > div { left:1.25rem; right:auto; }
-html[dir="ltr"] body > header > div > div { right:1.25rem; left:auto; }
+html[dir="rtl"] body > header > div > div { right:1.25rem; left:auto; }
+html[dir="ltr"] body > header > div > div { left:1.25rem; right:auto; }
 .brand-switcher { position:fixed; top:15px; left:50%; z-index:61; display:grid; width:7rem; height:40px; place-items:center; transform:translateX(-50%); }
 .brand-switcher img { grid-area:1 / 1; display:block; object-fit:contain; }
 .brand-switcher-wordmark { width:7rem; height:auto; }
