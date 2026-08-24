@@ -8,6 +8,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 type Member = { _id: string; userId: string; role: string; joinedAt: string; user?: { username?: string; avatarUrl?: string | null } };
 type Club = { _id: string; name: string; imageUrl: string | null; state: "FORMING" | "ACTIVE" };
+type Viewer = { username: string; avatarUrl: string | null };
 
 export default function ClubMembers({ params }: { params: Promise<{ clubId: string }> }) {
   const { t } = useLanguage();
@@ -54,6 +55,6 @@ export default function ClubMembers({ params }: { params: Promise<{ clubId: stri
   </div></main>;
 }
 
-function ClubAvatar({ club }: { club: Club | null }) { return <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-brand/50 bg-brand/10 p-1 shadow-[0_0_0_6px_rgba(32,184,121,.08)]">{club?.imageUrl ? <img src={club.imageUrl} alt="" className="h-full w-full rounded-full object-cover" /> : <span className="text-lg font-black text-brand">{club?.name?.slice(0, 2).toUpperCase() ?? "LB"}</span>}</div>; }
-function Avatar({ member }: { member: Member }) { return <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border border-brand/20 bg-brand/10 text-xs font-black text-brand">{member.user?.avatarUrl ? <img src={member.user.avatarUrl} alt="" className="h-full w-full object-cover" /> : (member.user?.username ?? "LB").slice(0, 2).toUpperCase()}</div>; }
+function ClubAvatar({ club }: { club: Club | null }) { return <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-brand/50 bg-brand/10 p-1 shadow-[0_0_0_6px_rgba(32,184,121,.08)]">{club?.imageUrl ? <img src={club.imageUrl} alt="" className="h-full w-full rounded-full object-cover" /> : <span className="text-lg font-black text-brand">{club?.name?.slice(0, 2).toUpperCase() ?? "?"}</span>}</div>; }
+function Avatar({ member }: { member: Member }) { const [viewer, setViewer] = useState<Viewer | null>(null); useEffect(() => { if (member.role !== "OWNER" || member.user?.avatarUrl) return; fetch("/api/auth/me").then((response) => response.json()).then((data) => setViewer(data.user ?? null)).catch(() => undefined); }, [member.role, member.user?.avatarUrl]); const username = member.user?.username ?? viewer?.username ?? "Player"; const avatarUrl = member.user?.avatarUrl ?? viewer?.avatarUrl; return <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border border-brand/20 bg-brand/10 text-xs font-black text-brand">{avatarUrl ? <img src={avatarUrl} alt={username} className="h-full w-full object-cover" /> : username.slice(0, 2).toUpperCase()}</div>; }
 function MemberSkeleton({ count }: { count: number }) { return <div className="animate-pulse space-y-1">{Array.from({ length: count }, (_, index) => <div key={index} className="flex items-center gap-3 border-t border-white/[.06] px-2 py-3.5 first:border-t-0"><span className="h-11 w-11 shrink-0 rounded-full bg-white/[.08]" /><span className="flex-1"><span className="block h-3 w-32 rounded bg-white/[.08]" /><span className="mt-2 block h-2.5 w-20 rounded bg-white/[.05]" /></span><span className="h-7 w-7 rounded-lg bg-white/[.06]" /></div>)}</div>; }
