@@ -7,6 +7,7 @@ import { T } from "@/components/LanguageProvider";
 import { BackButton } from "@/components/BackButton";
 import { LeagueRoundRail } from "@/components/LeagueRoundRail";
 import { LeagueStandings } from "@/components/LeagueStandings";
+import { LeagueLogo } from "@/components/LeagueLogo";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ code: s
   const activeNumber = rounds.filter((round) => round.active).at(-1)?.number ?? rounds.find((round) => !round.completed)?.number ?? rounds.at(-1)?.number;
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-6xl">
     <BackButton />
-    <section className="rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-6 md:p-9"><div className="flex items-center gap-4"><img src={league.logo} alt="" className="league-logo h-16 w-16 rounded-2xl object-contain" /><div><p className="text-xs font-black tracking-[.2em] text-brand"><T fa={`لیگ · ${year}`} en={`LEAGUE · ${year}`} /></p><h1 className="mt-1 text-3xl font-black"><T fa={league.faName} en={league.enName} /></h1></div></div></section>
+    <section className="rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-6 md:p-9"><div className="flex min-w-0 items-center gap-4"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/[.03] p-2"><LeagueLogo src={league.logo} className="h-full w-full" /></span><div className="min-w-0"><p className="text-xs font-black tracking-[.2em] text-brand"><T fa={`لیگ · ${year}`} en={`LEAGUE · ${year}`} /></p><h1 className="mt-1 truncate text-3xl font-black"><T fa={league.faName} en={league.enName} /></h1></div></div></section>
     <LeagueRoundRail code={code} rounds={rounds.map((round) => ({ ...round, active: round.number === activeNumber }))} />
     <LeagueStandings rows={rows} me={await currentUserId()} leagueCode={code} />
   </div></main>;

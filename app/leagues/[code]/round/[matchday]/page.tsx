@@ -7,6 +7,7 @@ import { T } from "@/components/LanguageProvider";
 import { BackButton } from "@/components/BackButton";
 import { LeagueRoundLeaderboard } from "@/components/LeagueRoundLeaderboard";
 import { RoundMatchGrid } from "@/components/RoundMatchGrid";
+import { LeagueLogo } from "@/components/LeagueLogo";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export default async function RoundPage({ params }: { params: Promise<{ code: st
   const players = canonical.map((row) => grouped.get(row.userId) ?? { userId: row.userId, username: row.username, avatarUrl: row.avatarUrl, points: row.points, predictions: [] });
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-3xl">
     <BackButton />
-    <div className="relative overflow-hidden rounded-3xl border border-white/[.08] bg-[radial-gradient(circle_at_85%_0%,rgba(32,184,121,.2),transparent_38%),linear-gradient(145deg,#14241b,#0b100d)] p-6 md:p-9"><div className="flex items-center gap-4"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-white/10 bg-[#0b120e] p-2 shadow-inner"><img src={league.logo} alt="" className="league-logo h-full w-full object-contain" /></span><div><p className="text-xs font-black tracking-[.2em] text-brand"><T fa={league.faName} en={league.enName} /></p><h1 className="mt-1 text-3xl font-black"><T fa={`دور ${day}`} en={`Round ${day}`} /></h1><p className="mt-2 text-sm text-white/60"><T fa="امتیازها از جدول مرکزی محاسبه می‌شوند" en="Scores come from the canonical leaderboard" /></p></div></div></div>
+    <div className="relative overflow-hidden rounded-3xl border border-white/[.08] bg-[radial-gradient(circle_at_85%_0%,rgba(32,184,121,.2),transparent_38%),linear-gradient(145deg,#14241b,#0b100d)] p-6 md:p-9"><div className="flex min-w-0 items-center gap-4"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-white/10 bg-[#0b120e] p-2 shadow-inner"><LeagueLogo src={league.logo} className="h-full w-full" /></span><div className="min-w-0"><p className="text-xs font-black tracking-[.2em] text-brand"><T fa={league.faName} en={league.enName} /></p><h1 className="mt-1 truncate text-3xl font-black"><T fa={`دور ${day}`} en={`Round ${day}`} /></h1><p className="mt-2 text-sm text-white/60"><T fa="امتیازها از جدول مرکزی محاسبه می‌شوند" en="Scores come from the canonical leaderboard" /></p></div></div></div>
     <RoundMatchGrid fixtures={matches.map((match) => ({ providerMatchId: match.providerMatchId, kickoffAt: new Date(match.kickoffAt).toISOString(), status: match.status, homeGoals: match.homeGoals, awayGoals: match.awayGoals, homeTeam: match.homeTeam, awayTeam: match.awayTeam }))} />
     <LeagueRoundLeaderboard players={players} />
   </div></main>;
