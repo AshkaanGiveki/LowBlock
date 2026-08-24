@@ -4,6 +4,7 @@ import { BarChart3, Crown, Medal, Sparkles, Trophy, Users, Zap } from "lucide-re
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { T } from "@/components/LanguageProvider";
+import { BackButton } from "@/components/BackButton";
 import { PublicPredictionHistory } from "./PublicPredictionHistory";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
     <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">{metrics.map(metric => <div key={metric.en} className="metric-tile group relative overflow-hidden rounded-[1.35rem] border border-white/[.1] bg-[linear-gradient(145deg,rgba(25,52,38,.82),rgba(10,17,13,.9))] p-4 shadow-[0_14px_40px_rgba(0,0,0,.18)] transition duration-300 hover:-translate-y-1 hover:border-brand/45"><span className="metric-tile-glow"/><div className="relative"><span className="grid h-9 w-9 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">{metric.icon}</span></div><b className="relative mt-4 block text-2xl font-black tracking-tight text-white">{metric.value}</b><small className="relative mt-1 block truncate text-[10px] font-black tracking-wide text-white/50"><T fa={metric.fa} en={metric.en}/></small><span className="relative mt-4 block h-1 overflow-hidden rounded-full bg-white/10"><span className="block h-full w-2/3 rounded-full bg-gradient-to-r from-brand/30 to-brand"/></span></div>)}</section>
     {club && club.visibility !== "PRIVATE" && <section className="relative mt-4 overflow-hidden rounded-[1.75rem] border border-[#e8c66a]/25 bg-[radial-gradient(circle_at_88%_0%,rgba(232,198,106,.16),transparent_38%),linear-gradient(145deg,#18271d,#0b120e)] p-5 shadow-[0_18px_60px_rgba(0,0,0,.2)] sm:p-6"><div className="absolute -bottom-20 -left-10 h-44 w-44 rounded-full bg-brand/10 blur-3xl"/><div className="relative flex items-center gap-4"><div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#e8c66a]/60 bg-brand/15 p-1 shadow-[0_0_0_5px_rgba(232,198,106,.08)]">{club.imageUrl ? <img src={club.imageUrl} alt={club.name} className="h-full w-full rounded-full object-cover"/> : <span className="text-xl font-black text-brand">{club.name.slice(0, 2).toUpperCase()}</span>}</div><div className="min-w-0 flex-1"><p className="text-[10px] font-black tracking-[.2em] text-[#e8c66a]"><T fa="باشگاه فعلی" en="CURRENT CLUB"/></p><h2 className="mt-1 truncate text-xl font-black text-white sm:text-2xl">{club.name}</h2><p className="mt-1 text-xs text-white/50">{club.state === "ACTIVE" ? <T fa="باشگاه فعال" en="Active Club"/> : <T fa="باشگاه در حال شکل‌گیری" en="Forming Club"/>}</p></div><ShieldIcon/></div></section>}
     <section className="mt-4 grid grid-cols-2 gap-3"><ProfileStat icon={<Crown size={16}/>} value={roundWins} fa="برد دورها" en="Round wins"/><ProfileStat icon={<BarChart3 size={16}/>} value={scoredMatches} fa="بازی‌های امتیازدار" en="Scored matches"/></section>
+    <BackButton />
     <PublicPredictionHistory username={user.username}/>
   </div></main>;
 }
