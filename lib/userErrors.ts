@@ -5,7 +5,7 @@ export function friendlyError(code: unknown, t: (fa: string, en: string) => stri
     INVALID_PREDICTION: ["نتیجه‌ی پیش‌بینی معتبر نیست.", "Please enter a valid prediction."],
     MATCH_NOT_FOUND: ["این مسابقه پیدا نشد. لطفاً دوباره تلاش کنید.", "This match could not be found. Please try again."],
     PREDICTION_LOCKED: ["مهلت ثبت پیش‌بینی این مسابقه تمام شده است.", "Predictions for this match are now closed."],
-    TRANSFER_OWNERSHIP_FIRST: ["پیش از پیوستن به باشگاه جدید، مالکیت باشگاه فعلی را منتقل کنید.", "Transfer ownership of your current Club before joining another one."],
+    TRANSFER_OWNERSHIP_FIRST: ["برای ترک یا جابه‌جایی باشگاه، ابتدا مالکیت را به یکی از اعضای دیگر منتقل کنید.", "Transfer ownership to another member before leaving or switching Clubs."],
     ALREADY_MEMBER: ["شما هم‌اکنون عضو این باشگاه هستید.", "You are already a member of this Club."],
     INVITATION_REVOKED_OR_INVALID: ["این لینک دعوت معتبر نیست یا منقضی شده است.", "This invitation link is invalid or has expired."],
     CLUB_NOT_FOUND: ["این باشگاه پیدا نشد.", "This Club could not be found."],
