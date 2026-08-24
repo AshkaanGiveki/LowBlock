@@ -222,6 +222,15 @@ nav.mt-4.grid.grid-cols-3 > a { min-width:0; gap:.3rem; padding-inline:.2rem; wh
 nav.mt-4.grid.grid-cols-3 > a > span { white-space:nowrap; }
 @media (min-width:640px) { nav.mt-4.grid.grid-cols-3 > a { font-size:.75rem; } }
 input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+.mobile-help-shortcut { -webkit-tap-highlight-color:transparent; }
+@media (max-width:380px) {
+  body > header > div > a[href="/"] img { width:4.75rem; }
+  .mobile-help-shortcut { top:15px; width:2.25rem; height:2.25rem; }
+}
+@media (max-width:340px) {
+  html[dir="rtl"] body > header > div > a[href="/"] { margin-left:2.25rem; }
+  html[dir="ltr"] body > header > div > a[href="/"] { margin-right:2.25rem; }
+}
 .help-hero { background:radial-gradient(circle at 88% 0%,rgba(32,184,121,.25),transparent 36%),linear-gradient(145deg,#142b20,#080e0a); box-shadow:0 24px 80px rgba(0,0,0,.22),inset 0 1px 0 rgba(184,255,218,.08); }
 .help-hero-glow { position:absolute; width:22rem; height:22rem; inset-inline-end:-5rem; top:-8rem; border:1px solid rgba(32,184,121,.22); border-radius:999px; box-shadow:0 0 0 2rem rgba(32,184,121,.025),0 0 0 4rem rgba(32,184,121,.018); }
 .help-hero-mark { position:absolute; inset-inline-end:8%; top:28%; display:grid; width:8rem; height:8rem; place-items:center; border:1px solid rgba(184,255,218,.2); border-radius:2rem; color:var(--brand); background:rgba(32,184,121,.08); transform:rotate(8deg); box-shadow:0 0 55px rgba(32,184,121,.14); }
