@@ -4,5 +4,32 @@ import { ObjectId } from "mongodb";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { currentMembership, refreshClubState } from "@/lib/domain/clubs";
+
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-export async function POST(req: Request) { const userId = await currentUserId(); if (!userId) return NextResponse.json({ error: "Authentication required" }, { status: 401 }); const { token, confirmSwitch } = await req.json().catch(() => ({})); if (typeof token !== "string" || token.length < 7) return NextResponse.json({ error: "Invalid invitation" }, { status: 400 }); const db = await getDb(); const invite = await db.collection<any>("clubInvitations").findOne({ tokenHash: hash(token), kind: "CLUB_LINK", status: "ACTIVE" }); if (!invite) return NextResponse.json({ error: "INVITATION_REVOKED_OR_INVALID" }, { status: 404 }); const existing = await currentMembership(db, userId); if (existing?.clubId === invite.clubId) return NextResponse.json({ error: "ALREADY_MEMBER" }, { status: 409 }); if (existing && !confirmSwitch) return NextResponse.json({ requiresSwitchConfirmation: true, currentClubId: existing.clubId }, { status: 409 }); if (existing) { const currentClub = await db.collection<any>("clubs").findOne({ _id: new ObjectId(existing.clubId) }); if (currentClub?.ownerId === userId) return NextResponse.json({ error: "TRANSFER_OWNERSHIP_FIRST" }, { status: 409 }); await db.collection("clubMemberships").updateOne({ _id: existing._id, leftAt: null }, { $set: { leftAt: new Date() } }); } const now = new Date(); try { await db.collection("clubMemberships").insertOne({ clubId: invite.clubId, userId, role: "MEMBER", joinedAt: now, leftAt: null }); } catch (error) { if (!(error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000)) throw error; return NextResponse.json({ error: "ALREADY_MEMBER" }, { status: 409 }); } await refreshClubState(db, invite.clubId); return NextResponse.json({ ok: true, clubId: invite.clubId }); }
+
+export async function POST(req: Request) {
+  const userId = await currentUserId();
+  if (!userId) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
+  const { token, confirmSwitch } = await req.json().catch(() => ({}));
+  if (typeof token !== "string" || token.length < 7) return NextResponse.json({ error: "Invalid invitation" }, { status: 400 });
+  const db = await getDb();
+  const invite = await db.collection<any>("clubInvitations").findOne({ tokenHash: hash(token), kind: "CLUB_LINK", status: "ACTIVE" });
+  if (!invite) return NextResponse.json({ error: "INVITATION_REVOKED_OR_INVALID" }, { status: 404 });
+  const existing = await currentMembership(db, userId);
+  if (existing?.clubId === invite.clubId) return NextResponse.json({ error: "ALREADY_MEMBER" }, { status: 409 });
+  if (existing && !confirmSwitch) return NextResponse.json({ requiresSwitchConfirmation: true, currentClubId: existing.clubId }, { status: 409 });
+  if (existing) {
+    const currentClub = await db.collection<any>("clubs").findOne({ _id: new ObjectId(existing.clubId) });
+    if (currentClub?.ownerId === userId) return NextResponse.json({ error: "TRANSFER_OWNERSHIP_FIRST" }, { status: 409 });
+    await db.collection("clubMemberships").updateOne({ _id: existing._id, leftAt: null }, { $set: { leftAt: new Date() } });
+  }
+  const now = new Date();
+  try {
+    await db.collection("clubMemberships").insertOne({ clubId: invite.clubId, userId, role: "MEMBER", joinedAt: now, leftAt: null });
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000)) throw error;
+    return NextResponse.json({ error: "ALREADY_MEMBER" }, { status: 409 });
+  }
+  await refreshClubState(db, invite.clubId);
+  return NextResponse.json({ ok: true, clubId: invite.clubId });
+}

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { CircleHelp } from "lucide-react";
+import { MessageCircleQuestion } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export function HelpShortcut() {
   const { language, t } = useLanguage();
-  return <Link href="/help" aria-label={t("راهنما", "Help")} className={`mobile-help-shortcut fixed top-[15px] z-[60] flex h-10 w-10 items-center justify-center rounded-full border-0 bg-transparent text-white/60 shadow-none transition hover:bg-brand/10 hover:text-brand lg:hidden ${language === "fa" ? "left-[10rem]" : "right-[10rem]"}`}><CircleHelp size={18}/></Link>;
+  return <Link href="/help" aria-label={t("راهنما", "Help")} className={`mobile-help-shortcut fixed top-[13px] z-[60] lg:hidden ${language === "fa" ? "left-5 md:left-8" : "right-5 md:right-8"}`}><span className="mobile-help-icon"><MessageCircleQuestion size={19} strokeWidth={1.9}/><i /></span></Link>;
 }
