@@ -223,13 +223,24 @@ nav.mt-4.grid.grid-cols-3 > a > span { white-space:nowrap; }
 @media (min-width:640px) { nav.mt-4.grid.grid-cols-3 > a { font-size:.75rem; } }
 input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 .mobile-help-shortcut { -webkit-tap-highlight-color:transparent; }
+body > header > div > a[href="/"]:nth-of-type(2) { display:none !important; }
+body > header > div > div { z-index:61; }
+html[dir="rtl"] body > header > div > div { left:1.25rem; right:auto; }
+html[dir="ltr"] body > header > div > div { right:1.25rem; left:auto; }
+.brand-switcher { position:fixed; top:15px; left:50%; z-index:61; display:grid; width:7rem; height:40px; place-items:center; transform:translateX(-50%); }
+.brand-switcher img { grid-area:1 / 1; display:block; object-fit:contain; }
+.brand-switcher-wordmark { width:7rem; height:auto; }
+.brand-switcher-mark { width:2.65rem; height:2.65rem; }
+@media (min-width:1024px) { .brand-switcher { top:2.1rem; } }
 @media (max-width:380px) {
-  body > header > div > a[href="/"] img { width:4.75rem; }
+  body > header > div > a[href="/"]:nth-of-type(2) { display:none !important; }
+  .brand-switcher { width:5.5rem; }
+  .brand-switcher-wordmark { width:5.5rem; }
   .mobile-help-shortcut { top:15px; width:2.25rem; height:2.25rem; }
 }
 @media (max-width:340px) {
-  html[dir="rtl"] body > header > div > a[href="/"] { margin-left:2.25rem; }
-  html[dir="ltr"] body > header > div > a[href="/"] { margin-right:2.25rem; }
+  .brand-switcher { width:4.75rem; }
+  .brand-switcher-wordmark { width:4.75rem; }
 }
 .help-hero { background:radial-gradient(circle at 88% 0%,rgba(32,184,121,.25),transparent 36%),linear-gradient(145deg,#142b20,#080e0a); box-shadow:0 24px 80px rgba(0,0,0,.22),inset 0 1px 0 rgba(184,255,218,.08); }
 .help-hero-glow { position:absolute; width:22rem; height:22rem; inset-inline-end:-5rem; top:-8rem; border:1px solid rgba(32,184,121,.22); border-radius:999px; box-shadow:0 0 0 2rem rgba(32,184,121,.025),0 0 0 4rem rgba(32,184,121,.018); }
