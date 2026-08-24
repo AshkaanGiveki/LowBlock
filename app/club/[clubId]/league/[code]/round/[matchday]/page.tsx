@@ -8,6 +8,31 @@ import { getLeague } from "@/lib/football/leagues";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { ClubRoundFixtures } from "@/components/ClubRoundFixtures";
 import { ClubLeaderboard } from "@/components/ClubLeaderboard";
+import { BackButton } from "@/components/BackButton";
 import { T } from "@/components/LanguageProvider";
+
 export const dynamic = "force-dynamic";
-export default async function ClubRoundPage({ params }: { params: Promise<{ clubId: string; code: string; matchday: string }> }) { const { clubId, code, matchday } = await params; const league = getLeague(code); const day = Number(matchday); if (!league || !ObjectId.isValid(clubId) || !Number.isInteger(day)) notFound(); const userId = await currentUserId(); if (!userId) notFound(); const db = await getDb(); let club; try { ({ club } = await requireClubMember(db, clubId, userId)); } catch { notFound(); } const matches = await db.collection<any>("matches").find({ leagueCode: code, matchday: day }).sort({ kickoffAt: 1 }).toArray(); if (!matches.length) notFound(); const year = Number(matches[0].seasonStartYear); const rows = await getCanonicalLeaderboard(db, { clubId, leagueCode: code, seasonStartYear: year, matchday: day }, 100); const final = matches.every(match => match.status === "FINISHED"); const live = matches.some(match => match.status === "LIVE"); return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-4xl"><section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_40%),linear-gradient(145deg,#14251c,#0a0f0c)] p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black tracking-[.2em] text-brand">{club.name} · {league.enName}</p><h1 className="mt-2 text-3xl font-black"><T fa={`دور ${day}`} en={`Round ${day}`}/></h1><div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-bold text-white/70">{final ? <T fa="نهایی" en="FINAL"/> : live ? <T fa="زنده" en="LIVE"/> : <T fa="در جریان" en="IN PROGRESS"/>}</div></div><CalendarCheck className="text-brand" size={25}/></div></section><ClubRoundFixtures clubId={clubId} fixtures={matches.map(match => ({ providerMatchId: match.providerMatchId, kickoffAt: new Date(match.kickoffAt).toISOString(), status: match.status, homeGoals: match.homeGoals, awayGoals: match.awayGoals, homeTeam: match.homeTeam, awayTeam: match.awayTeam }))}/><ClubLeaderboard rows={rows} round titleFa={`جدول امتیازات دور ${day}`} titleEn={`Round ${day} leaderboard`} subtitleFa="عملکرد اعضای باشگاه در همین دور، با امتیازهای canonical محاسبه شده است." subtitleEn="Club members ranked by the canonical score for this round."/></div></main>; }
+
+export default async function ClubRoundPage({ params }: { params: Promise<{ clubId: string; code: string; matchday: string }> }) {
+  const { clubId, code, matchday } = await params;
+  const league = getLeague(code);
+  const day = Number(matchday);
+  if (!league || !ObjectId.isValid(clubId) || !Number.isInteger(day)) notFound();
+  const userId = await currentUserId();
+  if (!userId) notFound();
+  const db = await getDb();
+  let club;
+  try { ({ club } = await requireClubMember(db, clubId, userId)); } catch { notFound(); }
+  const matches = await db.collection<any>("matches").find({ leagueCode: code, matchday: day }).sort({ kickoffAt: 1 }).toArray();
+  if (!matches.length) notFound();
+  const year = Number(matches[0].seasonStartYear);
+  const rows = await getCanonicalLeaderboard(db, { clubId, leagueCode: code, seasonStartYear: year, matchday: day }, 100);
+  const final = matches.every((match) => match.status === "FINISHED");
+  const live = matches.some((match) => match.status === "LIVE");
+  return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-4xl">
+    <BackButton />
+    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_40%),linear-gradient(145deg,#14251c,#0a0f0c)] p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black tracking-[.2em] text-brand">{club.name} · {league.enName}</p><h1 className="mt-2 text-3xl font-black"><T fa={`دور ${day}`} en={`Round ${day}`} /></h1><div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-bold text-white/70">{final ? <T fa="نهایی" en="FINAL" /> : live ? <T fa="زنده" en="LIVE" /> : <T fa="در جریان" en="IN PROGRESS" />}</div></div><CalendarCheck className="text-brand" size={25} /></div></section>
+    <ClubRoundFixtures clubId={clubId} fixtures={matches.map((match) => ({ providerMatchId: match.providerMatchId, kickoffAt: new Date(match.kickoffAt).toISOString(), status: match.status, homeGoals: match.homeGoals, awayGoals: match.awayGoals, homeTeam: match.homeTeam, awayTeam: match.awayTeam }))} />
+    <ClubLeaderboard rows={rows} round titleFa={`جدول امتیازات دور ${day}`} titleEn={`Round ${day} leaderboard`} subtitleFa="عملکرد اعضای باشگاه در همین دور، با امتیازهای canonical محاسبه شده است." subtitleEn="Club members ranked by the canonical score for this round." />
+  </div></main>;
+}
