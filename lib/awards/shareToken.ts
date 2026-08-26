@@ -1,0 +1,3 @@
+import { createHash, randomBytes } from "node:crypto";
+export function createAwardShareToken() { return randomBytes(32).toString("base64url"); }
+export function hashAwardShareToken(token: string) { return createHash("sha256").update(token).digest("hex"); }

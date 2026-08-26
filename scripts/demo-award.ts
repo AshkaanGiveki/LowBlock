@@ -21,7 +21,7 @@ async function main() {
     const result = await db.collection("awards").deleteOne(filter);
     console.log(result.deletedCount ? `Removed demo award for @${user.username}.` : `No demo award found for @${user.username}.`);
   } else {
-    const result = await db.collection("awards").updateOne(filter, { $setOnInsert: { ...filter, competitionName: asset.leagueName, seasonStartYear: 2026, roundNumber: 1, awardedAt: new Date(), revealedAt: null } }, { upsert: true });
+    const result = await db.collection("awards").updateOne(filter, { $set: { revealedAt: null }, $setOnInsert: { ...filter, competitionName: asset.leagueName, seasonStartYear: 2026, roundNumber: 1, awardedAt: new Date() } }, { upsert: true });
     console.log(result.upsertedCount ? `Seeded unrevealed demo award for @${user.username}.` : `Demo award already exists for @${user.username}.`);
   }
   await closeMongo();
