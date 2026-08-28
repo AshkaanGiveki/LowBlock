@@ -30,3 +30,10 @@ export const WEEKLY_LOWBLOCK_ASSET = { trophy: path.join(privateRoot, "Weekly", 
 export function getWeeklyLowBlockAsset() { return WEEKLY_LOWBLOCK_ASSET; }
 export const CLUB_WEEKLY_ASSET = { trophy: path.join(clubRoot, "Weekly", "21-27Aug", "Trophy.png"), shareCard: path.join(clubRoot, "Weekly", "21-27Aug", "Card.png") };
 export function getClubWeeklyAsset() { return CLUB_WEEKLY_ASSET; }
+
+export const CLUB_WEEKLY_WINNER_TYPE = "CLUB_WEEKLY_WINNER" as const;
+export function getAwardAsset(award: { type?: string; scope?: string; competitionId?: string; seasonStartYear?: number; roundNumber?: number }) {
+  if (award.type === CLUB_WEEKLY_WINNER_TYPE) return getClubWeeklyAsset();
+  if (award.competitionId && award.seasonStartYear && award.roundNumber) return getRoundWinnerAsset(award.competitionId, award.seasonStartYear, award.roundNumber);
+  return null;
+}
