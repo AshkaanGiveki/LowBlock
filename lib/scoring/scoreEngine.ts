@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/mongo";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
 import { createLockSnapshot, isPredictionLocked, SCORING_VERSION } from "@/lib/domain/predictionLock";
-import { grantFinalRoundWinnerAwards } from "@/lib/awards/service";
+import { grantAutomaticAwards } from "@/lib/awards/service";
 
 type Match = { _id?: unknown; providerMatchId: string; leagueCode: string; seasonStartYear: number; matchday: number; roundId?: string | null; status: string; kickoffAt: Date; homeGoals: number | null; awayGoals: number | null };
 type Prediction = { _id?: unknown; userId: string; matchId: string; homeGoals: number; awayGoals: number };
@@ -27,7 +27,7 @@ async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
 export async function runScoreEngine() {
   const db = await getDb();
   const matches = await db.collection<Match>("matches").find({ provider: "football-api", status: "FINISHED", homeGoals: { $ne: null }, awayGoals: { $ne: null } }).toArray();
-  if (!matches.length) return { matches: 0, scores: 0, leaderboards: 0 };
+  if (!matches.length) return { matches: 0, scores: 0, leaderboards: 0, awards: await grantAutomaticAwards(db) };
   const byMatch = new Map(matches.map(match => [match.providerMatchId, match]));
   const predictions = await db.collection<Prediction>("predictions").find({ matchId: { $in: matches.map(match => match.providerMatchId) }, userId: { $ne: "guest" } }).toArray();
   const now = new Date();
@@ -55,6 +55,6 @@ export async function runScoreEngine() {
   const statOps = [...aggregates.values()].map(row => ({ updateOne: { filter: { userId: row.userId, scope: row.scope }, update: { $set: { ...row, totalPoints: row.points, predictionCount: row.predictions, exactScores: row.exact, updatedAt: now } }, upsert: true } }));
   if (statOps.length) await db.collection("leaderboardStats").bulkWrite(statOps, { ordered: false });
   const roundWinners = await rebuildRoundWinners(db);
-  const awards = await grantFinalRoundWinnerAwards(db);
+  const awards = await grantAutomaticAwards(db);
   return { matches: matches.length, scores: scoreOps.length, leaderboards: aggregates.size, roundWinners, awards };
 }

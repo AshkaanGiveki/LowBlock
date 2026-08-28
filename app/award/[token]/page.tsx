@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db/mongo";
-import { getRoundWinnerAsset } from "@/lib/awards/config";
+import { getAwardAsset } from "@/lib/awards/config";
 import { hashAwardShareToken } from "@/lib/awards/shareToken";
 import { currentUserId } from "@/lib/auth/session";
 import { SharedPredictionExperience } from "@/components/SharedPredictionExperience";
@@ -14,7 +14,7 @@ async function load(token: string) {
   const db = await getDb();
   const award = await db.collection<any>("awards").findOne({ shareTokenHash: hashAwardShareToken(token), scope: "LOWBLOCK" });
   if (!award) return null;
-  const asset = getRoundWinnerAsset(award.competitionId, award.seasonStartYear, award.roundNumber);
+  const asset = getAwardAsset(award);
   if (!asset) return null;
   const viewerId = await currentUserId();
 
@@ -32,7 +32,7 @@ async function load(token: string) {
   const match = fallback[0] ?? null;
   const prediction = viewerId && match ? await db.collection<any>("predictions").findOne({ userId: viewerId, matchId: match.providerMatchId }) : null;
   return {
-    award: { competitionName: award.competitionName, competitionId: award.competitionId, seasonStartYear: award.seasonStartYear, roundNumber: award.roundNumber },
+    award: { competitionName: award.competitionName, competitionId: award.competitionId ?? "WEEKLY", seasonStartYear: award.seasonStartYear ?? new Date().getUTCFullYear(), roundNumber: award.roundNumber ?? 0 },
     winner: { name: winner?.username ?? "LowBlock Player", avatarUrl: winner?.avatarUrl ?? null, clubName: club?.name ?? null, clubImageUrl: club?.imageUrl ?? null, points: Number(scores[0]?.points ?? 0) },
     match: match ? { providerMatchId: match.providerMatchId, kickoffAt: new Date(match.kickoffAt).toISOString(), status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null,
     initial: prediction ? { homeGoals: prediction.homeGoals, awayGoals: prediction.awayGoals } : null,
