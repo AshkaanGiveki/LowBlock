@@ -443,3 +443,4 @@ html[dir="ltr"] body > header > div > div > div { left:0; right:auto; }
   div[class*="z-[80]"] > div:last-child > div:nth-of-type(2) > div { border-radius:1.25rem !important; border-color:rgba(255,255,255,.09) !important; background:rgba(0,0,0,.25) !important; padding:1rem !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.03); }
   div[class*="z-[80]"] > div:last-child > button:last-child { border-radius:1rem !important; padding-top:1rem !important; padding-bottom:1rem !important; box-shadow:0 10px 28px rgba(32,184,121,.22); }
 }
+body:has(.shared-award-page) .bottom-nav-dock { display: none !important; }
