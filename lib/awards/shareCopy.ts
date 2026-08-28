@@ -4,3 +4,4 @@ export const shareCopy = {
 } as const;
 let previous = -1;
 export function getRandomAwardShareMessage(locale: "fa" | "en") { const pool = shareCopy[locale]; let index = Math.floor(Math.random() * pool.length); if (pool.length > 1 && index === previous) index = (index + 1) % pool.length; previous = index; return pool[index]; }
+export function getAwardShareMessage(locale: "fa" | "en", index: number | null | undefined) { const pool = shareCopy[locale]; return pool[Math.abs(Number.isInteger(index) ? Number(index) : 0) % pool.length]; }
