@@ -40,6 +40,7 @@ export function getClubWeeklyAsset() { return CLUB_WEEKLY_ASSET; }
 export function getAwardAsset(award: { type?: string; scope?: string; competitionId?: string; seasonStartYear?: number; roundNumber?: number }) {
   if (award.type === WEEKLY_WINNER_TYPE) return getWeeklyLowBlockAsset();
   if (award.type === CLUB_WEEKLY_WINNER_TYPE) return getClubWeeklyAsset();
+  if (award.type === CLUB_ROUND_WINNER_TYPE && award.competitionId && award.seasonStartYear && award.roundNumber) return getClubRoundAsset(award.competitionId, award.seasonStartYear, award.roundNumber);
   if (award.competitionId && award.seasonStartYear && award.roundNumber) return getRoundWinnerAsset(award.competitionId, award.seasonStartYear, award.roundNumber);
   return null;
 }

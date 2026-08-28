@@ -2,9 +2,9 @@ import { randomInt } from "node:crypto";
 import type { Db } from "mongodb";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
-import { getRoundWinnerAsset, LOWBLOCK_SCOPE, ROUND_WINNER_TYPE, WEEKLY_WINNER_TYPE, CLUB_WEEKLY_WINNER_TYPE, LEAGUE_WINNER_TYPE, GLOBAL_WINNER_TYPE, MONTHLY_EXACT_WINNER_TYPE } from "@/lib/awards/config";
+import { getClubRoundAsset, getRoundWinnerAsset, LOWBLOCK_SCOPE, ROUND_WINNER_TYPE, CLUB_ROUND_WINNER_TYPE, WEEKLY_WINNER_TYPE, CLUB_WEEKLY_WINNER_TYPE, LEAGUE_WINNER_TYPE, GLOBAL_WINNER_TYPE, MONTHLY_EXACT_WINNER_TYPE } from "@/lib/awards/config";
 
-export type AwardRecord = { _id?: unknown; awardKey?: string; userId: string; type: string; scope: string; competitionId?: string; competitionName: string; seasonId?: string; seasonStartYear?: number; roundId?: string; roundNumber?: number; periodId?: string; awardedAt: Date; revealedAt: Date | null; shareCopyIndex?: number };
+export type AwardRecord = { _id?: unknown; awardKey?: string; userId: string; type: string; scope: string; competitionId?: string; competitionName: string; seasonId?: string; seasonStartYear?: number; roundId?: string; roundNumber?: number; periodId?: string; clubId?: string; points?: number; exact?: number; predictions?: number; awardedAt: Date; revealedAt: Date | null; shareCopyIndex?: number };
 
 async function ensureAwardIndexes(db: Db) {
   await db.collection("awards").createIndex({ awardKey: 1 }, { unique: true, sparse: true, name: "unique_award_key" });
@@ -20,9 +20,12 @@ async function issue(db: Db, award: Omit<AwardRecord, "awardedAt" | "revealedAt"
 export async function grantFinalRoundWinnerAwards(db: Db) {
   const rounds = await db.collection<any>("rounds").find({ status: "FINAL" }).toArray(); let granted = 0;
   for (const round of rounds) {
-    const seasonStartYear = Number(round.seasonId); const roundNumber = Number(round.number); const asset = getRoundWinnerAsset(round.leagueCode, seasonStartYear, roundNumber); if (!asset) continue;
-    const leaderboard = await getCanonicalLeaderboard(db, { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber }, 1); const winner = leaderboard[0]; if (!winner) continue;
-    granted += await issue(db, { awardKey: `ROUND_WINNER:${LOWBLOCK_SCOPE}:${round.leagueCode}:${seasonStartYear}:${roundNumber}`, userId: winner.userId, type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, competitionName: asset.leagueName, seasonId: String(round.seasonId), seasonStartYear, roundId: String(round.id), roundNumber }, { type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, seasonId: String(round.seasonId), roundId: String(round.id) });
+    const seasonStartYear = Number(round.seasonId); const roundNumber = Number(round.number); const asset = getRoundWinnerAsset(round.leagueCode, seasonStartYear, roundNumber); const clubAsset = getClubRoundAsset(round.leagueCode, seasonStartYear, roundNumber); const competitionName = asset?.leagueName ?? clubAsset?.leagueName ?? round.leagueCode;
+    const leaderboard = await getCanonicalLeaderboard(db, { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber }, 1); const winner = leaderboard[0];
+    if (winner) granted += await issue(db, { awardKey: `ROUND_WINNER:${LOWBLOCK_SCOPE}:${round.leagueCode}:${seasonStartYear}:${roundNumber}`, userId: winner.userId, type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, competitionName, seasonId: String(round.seasonId), seasonStartYear, roundId: String(round.id), roundNumber }, { type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, seasonId: String(round.seasonId), roundId: String(round.id) });
+    const activeClubs = new Set((await db.collection<any>("clubs").find({ state: "ACTIVE" }, { projection: { _id: 1 } }).toArray()).map((club) => String(club._id)));
+    const clubs = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber, clubIdAtLock: { $ne: null } } }, { $group: { _id: "$clubIdAtLock" } }]).toArray();
+    for (const club of clubs) { const clubId = String(club._id); if (!activeClubs.has(clubId)) continue; const clubWinner = (await getCanonicalLeaderboard(db, { clubId, leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber }, 1))[0]; if (!clubWinner || !clubAsset) continue; granted += await issue(db, { awardKey: `ROUND_WINNER:CLUB:${clubId}:${round.leagueCode}:${seasonStartYear}:${roundNumber}`, userId: clubWinner.userId, type: CLUB_ROUND_WINNER_TYPE, scope: "CLUB", competitionId: round.leagueCode, competitionName, seasonId: String(round.seasonId), seasonStartYear, roundId: String(round.id), roundNumber, clubId, points: clubWinner.points, exact: clubWinner.exact, predictions: clubWinner.predictions }, { type: CLUB_ROUND_WINNER_TYPE, scope: "CLUB", clubId, competitionId: round.leagueCode, seasonId: String(round.seasonId), roundId: String(round.id) }); }
   }
   return { rounds: rounds.length, granted };
 }
@@ -31,8 +34,9 @@ async function grantWeeklyAwards(db: Db) {
   const period = getIranWeeklyPeriod(new Date(), 1); const periodId = period.start.toISOString().slice(0, 10); let granted = 0;
   const winner = (await getCanonicalLeaderboard(db, { weekly: true, weeklyOffset: 1 }, 1))[0];
   if (winner) granted += await issue(db, { awardKey: `WEEKLY_WINNER:${LOWBLOCK_SCOPE}:${periodId}`, userId: winner.userId, type: WEEKLY_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionName: "Weekly", periodId });
+  const activeClubs = new Set((await db.collection<any>("clubs").find({ state: "ACTIVE" }, { projection: { _id: 1 } }).toArray()).map((club) => String(club._id)));
   const clubs = await db.collection("predictionScores").aggregate([{ $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } }, { $unwind: "$fixture" }, { $match: { "fixture.kickoffAt": { $gte: period.start, $lt: period.end }, clubIdAtLock: { $ne: null } } }, { $group: { _id: "$clubIdAtLock" } }]).toArray();
-  for (const club of clubs) { const clubId = String(club._id); const clubWinner = (await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, 1))[0]; if (!clubWinner) continue; granted += await issue(db, { awardKey: `CLUB_WEEKLY_WINNER:${clubId}:${periodId}`, userId: clubWinner.userId, type: CLUB_WEEKLY_WINNER_TYPE, scope: "CLUB", competitionName: "Club Weekly", periodId }); }
+  for (const club of clubs) { const clubId = String(club._id); if (!activeClubs.has(clubId)) continue; const clubWinner = (await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, 1))[0]; if (!clubWinner) continue; granted += await issue(db, { awardKey: `CLUB_WEEKLY_WINNER:${clubId}:${periodId}`, userId: clubWinner.userId, type: CLUB_WEEKLY_WINNER_TYPE, scope: "CLUB", competitionName: "Club Weekly", periodId }); }
   return granted;
 }
 
