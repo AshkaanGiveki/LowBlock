@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 async function load(token: string) {
   if (!/^[A-Za-z0-9_-]{6}$/.test(token) && !/^[A-Za-z0-9_-]{40,60}$/.test(token)) return null;
   const db = await getDb();
-  const award = await db.collection<any>("awards").findOne({ shareTokenHash: hashAwardShareToken(token), scope: "LOWBLOCK" });
+  const award = await db.collection<any>("awards").findOne({ shareTokenHash: hashAwardShareToken(token), scope: { $in: ["LOWBLOCK", "CLUB"] } });
   if (!award) return null;
   const asset = getAwardAsset(award);
   if (!asset) return null;
