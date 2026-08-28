@@ -9,14 +9,14 @@ import { formatNumber } from "@/lib/text";
 
 type Row = { userId: string; username: string; avatarUrl: string | null; points: number; exact: number; predictions: number; cursor?: { points: number; exact: number; predictions: number; userId: string } };
 
-export function InfiniteLeaderboard({ initialRows, seasonStartYear, leagueCode, lifetime, me }: { initialRows: Row[]; seasonStartYear: number; leagueCode?: string; lifetime?: boolean; me: string | null }) {
+export function InfiniteLeaderboard({ initialRows, seasonStartYear, leagueCode, lifetime, weekly = false, me }: { initialRows: Row[]; seasonStartYear: number; leagueCode?: string; lifetime?: boolean; weekly?: boolean; me: string | null }) {
   const { language, t } = useLanguage();
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState(initialRows.at(-1)?.cursor ?? null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(initialRows.length < 100);
   const sentinel = useRef<HTMLDivElement>(null);
-  const params = useMemo(() => { const query = new URLSearchParams({ limit: "40" }); if (!lifetime) query.set("seasonStartYear", String(seasonStartYear)); if (leagueCode) query.set("leagueCode", leagueCode); return query; }, [seasonStartYear, leagueCode, lifetime]);
+  const params = useMemo(() => { const query = new URLSearchParams({ limit: "40" }); if (weekly) query.set("weekly", "true"); else if (!lifetime) query.set("seasonStartYear", String(seasonStartYear)); if (leagueCode) query.set("leagueCode", leagueCode); return query; }, [seasonStartYear, leagueCode, lifetime, weekly]);
   useEffect(() => { const node = sentinel.current; if (!node) return; const observer = new IntersectionObserver(entries => { if (entries[0]?.isIntersecting && cursor && !loading && !done) loadMore(); }, { rootMargin: "500px" }); observer.observe(node); return () => observer.disconnect(); }, [cursor, loading, done]);
   async function loadMore() { setLoading(true); try { const query = new URLSearchParams(params); query.set("cursor", btoa(JSON.stringify(cursor))); const response = await fetch(`/api/leaderboards?${query}`); if (!response.ok) throw new Error("leaderboard request failed"); const data = await response.json(); const incoming: Row[] = data.rows ?? []; setRows(current => { const ids = new Set(current.map(row => row.userId)); return [...current, ...incoming.filter(row => !ids.has(row.userId))]; }); setCursor(data.nextCursor ? JSON.parse(atob(data.nextCursor)) : null); setDone(!data.nextCursor || incoming.length === 0); } finally { setLoading(false); } }
   const n = (value: number) => formatNumber(value, language);

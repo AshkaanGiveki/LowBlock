@@ -1,15 +1,18 @@
 import { ObjectId, type Db } from "mongodb";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
+import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 
-export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null };
+export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null; weekly?: boolean };
 export type LeaderboardRow = Rankable & { avatarUrl: string | null; rank: number };
 
-function scoreMatch(scope: LeaderboardScope) {
+function scoreMatch(scope: LeaderboardScope, now = new Date()) {
+  const period = scope.weekly ? getIranWeeklyPeriod(now) : null;
   return {
     ...(scope.clubId ? { clubIdAtLock: scope.clubId } : {}),
     ...(scope.seasonStartYear != null ? { seasonStartYear: scope.seasonStartYear } : {}),
     ...(scope.leagueCode ? { leagueCode: scope.leagueCode } : {}),
     ...(scope.matchday != null ? { matchday: scope.matchday } : {}),
+    ...(period ? { calculatedAt: { $gte: period.start, $lt: period.end } } : {}),
   };
 }
 
