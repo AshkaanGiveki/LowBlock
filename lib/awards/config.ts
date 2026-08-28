@@ -8,18 +8,20 @@ export const LEAGUE_WINNER_TYPE = "LEAGUE_WINNER" as const;
 export const GLOBAL_WINNER_TYPE = "GLOBAL_WINNER" as const;
 export const MONTHLY_EXACT_WINNER_TYPE = "MONTHLY_EXACT_WINNER" as const;
 export const LOWBLOCK_SCOPE = "LOWBLOCK" as const;
-type AssetEntry = { leagueCode: string; leagueName: string; seasonStartYear: number; roundNumber: number; trophy: string; shareCard: string };
+export type AssetEntry = { leagueCode: string; leagueName: string; seasonStartYear: number; roundNumber: number; trophy: string; shareCard: string };
 const privateRoot = path.join(process.cwd(), "lib", "server-assets", "awards");
 const clubRoot = path.join(privateRoot, "Club");
 const asset = (leagueCode: string, leagueName: string, folder: string, roundNumber: number, lowBlockFolder = true): AssetEntry => ({ leagueCode, leagueName, seasonStartYear: 2026, roundNumber, trophy: path.join(privateRoot, folder, ...(lowBlockFolder ? ["LowBlock"] : []), `MD${String(roundNumber).padStart(2, "0")}`, "Trophy.png"), shareCard: path.join(privateRoot, folder, ...(lowBlockFolder ? ["LowBlock"] : []), `MD${String(roundNumber).padStart(2, "0")}`, "Card.png") });
 const clubAsset = (leagueCode: string, leagueName: string, folder: string, roundNumber: number): AssetEntry => ({ leagueCode, leagueName, seasonStartYear: 2026, roundNumber, trophy: path.join(clubRoot, folder, `MD${String(roundNumber).padStart(2, "0")}`, "Trophy.png"), shareCard: path.join(clubRoot, folder, `MD${String(roundNumber).padStart(2, "0")}`, "Card.png") });
 export const ROUND_WINNER_ASSETS: Record<string, AssetEntry> = {
   "GB1:2026:1": asset("GB1", "Premier League", "PremierLeague", 1),
+  "ES1:2026:1": { ...asset("ES1", "LaLiga", "LaLiga", 1), trophy: path.join(privateRoot, "LaLiga", "LowBlock", "MD01", "Trophy.webp"), shareCard: path.join(privateRoot, "LaLiga", "LowBlock", "MD01", "Card.webp") },
   "ES1:2026:2": asset("ES1", "LaLiga", "LaLiga", 2),
   "L1:2026:1": asset("L1", "Bundesliga", "BundesLiga", 1, false),
   "IT1:2026:1": asset("IT1", "Serie A", "SerieA", 1),
   "FR1:2026:1": asset("FR1", "Ligue 1", "Ligue1", 1),
 };
+export function getAwardAssetContentType(filePath: string) { return filePath.toLowerCase().endsWith(".webp") ? "image/webp" : "image/png"; }
 export function getRoundWinnerAsset(leagueCode: string, seasonStartYear: number, roundNumber: number) { return ROUND_WINNER_ASSETS[`${leagueCode}:${seasonStartYear}:${roundNumber}`] ?? null; }
 
 export const CLUB_ROUND_ASSETS: Record<string, AssetEntry> = {

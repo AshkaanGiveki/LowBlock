@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRoundWinnerAsset } from "@/lib/awards/config";
+import { getAwardAssetContentType, getRoundWinnerAsset } from "@/lib/awards/config";
 import { rankRows } from "@/lib/domain/ranking";
 describe("round winner awards", () => {
   it("maps each supplied first-release asset to the intended competition and round", () => {
@@ -9,6 +9,8 @@ describe("round winner awards", () => {
     expect(getRoundWinnerAsset("IT1", 2026, 1)?.leagueName).toBe("Serie A");
     expect(getRoundWinnerAsset("FR1", 2026, 1)?.leagueName).toBe("Ligue 1");
     expect(getRoundWinnerAsset("GB1", 2026, 2)).toBeNull();
+    expect(getRoundWinnerAsset("ES1", 2026, 1)?.trophy.endsWith("LaLiga\\LowBlock\\MD01\\Trophy.webp")).toBe(true);
+    expect(getAwardAssetContentType("Trophy.webp")).toBe("image/webp");
   });
   it("uses the application's canonical points/exact/prediction/user-id ordering", () => {
     const [winner] = rankRows([{ userId: "b", points: 10, exact: 1, predictions: 3 }, { userId: "a", points: 10, exact: 1, predictions: 3 }]);
