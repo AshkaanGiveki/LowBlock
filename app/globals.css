@@ -444,3 +444,15 @@ html[dir="ltr"] body > header > div > div > div { left:0; right:auto; }
   div[class*="z-[80]"] > div:last-child > button:last-child { border-radius:1rem !important; padding-top:1rem !important; padding-bottom:1rem !important; box-shadow:0 10px 28px rgba(32,184,121,.22); }
 }
 body:has(.shared-award-page) .bottom-nav-dock { display: none !important; }
+
+/* Public profile: anchor the polish to content, not optional-section order. */
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) { gap:.65rem !important; }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) > div { min-height:7rem; border-color:rgba(255,255,255,.13); border-radius:1.45rem; background:linear-gradient(145deg,rgba(28,61,44,.82),rgba(7,15,10,.92)); box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 16px 40px rgba(0,0,0,.18); padding:1rem; }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) > div > div.relative { padding:0; }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) > div > div:first-of-type > span:first-child { width:2.45rem; height:2.45rem; border-radius:.85rem; background:linear-gradient(145deg,rgba(32,184,121,.25),rgba(32,184,121,.08)); box-shadow:0 0 22px rgba(32,184,121,.12); }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) > div > b { font-size:1.8rem; }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) + section:has(h2) { border-color:rgba(232,198,106,.34); box-shadow:0 18px 60px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.08); }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) + section:has(h2) > div.relative { padding:.15rem; border-color:rgba(232,198,106,.25); background:radial-gradient(circle at 88% 0%,rgba(232,198,106,.16),transparent 38%),linear-gradient(145deg,#18271d,#0b120e); box-shadow:none; }
+main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) + section:has(h2) > div.absolute { border:0; background:transparent; box-shadow:none; }
+main:has(.metric-tile) > div.max-w-4xl { display:flex; flex-direction:column; }
+main:has(.metric-tile) > div.max-w-4xl > .page-back-button { order:-1; align-self:flex-start; position:static; margin-bottom:1.25rem; }
