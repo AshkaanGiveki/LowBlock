@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { useLanguage } from "@/components/LanguageProvider";
+import { migrateGuestPredictions } from "@/lib/predictions/guestStorage";
 
 export default function Signup() {
   const router = useRouter(); const { t } = useLanguage();
@@ -13,7 +14,7 @@ export default function Signup() {
     event.preventDefault(); if (password !== confirm) { setError(t("\u0631\u0645\u0632\u0647\u0627\u06cc \u0639\u0628\u0648\u0631 \u06cc\u06a9\u0633\u0627\u0646 \u0646\u06cc\u0633\u062a\u0646\u062f", "Passwords do not match")); return; }
     setBusy(true); setError(""); const response = await fetch("/api/auth/signup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }) }); const data = await response.json().catch(() => ({}));
     if (!response.ok) { setError(data.error ?? t("\u062b\u0628\u062a\u200c\u0646\u0627\u0645 \u0627\u0646\u062c\u0627\u0645 \u0646\u0634\u062f", "Sign-up failed")); setBusy(false); return; }
-    router.push("/matches"); router.refresh();
+    await migrateGuestPredictions(); router.push(new URLSearchParams(window.location.search).get("returnTo") || "/matches"); router.refresh();
   }
   return <AuthShell title={t("\u0631\u0642\u0627\u0628\u062a \u0631\u0627 \u0634\u0631\u0648\u0639 \u06a9\u0646", "Start competing")} subtitle={t("\u06cc\u06a9 \u0646\u0627\u0645 \u06a9\u0627\u0631\u0628\u0631\u06cc \u0628\u0633\u0627\u0632 \u0648 \u0648\u0627\u0631\u062f \u0644\u06cc\u06af \u0634\u0648.", "Create a username and join the league.")}><form onSubmit={submit} className="space-y-4">
     <label className="block text-sm font-semibold">{t("\u0646\u0627\u0645 \u06a9\u0627\u0631\u0628\u0631\u06cc", "Username")}<input required minLength={3} value={username} onChange={(event) => setUsername(event.target.value)} className="focus-ring mt-2 w-full rounded-xl border border-[var(--border)] bg-black/10 px-4 py-3" placeholder={t("نام کاربری", "e.g. football_master")} /></label>

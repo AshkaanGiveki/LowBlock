@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { useLanguage } from "@/components/LanguageProvider";
+import { migrateGuestPredictions } from "@/lib/predictions/guestStorage";
 
 export default function Login() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function Login() {
     const response = await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) { setError(data.error ?? t("\u0648\u0631\u0648\u062f \u0627\u0646\u062c\u0627\u0645 \u0646\u0634\u062f", "Sign-in failed")); setBusy(false); return; }
-    router.push("/matches"); router.refresh();
+    await migrateGuestPredictions(); router.push(new URLSearchParams(window.location.search).get("returnTo") || "/matches"); router.refresh();
   }
 
   return <AuthShell title={t("\u062e\u0648\u0634 \u0628\u0631\u06af\u0634\u062a\u06cc", "Welcome back")} subtitle={t("\u0628\u0631\u0627\u06cc \u0627\u062f\u0627\u0645\u0647 \u0631\u0642\u0627\u0628\u062a \u0648\u0627\u0631\u062f \u062d\u0633\u0627\u0628 \u062e\u0648\u062f\u062a \u0634\u0648.", "Sign in to continue the competition.")}><form onSubmit={submit} className="space-y-4">
