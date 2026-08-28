@@ -456,3 +456,7 @@ main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) + section:has
 main:has(.metric-tile) > div.max-w-4xl > section:has(.metric-tile) + section:has(h2) > div.absolute { border:0; background:transparent; box-shadow:none; }
 main:has(.metric-tile) > div.max-w-4xl { display:flex; flex-direction:column; }
 main:has(.metric-tile) > div.max-w-4xl > .page-back-button { order:-1; align-self:flex-start; position:static; margin-bottom:1.25rem; }
+
+/* Public awards/glory list: the individual award tiles provide the surfaces. */
+main:has(.metric-tile) section:has(img[src*="/api/profiles/"]) { border:0 !important; background:transparent !important; box-shadow:none !important; padding:0 !important; }
+main:has(.metric-tile) section:has(img[src*="/api/profiles/"]) > div { min-height:unset !important; border:0 !important; background:transparent !important; box-shadow:none !important; padding:0 !important; }
