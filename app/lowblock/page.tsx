@@ -8,14 +8,15 @@ import { BarChart3, Sparkles, Trophy, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function LowBlockPage({ searchParams }: { searchParams: Promise<{ scope?: string; league?: string }> }) {
+export default async function LowBlockPage({ searchParams }: { searchParams: Promise<{ scope?: string; league?: string; week?: string }> }) {
   const query = await searchParams;
   const weekly = query.scope === "weekly";
+  const weekOffset = weekly && query.week === "previous" ? 1 : 0;
   const lifetime = query.scope === "lifetime";
   const league = LEAGUES.find((item) => item.code === query.league);
   const db = await getDb();
   const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
-  const rows = await getCanonicalLeaderboard(db, { seasonStartYear: lifetime || weekly ? null : year, leagueCode: league?.code ?? null, weekly }, 100);
+  const rows = await getCanonicalLeaderboard(db, { seasonStartYear: lifetime || weekly ? null : year, leagueCode: league?.code ?? null, weekly, weeklyOffset: weekOffset }, 100);
   const [usersCount, picksCount, roundsCount, me] = await Promise.all([
     db.collection("users").countDocuments(),
     db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
@@ -29,7 +30,7 @@ export default async function LowBlockPage({ searchParams }: { searchParams: Pro
       <div className="lowblock-command-orbit" aria-hidden="true"><Trophy size={42} /></div>
       <div className="lowblock-metric-grid mt-8 grid grid-cols-3 gap-3"><Metric icon={<Users size={17} />} value={usersCount} fa="کاربر" en="Users" /><Metric icon={<BarChart3 size={17} />} value={picksCount} fa="پیش‌بینی" en="Predictions" /><Metric icon={<Trophy size={17} />} value={roundsCount} fa="راند نهایی" en="Final rounds" /></div>
     </section>
-    <LeaderboardExplorer initialRows={rows} seasonStartYear={year} leagueCode={league?.code} lifetime={lifetime} weekly={weekly} me={me} />
+    <LeaderboardExplorer initialRows={rows} seasonStartYear={year} leagueCode={league?.code} lifetime={lifetime} weekly={weekly} weekOffset={weekOffset} me={me} />
   </div></main>;
 }
 

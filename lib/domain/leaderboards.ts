@@ -2,11 +2,11 @@ import { ObjectId, type Db } from "mongodb";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 
-export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null; weekly?: boolean };
+export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null; weekly?: boolean; weeklyOffset?: number };
 export type LeaderboardRow = Rankable & { avatarUrl: string | null; rank: number };
 
 function scoreMatch(scope: LeaderboardScope, now = new Date()) {
-  const period = scope.weekly ? getIranWeeklyPeriod(now) : null;
+  const period = scope.weekly ? getIranWeeklyPeriod(now, scope.weeklyOffset ?? 0) : null;
   return {
     ...(scope.clubId ? { clubIdAtLock: scope.clubId } : {}),
     ...(scope.seasonStartYear != null ? { seasonStartYear: scope.seasonStartYear } : {}),

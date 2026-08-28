@@ -20,6 +20,7 @@ export async function GET(req: Request) {
   const scope = new URL(req.url).searchParams.get("scope");
   const weekly = scope === "weekly";
   const lifetime = scope === "lifetime";
+  const weeklyOffset = new URL(req.url).searchParams.get("week") === "previous" ? 1 : 0;
   const membership = await currentMembership(db, userId);
   const club = membership ? await db.collection("clubs").findOne({ _id: new ObjectId(membership.clubId) }) : null;
   const pending = await db.collection<any>("clubJoinRequests").findOne({ userId, status: "PENDING" }, { sort: { createdAt: -1 } });
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   let leaderboard: any[] = [];
   if (membership && club) {
     const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
-    const rows = await getCanonicalLeaderboard(db, { clubId: membership.clubId, seasonStartYear: lifetime || weekly ? null : year, weekly }, 100);
+    const rows = await getCanonicalLeaderboard(db, { clubId: membership.clubId, seasonStartYear: lifetime || weekly ? null : year, weekly, weeklyOffset }, 100);
     leaderboard = rows.slice(0, 8);
     const mine = rows.find((row) => row.userId === userId);
     const totals = await db.collection<any>("predictionScores").aggregate([

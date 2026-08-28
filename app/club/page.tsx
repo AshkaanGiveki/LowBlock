@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, BarChart3, CalendarDays, ChevronRight, Crown, Gauge, Settings2, ShieldCheck, Sparkles, Trophy, Users, Zap } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -15,6 +16,7 @@ type PendingJoinRequest = { id: string; clubId: string; club: { name: string; im
 
 export default function ClubPage() {
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState(0);
   const [performance, setPerformance] = useState<Performance | null>(null);
@@ -25,7 +27,10 @@ export default function ClubPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { const scope = new URLSearchParams(window.location.search).get("scope"); const nextScope = scope === "weekly" || scope === "lifetime" ? scope : "season"; setLeaderboardScope(nextScope); fetch(`/api/clubs?scope=${nextScope}`).then((response) => response.json()).then((data) => { setClub(data.club); setMembers(data.members ?? 0); setPerformance(data.performance ?? null); setLeaderboard(data.leaderboard ?? []); setPendingJoinRequest(data.pendingJoinRequest ?? null); setPendingCount(data.pendingCount ?? 0); setIsOwner(data.membership?.role === "OWNER"); }).finally(() => setLoading(false)); }, []);
+  const scopeParam = searchParams.get("scope");
+  const requestedScope: "season" | "weekly" | "lifetime" = scopeParam === "weekly" || scopeParam === "lifetime" ? scopeParam : "season";
+  const requestedWeek = searchParams.get("week") === "previous" ? "&week=previous" : "";
+  useEffect(() => { setLeaderboardScope(requestedScope); setLoading(true); fetch(`/api/clubs?scope=${requestedScope}${requestedWeek}`).then((response) => response.json()).then((data) => { setClub(data.club); setMembers(data.members ?? 0); setPerformance(data.performance ?? null); setLeaderboard(data.leaderboard ?? []); setPendingJoinRequest(data.pendingJoinRequest ?? null); setPendingCount(data.pendingCount ?? 0); setIsOwner(data.membership?.role === "OWNER"); }).finally(() => setLoading(false)); }, [requestedScope, requestedWeek]);
 
   if (loading) return <ClubSkeleton />;
   if (!club && pendingJoinRequest) return <PendingClub request={pendingJoinRequest} t={t} />;

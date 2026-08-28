@@ -7,7 +7,7 @@ export type LeaderboardPeriod = { start: Date; end: Date };
  * the following Friday 03:30:00. Iran is UTC+03:30 for the product's current
  * operating calendar, so the boundary is represented as a UTC midnight date.
  */
-export function getIranWeeklyPeriod(now = new Date()): LeaderboardPeriod {
+export function getIranWeeklyPeriod(now = new Date(), weekOffset = 0): LeaderboardPeriod {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Tehran",
     year: "numeric",
@@ -31,7 +31,7 @@ export function getIranWeeklyPeriod(now = new Date()): LeaderboardPeriod {
   const effectiveWeekday = beforeFridayBoundary ? 4 : weekday;
   const daysSinceFriday = (effectiveWeekday - 5 + 7) % 7;
   const effectiveDate = iranDateAsUtc - (beforeFridayBoundary ? 86400000 : 0);
-  const start = new Date(effectiveDate - daysSinceFriday * 86400000);
+  const start = new Date(effectiveDate - daysSinceFriday * 86400000 - weekOffset * 7 * 86400000);
   // The Iran 03:30 boundary is midnight UTC under the current Iran offset.
   // Keep the offset explicit so the contract is clear and easy to revise if
   // the product ever changes its operating timezone.
