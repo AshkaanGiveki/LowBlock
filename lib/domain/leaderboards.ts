@@ -1,7 +1,8 @@
 import { ObjectId, type Db } from "mongodb";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
+import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 
-export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null };
+export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null; weekly?: boolean; weeklyOffset?: number };
 export type LeaderboardRow = Rankable & { avatarUrl: string | null; rank: number };
 
 function scoreMatch(scope: LeaderboardScope) {
@@ -14,10 +15,17 @@ function scoreMatch(scope: LeaderboardScope) {
 }
 
 export async function getCanonicalLeaderboard(db: Db, scope: LeaderboardScope, limit = 100, cursor?: { points: number; exact: number; predictions: number; userId: string }) {
-  const pipeline: any[] = [
+  const period = scope.weekly ? getIranWeeklyPeriod(new Date(), scope.weeklyOffset ?? 0) : null;
+  const pipeline: any[] = [];
+  if (period) pipeline.push(
+    { $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } },
+    { $unwind: "$fixture" },
+    { $match: { "fixture.kickoffAt": { $gte: period.start, $lt: period.end } } },
+  );
+  pipeline.push(
     { $match: scoreMatch(scope) },
     { $group: { _id: "$userId", points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } },
-  ];
+  );
   if (cursor) pipeline.push({ $match: { $or: [{ points: { $lt: cursor.points } }, { points: cursor.points, exact: { $lt: cursor.exact } }, { points: cursor.points, exact: cursor.exact, predictions: { $lt: cursor.predictions } }, { points: cursor.points, exact: cursor.exact, predictions: cursor.predictions, _id: { $gt: cursor.userId } }] } });
   pipeline.push(
     { $sort: { points: -1, exact: -1, predictions: -1, _id: 1 } },

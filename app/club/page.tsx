@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, BarChart3, CalendarDays, ChevronRight, Crown, Gauge, Settings2, ShieldCheck, Sparkles, Trophy, Users, Zap } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { OwnerRequestsBanner, PendingSwitchBanner } from "@/components/ClubRequestBanners";
+import { LeaderboardFilters } from "@/components/LeaderboardFilters";
+import type { LeaderboardSelection } from "@/components/LeaderboardFilters";
 
 type Club = { _id: string; name: string; imageUrl: string | null; state: "FORMING" | "ACTIVE"; discoveryMode: string; activatedAt: string | null };
 type Performance = { rank: number | null; points: number; exact: number; roundWins: number; predictions?: number };
@@ -14,17 +17,24 @@ type PendingJoinRequest = { id: string; clubId: string; club: { name: string; im
 
 export default function ClubPage() {
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState(0);
   const [performance, setPerformance] = useState<Performance | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [leaderboardScope, setLeaderboardScope] = useState<"season" | "weekly" | "lifetime">("season");
+  const [leaderboardWeekOffset, setLeaderboardWeekOffset] = useState(0);
   const [pendingJoinRequest, setPendingJoinRequest] = useState<PendingJoinRequest | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetch("/api/clubs").then((response) => response.json()).then((data) => { setClub(data.club); setMembers(data.members ?? 0); setPerformance(data.performance ?? null); setLeaderboard(data.leaderboard ?? []); setPendingJoinRequest(data.pendingJoinRequest ?? null); setPendingCount(data.pendingCount ?? 0); setIsOwner(data.membership?.role === "OWNER"); }).finally(() => setLoading(false)); }, []);
+  const scopeParam = searchParams.get("scope");
+  const requestedScope: "season" | "weekly" | "lifetime" = scopeParam === "weekly" || scopeParam === "lifetime" ? scopeParam : "season";
+  const requestedWeek = searchParams.get("week") === "previous" ? "&week=previous" : "";
+  useEffect(() => { setLeaderboardScope(requestedScope); setLeaderboardWeekOffset(requestedWeek ? 1 : 0); setLoading(true); fetch(`/api/clubs?scope=${requestedScope}${requestedWeek}`).then((response) => response.json()).then((data) => { setClub(data.club); setMembers(data.members ?? 0); setPerformance(data.performance ?? null); setLeaderboard(data.leaderboard ?? []); setPendingJoinRequest(data.pendingJoinRequest ?? null); setPendingCount(data.pendingCount ?? 0); setIsOwner(data.membership?.role === "OWNER"); }).finally(() => setLoading(false)); }, [requestedScope, requestedWeek]);
 
+  async function changeLeaderboard(selection: LeaderboardSelection) { setLeaderboardScope(selection.weekly ? "weekly" : selection.lifetime ? "lifetime" : "season"); setLeaderboardWeekOffset(selection.weekOffset); try { const query = new URLSearchParams({ scope: selection.weekly ? "weekly" : selection.lifetime ? "lifetime" : "season" }); if (selection.weekly && selection.weekOffset) query.set("week", "previous"); const response = await fetch(`/api/clubs?${query}`); if (!response.ok) throw new Error("club leaderboard request failed"); const data = await response.json(); setLeaderboard(data.leaderboard ?? []); } catch { setLeaderboard([]); } }
   if (loading) return <ClubSkeleton />;
   if (!club && pendingJoinRequest) return <PendingClub request={pendingJoinRequest} t={t} />;
   if (!club) return <EmptyClub t={t} />;
@@ -40,6 +50,7 @@ export default function ClubPage() {
 
     <nav className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-[#101812] p-2 shadow-lg"><NavItem href="/club" active icon={<Gauge size={16} />} label={t("نمای کلی", "Overview")} /><NavItem href={`/club/${club._id}/match-centre`} icon={<BarChart3 size={16} />} label={t("مرکز مسابقات", "Match Centre")} /><NavItem href={`/club/${club._id}/members`} icon={<Users size={16} />} label={t("اعضای باشگاه", "Members")} /></nav>
 
+    <LeaderboardFilters lifetime={leaderboardScope === "lifetime"} weekly={leaderboardScope === "weekly"} weekOffset={leaderboardWeekOffset} basePath="/club" showLeagues={false} onNavigate={changeLeaderboard} />
     <ClubLeaderboard rows={leaderboard} t={t} clubId={club._id} />
 
     {isOwner && <OwnerRequestsBanner clubId={club._id} count={pendingCount} t={t} />}
