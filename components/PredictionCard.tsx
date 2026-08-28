@@ -15,10 +15,10 @@ import { friendlyError } from "@/lib/userErrors";
 
 type Team = { id: number; name: string; logoUrl: string | null };
 type Match = { providerMatchId: string; kickoffAt: Date | string; status: string; homeGoals?: number | null; awayGoals?: number | null; homeTeam: Team; awayTeam: Team };
-type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number }; index?: number; onDrawerChange?: (open: boolean) => void; onPredictionSaved?: (prediction: { homeGoals: number; awayGoals: number }) => void };
+type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number }; index?: number; onDrawerChange?: (open: boolean) => void; onPredictionSaved?: (prediction: { homeGoals: number; awayGoals: number }) => void; openOnMount?: boolean; submitPrediction?: (prediction: { matchId: string; homeGoals: number; awayGoals: number }) => Promise<void> };
 type DrawerTeam = { name: string; logo: string | null };
 
-export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPredictionSaved }: Props) {
+export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPredictionSaved, openOnMount = false, submitPrediction }: Props) {
   const { language, t } = useLanguage(); const { showToast } = useToast(); const router = useRouter();
   const [now, setNow] = useState(Date.now());
   const [home, setHome] = useState(initial?.homeGoals?.toString() ?? "");
@@ -35,6 +35,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPr
   const finished = match.status === "FINISHED" || (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED");
   const live = !finished && (match.status === "LIVE" || now >= kickoff);
   const locked = live || finished;
+  useEffect(() => { if (!openOnMount || locked) return; setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange]);
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
   const closeDrawer = () => { setDrawerOpen(false); setInsightsOpen(false); onDrawerChange?.(false); };
