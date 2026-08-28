@@ -7,8 +7,9 @@ import { BarChart3, Crown, Medal, Sparkles, Trophy, Users } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { Brand } from "@/components/Brand";
+import { UserAvatar } from "@/components/UserAvatar";
 
-type Row = { userId: string; points: number; predictions: number; exact: number; username: string; avatarUrl: string | null };
+type Row = { userId: string; points: number; predictions: number; exact: number; username: string; avatarUrl: string | null; isDefendingChampion?: boolean };
 type Props = { rows: Row[]; me: string | null; usersCount?: number; picksCount?: number; roundsCount?: number };
 
 export function LeaderboardView({ rows, me, usersCount = rows.length, picksCount = rows.reduce((sum, row) => sum + row.predictions, 0), roundsCount = 0 }: Props) {
@@ -25,4 +26,4 @@ function PodiumCard({ row, rank, language, t }: { row: Row; rank: number; langua
 function number(value: number, language: "fa" | "en") { return formatNumber(value, language); }
 function Metric({ icon, value, label, language }: { icon: React.ReactNode; value: number; label: string; language: "fa" | "en" }) { return <div className="rounded-2xl border border-white/[.08] bg-black/20 p-3"><span className="text-brand">{icon}</span><AnimatedNumber value={value} language={language}/><small className="block text-[10px] text-[var(--muted)]">{label}</small></div>; }
 function AnimatedNumber({ value, language }: { value: number; language: "fa" | "en" }) { const [current, setCurrent] = useState(0); useEffect(() => { const started = performance.now(); const duration = 850; let frame = 0; const tick = (now: number) => { const progress = Math.min((now - started) / duration, 1); setCurrent(Math.round(value * (1 - Math.pow(1 - progress, 3)))); if (progress < 1) frame = requestAnimationFrame(tick); }; frame = requestAnimationFrame(tick); return () => cancelAnimationFrame(frame); }, [value]); return <b className="mt-1 block text-2xl tracking-tight">{formatNumber(current, language)}</b>; }
-function Avatar({ row, large = false }: { row: Row; large?: boolean }) { return <span className={`grid shrink-0 place-items-center overflow-hidden rounded-full border-2 bg-brand/15 font-black ${large ? "h-16 w-16 border-white/30 text-lg" : "h-9 w-9 border-white/10 text-[10px]"}`}>{row.avatarUrl ? <img src={row.avatarUrl} alt={row.username} className="h-full w-full object-cover"/> : row.username.slice(0, 2).toUpperCase()}</span>; }
+function Avatar({ row, large = false }: { row: Row; large?: boolean }) { return <UserAvatar name={row.username} avatarUrl={row.avatarUrl} isDefendingChampion={row.isDefendingChampion} className={`${large ? "h-16 w-16 border-2 border-white/30 text-lg" : "h-9 w-9 border-2 border-white/10 text-[10px]"}`} />; }

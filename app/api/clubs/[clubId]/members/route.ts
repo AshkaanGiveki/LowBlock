@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { refreshClubState, transferOwnership } from "@/lib/domain/clubs";
+import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ clubId: string }> }) {
   const viewer = await currentUserId();
@@ -18,7 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ clubId:
     { $lookup: { from: "users", let: { userId: "$userId" }, pipeline: [{ $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$userId"] } } }, { $project: { username: 1, avatarUrl: 1 } }], as: "user" } },
     { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
   ]).toArray();
-  return NextResponse.json({ club, members, isOwner: club.ownerId === viewer });
+  const championId = await getDefendingChampionUserId(db);
+  return NextResponse.json({ club, members: members.map((member) => ({ ...member, isDefendingChampion: String(member.userId) === championId })), isOwner: club.ownerId === viewer });
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ clubId: string }> }) {

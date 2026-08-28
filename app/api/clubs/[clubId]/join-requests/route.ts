@@ -4,6 +4,7 @@ import { z } from "zod";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb, withMongoTransaction } from "@/lib/db/mongo";
 import { refreshClubState } from "@/lib/domain/clubs";
+import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
 
 const body = z.object({ action: z.enum(["ACCEPT", "DECLINE", "CANCEL"]), requestId: z.string().min(1), confirmSwitch: z.boolean().default(false) });
 
@@ -18,7 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ clubId:
   const ids = requests.filter((request) => ObjectId.isValid(request.userId)).map((request) => new ObjectId(request.userId));
   const users = await db.collection<any>("users").find({ _id: { $in: ids } }, { projection: { username: 1, avatarUrl: 1 } }).toArray();
   const byId = new Map(users.map((user) => [String(user._id), user]));
-  return NextResponse.json({ club: { name: club.name, imageUrl: club.imageUrl ?? null }, requests: requests.map((request) => ({ ...request, _id: String(request._id), user: byId.get(request.userId) ? { username: byId.get(request.userId).username, avatarUrl: byId.get(request.userId).avatarUrl ?? null } : null })) });
+  const championId = await getDefendingChampionUserId(db);
+  return NextResponse.json({ club: { name: club.name, imageUrl: club.imageUrl ?? null }, requests: requests.map((request) => ({ ...request, _id: String(request._id), isDefendingChampion: request.userId === championId, user: byId.get(request.userId) ? { username: byId.get(request.userId).username, avatarUrl: byId.get(request.userId).avatarUrl ?? null } : null })) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ clubId: string }> }) {
