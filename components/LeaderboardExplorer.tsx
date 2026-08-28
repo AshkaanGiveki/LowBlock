@@ -5,7 +5,7 @@ import { LeaderboardFilters } from "@/components/LeaderboardFilters";
 import type { LeaderboardSelection } from "@/components/LeaderboardFilters";
 import { InfiniteLeaderboard } from "@/components/InfiniteLeaderboard";
 
-type Row = { userId: string; username: string; avatarUrl: string | null; points: number; exact: number; predictions: number; cursor?: { points: number; exact: number; predictions: number; userId: string } };
+type Row = { userId: string; username: string; avatarUrl: string | null; isDefendingChampion?: boolean; points: number; exact: number; predictions: number; cursor?: { points: number; exact: number; predictions: number; userId: string } };
 
 export function LeaderboardExplorer({ initialRows, seasonStartYear, leagueCode, lifetime, weekly = false, weekOffset = 0, me }: { initialRows: Row[]; seasonStartYear: number; leagueCode?: string; lifetime: boolean; weekly?: boolean; weekOffset?: number; me: string | null }) {
   const [selection, setSelection] = useState<LeaderboardSelection>({ lifetime, weekly, weekOffset, leagueCode });

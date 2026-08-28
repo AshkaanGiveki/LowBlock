@@ -4,15 +4,173 @@ import { useState } from "react";
 import { T, useLanguage } from "@/components/LanguageProvider";
 import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
+import { UserAvatar } from "@/components/UserAvatar";
 
-type Match = { matchId: string; kickoffAt: string; homeTeam: { id: number; name: string; logoUrl: string | null }; awayTeam: { id: number; name: string; logoUrl: string | null }; predictedHome: number | null; predictedAway: number | null; actualHome: number | null; actualAway: number | null; points: number | null; revealed: boolean };
-type Player = { userId: string; username: string; avatarUrl: string | null; points: number; predictions: Match[] };
+type Match = {
+  matchId: string;
+  kickoffAt: string;
+  homeTeam: { id: number; name: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; logoUrl: string | null };
+  predictedHome: number | null;
+  predictedAway: number | null;
+  actualHome: number | null;
+  actualAway: number | null;
+  points: number | null;
+  revealed: boolean;
+};
+type Player = {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  isDefendingChampion?: boolean;
+  points: number;
+  predictions: Match[];
+};
 
 export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
   const [open, setOpen] = useState<string | null>(null);
   const { language } = useLanguage();
   const n = (value: number) => formatNumber(value, language);
-  return <section className="mt-8"><h2 className="mb-4 text-2xl font-black"><T fa="جدول امتیازات دور" en="Round leaderboard"/></h2><div className="space-y-3">{players.map((player, index) => { const expanded = open === player.userId; return <article key={player.userId} className="overflow-hidden rounded-2xl border border-white/10 bg-[#111713]"><button onClick={() => setOpen(expanded ? null : player.userId)} className="flex w-full items-center gap-3 p-4 text-start"><b className="w-6 text-[var(--muted)]">{n(index + 1)}</b><span className="grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-brand/15 font-black">{player.avatarUrl ? <img src={player.avatarUrl} alt="" className="h-full w-full object-cover"/> : player.username.slice(0, 2).toUpperCase()}</span><span className="flex-1"><b className="block">{player.username}</b><small className="text-[var(--muted)]">{n(player.predictions.length)} <T fa="پیش‌بینی" en="predictions"/></small></span><strong className="text-xl text-brand">{n(player.points)}</strong><span className="text-xl text-[var(--muted)]">{expanded ? "−" : "+"}</span></button>{expanded && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} className="space-y-2 border-t border-white/10 p-3">{player.predictions.map((match, itemIndex) => <motion.div key={match.matchId} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: itemIndex * .05 }} className="rounded-xl bg-black/20 p-3"><div className="text-[10px] text-[var(--muted)]">{new Date(match.kickoffAt).toLocaleString(language === "fa" ? "fa-IR" : "en-GB")} <span className="float-end text-brand">{match.revealed ? (match.points === null ? <T fa="در انتظار" en="Pending"/> : `+${n(match.points)}`) : <T fa="تا شروع بازی مخفی" en="Hidden until kickoff"/>}</span></div><div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center"><Team id={match.homeTeam.id} name={match.homeTeam.name} logo={match.homeTeam.logoUrl} language={language}/><b className="rounded-full border border-brand/30 px-2 py-1 text-[9px] text-brand">VS</b><Team id={match.awayTeam.id} name={match.awayTeam.name} logo={match.awayTeam.logoUrl} language={language}/></div><div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs"><div className="rounded bg-brand/10 p-2"><small className="block text-[var(--muted)]"><T fa="پیش‌بینی" en="Prediction"/></small><b>{match.revealed ? `${n(match.predictedHome ?? 0)} - ${n(match.predictedAway ?? 0)}` : <T fa="مخفی" en="Hidden"/>}</b></div><div className="rounded bg-white/5 p-2"><small className="block text-[var(--muted)]"><T fa="نتیجه" en="Result"/></small><b>{match.actualHome === null ? "—" : `${n(match.actualHome)} - ${n(match.actualAway ?? 0)}`}</b></div></div></motion.div>)}</motion.div>}</article>; })}</div></section>;
+  return (
+    <section className="mt-8">
+      <h2 className="mb-4 text-2xl font-black">
+        <T fa="جدول امتیازات دور" en="Round leaderboard" />
+      </h2>
+      <div className="space-y-3">
+        {players.map((player, index) => {
+          const expanded = open === player.userId;
+          return (
+            <article
+              key={player.userId}
+              className="overflow-hidden rounded-2xl border border-white/10 bg-[#111713]"
+            >
+              <button
+                onClick={() => setOpen(expanded ? null : player.userId)}
+                className="flex w-full items-center gap-3 p-4 text-start"
+              >
+                <b className="w-6 text-[var(--muted)]">{n(index + 1)}</b>
+                <UserAvatar name={player.username} avatarUrl={player.avatarUrl} isDefendingChampion={player.isDefendingChampion} className="h-11 w-11" />
+                <span className="flex-1">
+                  <b className="block">{player.username}</b>
+                  <small className="text-[var(--muted)]">
+                    {n(player.predictions.length)}{" "}
+                    <T fa="پیش‌بینی" en="predictions" />
+                  </small>
+                </span>
+                <strong className="text-xl text-brand">
+                  {n(player.points)}
+                </strong>
+                <span className="text-xl text-[var(--muted)]">
+                  {expanded ? "−" : "+"}
+                </span>
+              </button>
+              {expanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  className="space-y-2 border-t border-white/10 p-3"
+                >
+                  {player.predictions.map((match, itemIndex) => (
+                    <motion.div
+                      key={match.matchId}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: itemIndex * 0.05 }}
+                      className="rounded-xl bg-black/20 p-3"
+                    >
+                      <div className="text-[10px] text-[var(--muted)]">
+                        {new Date(match.kickoffAt).toLocaleString(
+                          language === "fa" ? "fa-IR" : "en-GB",
+                        )}{" "}
+                        <span className="float-end text-brand">
+                          {match.revealed ? (
+                            match.points === null ? (
+                              <T fa="در انتظار" en="Pending" />
+                            ) : (
+                              `+${n(match.points)}`
+                            )
+                          ) : (
+                            <T
+                              fa="تا شروع بازی مخفی"
+                              en="Hidden until kickoff"
+                            />
+                          )}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+                        <Team
+                          id={match.homeTeam.id}
+                          name={match.homeTeam.name}
+                          logo={match.homeTeam.logoUrl}
+                          language={language}
+                        />
+                        <b className="rounded-full border border-brand/30 px-2 py-1 text-[9px] text-brand">
+                          VS
+                        </b>
+                        <Team
+                          id={match.awayTeam.id}
+                          name={match.awayTeam.name}
+                          logo={match.awayTeam.logoUrl}
+                          language={language}
+                        />
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+                        <div className="rounded bg-brand/10 p-2">
+                          <small className="block text-[var(--muted)]">
+                            <T fa="پیش‌بینی" en="Prediction" />
+                          </small>
+                          <b>
+                            {match.revealed ? (
+                              `${n(match.predictedHome ?? 0)} - ${n(match.predictedAway ?? 0)}`
+                            ) : (
+                              <T fa="مخفی" en="Hidden" />
+                            )}
+                          </b>
+                        </div>
+                        <div className="rounded bg-white/5 p-2">
+                          <small className="block text-[var(--muted)]">
+                            <T fa="نتیجه" en="Result" />
+                          </small>
+                          <b>
+                            {match.actualHome === null
+                              ? "—"
+                              : `${n(match.actualHome)} - ${n(match.actualAway ?? 0)}`}
+                          </b>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
-function Team({ id, name, logo, language }: { id: number; name: string; logo: string | null; language: "fa" | "en" }) { return <div className="min-w-0 text-center"><img src={logo ?? "/icon.png"} alt="" className="mx-auto h-8 w-8 object-contain"/><span className="mt-1 block truncate text-[10px] font-bold">{teamName(language, id, name)}</span></div>; }
+function Team({
+  id,
+  name,
+  logo,
+  language,
+}: {
+  id: number;
+  name: string;
+  logo: string | null;
+  language: "fa" | "en";
+}) {
+  return (
+    <div className="min-w-0 text-center">
+      <img
+        src={logo ?? "/icon.png"}
+        alt=""
+        className="mx-auto h-8 w-8 object-contain"
+      />
+      <span className="mt-1 block truncate text-[10px] font-bold">
+        {teamName(language, id, name)}
+      </span>
+    </div>
+  );
+}
