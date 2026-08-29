@@ -430,6 +430,9 @@ html[dir="ltr"] body > header > div > div > div { left:0; right:auto; }
   div[class*="z-[80]"] button[aria-label="Decrease score"] { border-color:rgba(255,255,255,.14) !important; background:rgba(255,255,255,.04) !important; color:rgba(255,255,255,.72) !important; }
 }
 .drawer-team-card { border:0 !important; background:transparent !important; padding:0 !important; box-shadow:none !important; }
+
+/* Keep the honours drawer anchored while the carousel images settle. */
+.fixed.inset-0.z-\[100\].flex.items-end > aside { height:94dvh; min-height:0; }
 @media (max-width:767px) { main section.mt-8.grid.items-end.gap-3 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .glow-card { background-color:#10251b !important; background-image:repeating-linear-gradient(135deg,rgba(32,184,121,.07) 0,rgba(32,184,121,.07) 1px,transparent 1px,transparent 16px) !important; background-size:auto !important; }
 .ltr-arrow { display:none; } html[dir="ltr"] .rtl-arrow { display:none; } html[dir="ltr"] .ltr-arrow { display:inline-flex; }
