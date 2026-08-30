@@ -150,6 +150,13 @@ Never commit `.env.local`, API tokens, MongoDB credentials, or session secrets.
 | `MONGODB_REPLICA_SET` | Optional replica-set name |
 | `SESSION_SECRET` | Secret used to sign website sessions |
 | `CRON_SECRET` | Secret protecting scheduled sync endpoints |
+| `TELEGRAM_BOT_TOKEN` | Server-only Telegram Bot API token used for Mini App verification and delivery |
+| `TELEGRAM_BOT_USERNAME` | Telegram bot username used for account-link deep links |
+| `BALE_BOT_TOKEN` | Server-only Bale bot token used for Mini App verification |
+| `BALE_BOT_USERNAME` | Bale bot username used for account-link deep links |
+| `QSTASH_TOKEN` | Server-only Upstash QStash publishing token |
+| `QSTASH_CURRENT_SIGNING_KEY` | QStash callback verification key |
+| `QSTASH_NEXT_SIGNING_KEY` | QStash callback key during key rotation |
 | `NEXT_PUBLIC_APP_URL` | Canonical public URL used by links and metadata |
 | `APP_TIMEZONE` | Scheduling/display timezone; defaults to `Asia/Tehran` |
 | `FOOTBALL_API_KEY` | API-Football key |

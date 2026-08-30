@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Camera, LogOut, Save, UserRound } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
+import { ConnectedAccounts } from "@/components/ConnectedAccounts";
 type User = { username: string; avatarUrl: string | null; isDefendingChampion?: boolean };
 export default function ProfilePage() {
   const router = useRouter();
@@ -221,7 +222,7 @@ export default function ProfilePage() {
               {t("خروج", "Log out")}
             </button>
           </div>
-        </form>
+        </form><ConnectedAccounts />
       </div>
     </main>
   );

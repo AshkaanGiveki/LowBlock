@@ -1,0 +1,3 @@
+import { Client, Receiver } from "@upstash/qstash"; import { env } from "@/lib/env";
+export async function scheduleMatchReminder(matchId:string,runAt:Date){if(!env.QSTASH_TOKEN)return false;await new Client({token:env.QSTASH_TOKEN}).publishJSON({url:`${env.NEXT_PUBLIC_APP_URL}/api/notifications/match-reminder`,body:{matchId},notBefore:Math.floor(runAt.getTime()/1000),deduplicationId:`lowblock-match-reminder-${matchId}`});return true;}
+export async function verifyQstashSignature(body:string,signature:string|null,url?:string){if(!signature||!env.QSTASH_CURRENT_SIGNING_KEY)return false;try{return await new Receiver({currentSigningKey:env.QSTASH_CURRENT_SIGNING_KEY,nextSigningKey:env.QSTASH_NEXT_SIGNING_KEY}).verify({signature,body,url})}catch{return false}}

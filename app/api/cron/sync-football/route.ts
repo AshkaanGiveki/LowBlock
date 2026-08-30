@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { syncFootballApi } from "@/lib/football/api-sports/sync";
+import { scheduleUpcomingReminders } from "@/lib/notifications/reminders";
 
 async function run(request: Request) {
   if (!env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  try { return NextResponse.json({ ok: true, ...(await syncFootballApi()) }); } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "sync failed" }, { status: 500 }); }
+  try { const result=await syncFootballApi(); let remindersScheduled=0; try { remindersScheduled=await scheduleUpcomingReminders(); } catch (error) { console.error("match_reminder_scheduling_failed",{error:error instanceof Error?error.message:"unknown"}); } return NextResponse.json({ ok: true, ...result, remindersScheduled }); } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "sync failed" }, { status: 500 }); }
 }
 
 export async function GET(request: Request) { return run(request); }
