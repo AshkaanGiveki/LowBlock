@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Nav } from "@/components/Nav";
@@ -23,5 +24,5 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { themeColor: "#20b879" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="fa" dir="rtl"><body><Providers><DesktopNavigation/><Nav/><BrandSwitcher/><HelpShortcut/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
+  return <html lang="fa" dir="rtl"><body><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/><Providers><DesktopNavigation/><Nav/><BrandSwitcher/><HelpShortcut/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
