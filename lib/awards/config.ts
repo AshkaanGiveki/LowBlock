@@ -1,48 +1,62 @@
-import path from "node:path";
-
 export const ROUND_WINNER_TYPE = "ROUND_WINNER" as const;
 export const CLUB_ROUND_WINNER_TYPE = "CLUB_ROUND_WINNER" as const;
 export const WEEKLY_WINNER_TYPE = "WEEKLY_WINNER" as const;
 export const CLUB_WEEKLY_WINNER_TYPE = "CLUB_WEEKLY_WINNER" as const;
 export const LEAGUE_WINNER_TYPE = "LEAGUE_WINNER" as const;
 export const GLOBAL_WINNER_TYPE = "GLOBAL_WINNER" as const;
+export const CLUB_LEAGUE_WINNER_TYPE = "CLUB_LEAGUE_WINNER" as const;
 export const MONTHLY_EXACT_WINNER_TYPE = "MONTHLY_EXACT_WINNER" as const;
+export const CLUB_MONTHLY_EXACT_WINNER_TYPE = "CLUB_MONTHLY_EXACT_WINNER" as const;
 export const LOWBLOCK_SCOPE = "LOWBLOCK" as const;
-export type AssetEntry = { leagueCode: string; leagueName: string; seasonStartYear: number; roundNumber: number; trophy: string; shareCard: string };
-const privateRoot = path.join(process.cwd(), "lib", "server-assets", "awards");
-const clubRoot = path.join(privateRoot, "Club");
-const asset = (leagueCode: string, leagueName: string, folder: string, roundNumber: number, lowBlockFolder = true): AssetEntry => ({ leagueCode, leagueName, seasonStartYear: 2026, roundNumber, trophy: path.join(privateRoot, folder, ...(lowBlockFolder ? ["LowBlock"] : []), `MD${String(roundNumber).padStart(2, "0")}`, "Trophy.png"), shareCard: path.join(privateRoot, folder, ...(lowBlockFolder ? ["LowBlock"] : []), `MD${String(roundNumber).padStart(2, "0")}`, "Card.png") });
-const clubAsset = (leagueCode: string, leagueName: string, folder: string, roundNumber: number): AssetEntry => ({ leagueCode, leagueName, seasonStartYear: 2026, roundNumber, trophy: path.join(clubRoot, folder, `MD${String(roundNumber).padStart(2, "0")}`, "Trophy.png"), shareCard: path.join(clubRoot, folder, `MD${String(roundNumber).padStart(2, "0")}`, "Card.png") });
+
+export type AssetEntry = { leagueCode?: string; leagueName?: string; seasonStartYear?: number; roundNumber?: number; trophy: string; shareCard: string };
+const join = (...parts: string[]) => parts.filter(Boolean).join("/");
+const root = typeof window === "undefined" ? join(process.cwd(), "lib", "server-assets", "awards") : "";
+const clubRoot = join(root, "Club");
+const pair = (folder: string): AssetEntry => ({ trophy: join(folder, "Trophy.png"), shareCard: join(folder, "Card.png") });
+const league = (leagueCode: string, leagueName: string, folder: string, lowBlock = true): AssetEntry => ({ ...pair(join(root, folder, ...(lowBlock ? ["LowBlock"] : []), "MD01")), leagueCode, leagueName, seasonStartYear: 2026, roundNumber: 1 });
+const clubLeague = (leagueCode: string, leagueName: string, folder: string): AssetEntry => ({ ...pair(join(clubRoot, folder, "MD01")), leagueCode, leagueName, seasonStartYear: 2026, roundNumber: 1 });
+
+// Canonical design per league/scope. The period is dynamic data, not an asset variant.
 export const ROUND_WINNER_ASSETS: Record<string, AssetEntry> = {
-  "GB1:2026:1": asset("GB1", "Premier League", "PremierLeague", 1),
-  "ES1:2026:1": { ...asset("ES1", "LaLiga", "LaLiga", 1), trophy: path.join(privateRoot, "LaLiga", "LowBlock", "MD01", "Trophy.webp"), shareCard: path.join(privateRoot, "LaLiga", "LowBlock", "MD01", "Card.webp") },
-  "ES1:2026:2": asset("ES1", "LaLiga", "LaLiga", 2),
-  "L1:2026:1": asset("L1", "Bundesliga", "BundesLiga", 1, false),
-  "IT1:2026:1": asset("IT1", "Serie A", "SerieA", 1),
-  "FR1:2026:1": asset("FR1", "Ligue 1", "Ligue1", 1),
+  GB1: league("GB1", "Premier League", "PremierLeague"),
+  ES1: { ...league("ES1", "LaLiga", "LaLiga"), trophy: join(root, "LaLiga", "LowBlock", "MD01", "Trophy.webp"), shareCard: join(root, "LaLiga", "LowBlock", "MD01", "Card.webp") },
+  L1: league("L1", "Bundesliga", "BundesLiga", false),
+  IT1: league("IT1", "Serie A", "SerieA"),
+  FR1: league("FR1", "Ligue 1", "Ligue1"),
 };
-export function getAwardAssetContentType(filePath: string) { return filePath.toLowerCase().endsWith(".webp") ? "image/webp" : "image/png"; }
-export function getRoundWinnerAsset(leagueCode: string, seasonStartYear: number, roundNumber: number) { return ROUND_WINNER_ASSETS[`${leagueCode}:${seasonStartYear}:${roundNumber}`] ?? null; }
+export function getRoundWinnerAsset(leagueCode: string, seasonStartYear: number, _roundNumber: number) { return ROUND_WINNER_ASSETS[leagueCode] && seasonStartYear === 2026 ? ROUND_WINNER_ASSETS[leagueCode] : null; }
 
 export const CLUB_ROUND_ASSETS: Record<string, AssetEntry> = {
-  "GB1:2026:1": clubAsset("GB1", "Premier League", "Premier League", 1),
-  "ES1:2026:1": clubAsset("ES1", "LaLiga", "LaLiga", 1),
-  "ES1:2026:2": clubAsset("ES1", "LaLiga", "LaLiga", 2),
-  "L1:2026:1": clubAsset("L1", "Bundesliga", "BundesLiga", 1),
-  "IT1:2026:1": clubAsset("IT1", "Serie A", "SerieA", 1),
-  "FR1:2026:1": clubAsset("FR1", "Ligue 1", "Ligue1", 1),
+  GB1: clubLeague("GB1", "Premier League", "Premier League"),
+  ES1: clubLeague("ES1", "LaLiga", "LaLiga"),
+  L1: clubLeague("L1", "Bundesliga", "BundesLiga"),
+  IT1: clubLeague("IT1", "Serie A", "SerieA"),
+  FR1: clubLeague("FR1", "Ligue 1", "Ligue1"),
 };
-export function getClubRoundAsset(leagueCode: string, seasonStartYear: number, roundNumber: number) { return CLUB_ROUND_ASSETS[`${leagueCode}:${seasonStartYear}:${roundNumber}`] ?? null; }
+export function getClubRoundAsset(leagueCode: string, seasonStartYear: number, _roundNumber: number) { return CLUB_ROUND_ASSETS[leagueCode] && seasonStartYear === 2026 ? CLUB_ROUND_ASSETS[leagueCode] : null; }
 
-export const WEEKLY_LOWBLOCK_ASSET = { trophy: path.join(privateRoot, "Weekly", "Trophy.png"), shareCard: path.join(privateRoot, "Weekly", "Card.png") };
+export const WEEKLY_LOWBLOCK_ASSET = pair(join(root, "Weekly"));
 export function getWeeklyLowBlockAsset() { return WEEKLY_LOWBLOCK_ASSET; }
-export const CLUB_WEEKLY_ASSET = { trophy: path.join(clubRoot, "Weekly", "21-27Aug", "Trophy.png"), shareCard: path.join(clubRoot, "Weekly", "21-27Aug", "Card.png") };
+export const CLUB_WEEKLY_ASSET = pair(join(clubRoot, "Weekly", "21-27Aug"));
 export function getClubWeeklyAsset() { return CLUB_WEEKLY_ASSET; }
+export const GLOBAL_EXACT_PICKER_ASSET = pair(join(root, "ExactPicker", "Global"));
+export const CLUB_EXACT_PICKER_ASSET = pair(join(root, "ExactPicker", "Club"));
+export const GLOBAL_LEAGUE_WINNER_ASSET = pair(join(root, "LeagueWinner", "Global"));
+export const CLUB_LEAGUE_WINNER_ASSET = pair(join(root, "LeagueWinner", "Club"));
 
-export function getAwardAsset(award: { type?: string; scope?: string; competitionId?: string; seasonStartYear?: number; roundNumber?: number }) {
-  if (award.type === WEEKLY_WINNER_TYPE) return getWeeklyLowBlockAsset();
-  if (award.type === CLUB_WEEKLY_WINNER_TYPE) return getClubWeeklyAsset();
-  if (award.type === CLUB_ROUND_WINNER_TYPE && award.competitionId && award.seasonStartYear && award.roundNumber) return getClubRoundAsset(award.competitionId, award.seasonStartYear, award.roundNumber);
-  if (award.competitionId && award.seasonStartYear && award.roundNumber) return getRoundWinnerAsset(award.competitionId, award.seasonStartYear, award.roundNumber);
-  return null;
+export function getAwardAssetContentType(filePath: string) { return filePath.toLowerCase().endsWith(".webp") ? "image/webp" : "image/png"; }
+export function getAwardAsset(award: { type?: string; competitionId?: string; seasonStartYear?: number; roundNumber?: number }) {
+  switch (award.type) {
+    case WEEKLY_WINNER_TYPE: return getWeeklyLowBlockAsset();
+    case CLUB_WEEKLY_WINNER_TYPE: return getClubWeeklyAsset();
+    case MONTHLY_EXACT_WINNER_TYPE: return GLOBAL_EXACT_PICKER_ASSET;
+    case CLUB_MONTHLY_EXACT_WINNER_TYPE: return CLUB_EXACT_PICKER_ASSET;
+    case GLOBAL_WINNER_TYPE:
+    case LEAGUE_WINNER_TYPE: return GLOBAL_LEAGUE_WINNER_ASSET;
+    case CLUB_LEAGUE_WINNER_TYPE: return CLUB_LEAGUE_WINNER_ASSET;
+    case CLUB_ROUND_WINNER_TYPE: return award.competitionId && award.seasonStartYear ? getClubRoundAsset(award.competitionId, award.seasonStartYear, award.roundNumber ?? 1) : null;
+    case ROUND_WINNER_TYPE: return award.competitionId && award.seasonStartYear ? getRoundWinnerAsset(award.competitionId, award.seasonStartYear, award.roundNumber ?? 1) : null;
+    default: return null;
+  }
 }

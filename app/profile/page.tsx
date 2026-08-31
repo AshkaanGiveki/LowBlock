@@ -6,6 +6,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ConnectedAccounts } from "@/components/ConnectedAccounts";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { PlatformNotificationToggle } from "@/components/PlatformNotificationToggle";
 type User = { username: string; avatarUrl: string | null; isDefendingChampion?: boolean };
 export default function ProfilePage() {
   const router = useRouter();
@@ -110,6 +111,7 @@ export default function ProfilePage() {
             {t("پروفایل شما", "Your profile")}
           </h1>
         </section>
+        {platformChecked && embeddedPlatform && <PlatformNotificationToggle provider={embeddedPlatform} username={platformUsername} />}
         <form
           onSubmit={save}
           className="mt-4 rounded-2xl border border-white/[.08] bg-[#101512] p-5 md:p-7"

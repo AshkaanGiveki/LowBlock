@@ -1,0 +1,12 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
+
+type Provider = "telegram" | "bale";
+export function PlatformNotificationToggle({ provider, username }: { provider: Provider; username: string | null }) {
+  const { t } = useLanguage(); const [enabled, setEnabled] = useState(true); const [connected, setConnected] = useState(true); const [busy, setBusy] = useState(false); const name = provider === "telegram" ? "Telegram" : "Bale";
+  useEffect(() => { fetch("/api/notifications/preferences").then(r => r.ok ? r.json() : null).then(data => { if (!data) return; setConnected(data.connected?.[provider] === true); setEnabled(data.providers?.[provider] !== false); }).catch(() => undefined); }, [provider]);
+  async function toggle() { setBusy(true); const response = await fetch("/api/notifications/preferences", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider, enabled: !enabled }) }); const data = await response.json().catch(() => null); if (response.ok) setEnabled(data?.enabled === true); setBusy(false); }
+  return <div className="mt-5 rounded-2xl border border-white/[.08] bg-black/15 p-4 sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-start gap-3"><Bell size={18} className="mt-0.5 shrink-0 text-brand"/><div className="min-w-0"><b className="text-sm text-white">{t(`یادآوری پیش‌بینی در ${name}`, `${name} prediction reminders`)}</b><p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t(`اگر پیش‌بینی ثبت نکرده باشید، ۳۰ دقیقه قبل از بازی در ${name} یادآوری می‌شوید.`, `Get a ${name} reminder 30 minutes before a match when you are missing a pick.`)}{username ? ` · @${username}` : ""}</p></div></div><button type="button" onClick={toggle} disabled={!connected || busy} aria-pressed={enabled} aria-label={t("فعال‌سازی یادآوری‌ها", "Toggle prediction reminders")} dir="ltr" className={`relative h-8 w-14 shrink-0 rounded-full border transition ${enabled ? "border-brand bg-brand" : "border-white/15 bg-white/10"}`}><span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-md transition-transform ${enabled ? "translate-x-6" : "translate-x-0"}`} /></button></div>{!connected && <p className="mt-3 text-xs text-brand">{t(`${name} متصل نیست.`, `${name} is not connected.`)}</p>}</div>;
+}
