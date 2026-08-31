@@ -5,11 +5,11 @@ describe("round winner awards", () => {
   it("maps each supplied first-release asset to the intended competition and round", () => {
     expect(getRoundWinnerAsset("GB1", 2026, 1)?.leagueName).toBe("Premier League");
     expect(getRoundWinnerAsset("ES1", 2026, 2)?.leagueName).toBe("LaLiga");
-    expect(getRoundWinnerAsset("L1", 2026, 1)?.trophy.endsWith("BundesLiga\\MD01\\Trophy.png")).toBe(true);
+    expect(getRoundWinnerAsset("L1", 2026, 1)?.trophy.replaceAll("\\", "/").endsWith("BundesLiga/MD01/Trophy.png")).toBe(true);
     expect(getRoundWinnerAsset("IT1", 2026, 1)?.leagueName).toBe("Serie A");
     expect(getRoundWinnerAsset("FR1", 2026, 1)?.leagueName).toBe("Ligue 1");
     expect(getRoundWinnerAsset("GB1", 2026, 2)?.trophy).toBe(getRoundWinnerAsset("GB1", 2026, 1)?.trophy);
-    expect(getRoundWinnerAsset("ES1", 2026, 1)?.trophy.endsWith("LaLiga\\LowBlock\\MD01\\Trophy.webp")).toBe(true);
+    expect(getRoundWinnerAsset("ES1", 2026, 1)?.trophy.replaceAll("\\", "/").endsWith("LaLiga/LowBlock/MD01/Trophy.webp")).toBe(true);
     expect(getAwardAssetContentType("Trophy.webp")).toBe("image/webp");
   });
   it("maps every award type to one canonical design family", () => {
