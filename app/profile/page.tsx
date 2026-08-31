@@ -5,6 +5,7 @@ import { Camera, LogOut, Save, UserRound } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ConnectedAccounts } from "@/components/ConnectedAccounts";
+import { PlatformIcon } from "@/components/PlatformIcon";
 type User = { username: string; avatarUrl: string | null; isDefendingChampion?: boolean };
 export default function ProfilePage() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function ProfilePage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [embeddedPlatform, setEmbeddedPlatform] = useState<"telegram" | "bale" | null>(null);
+  const [platformUsername, setPlatformUsername] = useState<string | null>(null);
+  const [platformChecked, setPlatformChecked] = useState(false);
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -29,8 +32,12 @@ export default function ProfilePage() {
       });
   }, [router]);
   useEffect(() => {
-    const w = window as Window & { Telegram?: { WebApp?: { initData?: string } }; Bale?: { WebApp?: { initData?: string } } };
-    setEmbeddedPlatform(w.Telegram?.WebApp?.initData ? "telegram" : w.Bale?.WebApp?.initData ? "bale" : null);
+    const w = window as Window & { Telegram?: { WebApp?: { initData?: string; initDataUnsafe?: { user?: { username?: string } } } }; Bale?: { WebApp?: { initData?: string; initDataUnsafe?: { user?: { username?: string } } } } };
+    const platform = w.Telegram?.WebApp?.initData ? "telegram" : w.Bale?.WebApp?.initData ? "bale" : null;
+    const webApp = platform === "telegram" ? w.Telegram?.WebApp : w.Bale?.WebApp;
+    setEmbeddedPlatform(platform);
+    setPlatformUsername(webApp?.initDataUnsafe?.user?.username ?? null);
+    setPlatformChecked(true);
   }, []);
   function chooseAvatar(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -211,23 +218,25 @@ export default function ProfilePage() {
             </p>
           )}
           <div className="mt-6 flex flex-wrap gap-3">
-            {!embeddedPlatform && <button
+            <button
               disabled={busy}
               className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-3 text-sm font-black text-white"
             >
               <Save size={16} />
               {busy ? "…" : t("ذخیره تغییرات", "Save changes")}
-            </button>}
+            </button>
             <button
               type="button"
               onClick={logout}
+              hidden={!platformChecked || !!embeddedPlatform}
               className="inline-flex items-center gap-2 rounded-lg border border-red-400/30 px-4 py-3 text-sm font-black text-red-300"
             >
               <LogOut size={16} />
               {t("خروج", "Log out")}
             </button>
           </div>
-        </form><ConnectedAccounts />
+        </form>
+        {platformChecked && (embeddedPlatform ? <section className="mt-4 rounded-2xl border border-brand/20 bg-[linear-gradient(135deg,rgba(32,184,121,.12),rgba(16,21,18,.96))] p-5 md:p-7"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand"><PlatformIcon provider={embeddedPlatform}/></span><div className="min-w-0"><h2 className="font-black text-white">{t("حساب متصل به پلتفرم", "Platform-linked account")}</h2><p className="mt-2 text-sm leading-6 text-white/65">{t(`این حساب LowBlock به حساب ${embeddedPlatform === "telegram" ? "تلگرام" : "بله"}${platformUsername ? ` @${platformUsername}` : ""} شما متصل است.`, `This LowBlock account is linked to your ${embeddedPlatform === "telegram" ? "Telegram" : "Bale"}${platformUsername ? ` @${platformUsername}` : ""} account.`)}</p><p className="mt-2 text-xs leading-5 text-white/45">{t("برای قطع اتصال یا مدیریت حساب‌های متصل، LowBlock را مستقیماً در مرورگر باز کنید.", "To disconnect or manage connected accounts, open LowBlock directly in your browser.")}</p></div></div></section> : <ConnectedAccounts />)}
       </div>
     </main>
   );
