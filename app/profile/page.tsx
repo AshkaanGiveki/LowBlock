@@ -18,6 +18,7 @@ export default function ProfilePage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [embeddedPlatform, setEmbeddedPlatform] = useState<"telegram" | "bale" | null>(null);
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -27,6 +28,10 @@ export default function ProfilePage() {
         setAvatarUrl(data.user.avatarUrl ?? "");
       });
   }, [router]);
+  useEffect(() => {
+    const w = window as Window & { Telegram?: { WebApp?: { initData?: string } }; Bale?: { WebApp?: { initData?: string } } };
+    setEmbeddedPlatform(w.Telegram?.WebApp?.initData ? "telegram" : w.Bale?.WebApp?.initData ? "bale" : null);
+  }, []);
   function chooseAvatar(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -206,13 +211,13 @@ export default function ProfilePage() {
             </p>
           )}
           <div className="mt-6 flex flex-wrap gap-3">
-            <button
+            {!embeddedPlatform && <button
               disabled={busy}
               className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-3 text-sm font-black text-white"
             >
               <Save size={16} />
               {busy ? "…" : t("ذخیره تغییرات", "Save changes")}
-            </button>
+            </button>}
             <button
               type="button"
               onClick={logout}
