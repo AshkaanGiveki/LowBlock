@@ -36,6 +36,16 @@ export async function getMatches(filters: { leagueCode?: string; matchday?: numb
   return getCachedMatches(filters.leagueCode ?? "", filters.matchday ?? null, filters.limit ?? 50, now - 2 * 60 * 60 * 1000, now + 14 * 864e5);
 }
 
+export async function getMatch(providerMatchId: string) {
+  const db = await getDb();
+  return db.collection<MatchRecord>("matches").findOne({
+    provider: "football-api",
+    providerMatchId,
+    rawApiResponse: { $exists: true },
+    status: { $nin: ["VOID", "CANCELLED"] },
+  });
+}
+
 export async function getPredictions(matchIds: string[], userId = "guest") {
   if (!matchIds.length) return new Map();
   const db = await getDb();

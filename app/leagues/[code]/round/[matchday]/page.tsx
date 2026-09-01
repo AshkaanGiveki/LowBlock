@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db/mongo";
 import { getLeague } from "@/lib/football/leagues";
@@ -11,12 +12,22 @@ import { LeagueLogo } from "@/components/LeagueLogo";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({ params }: { params: Promise<{ code: string; matchday: string }> }): Promise<Metadata> {
+  const { code, matchday } = await params;
+  const league = getLeague(code);
+  if (!league) return { title: "Round not found", robots: { index: false, follow: false } };
+  return { title: `${league.enName} Round ${matchday} Predictions`, description: `Follow ${league.enName} Round ${matchday}, compare predictions, and see the LowBlock round leaderboard.`, alternates: { canonical: `/leagues/${league.code}/round/${matchday}` } };
+}
+
 export default async function RoundPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string; matchday: string }>;
+  searchParams: Promise<{ match?: string }>;
 }) {
   const { code, matchday } = await params;
+  const { match: focusMatchId } = await searchParams;
   const league = getLeague(code);
   if (!league) notFound();
   const day = Number(matchday);
@@ -118,6 +129,7 @@ export default async function RoundPage({
           </div>
         </div>
         <RoundMatchGrid
+          focusMatchId={focusMatchId}
           fixtures={matches.map((match) => ({
             providerMatchId: match.providerMatchId,
             kickoffAt: new Date(match.kickoffAt).toISOString(),

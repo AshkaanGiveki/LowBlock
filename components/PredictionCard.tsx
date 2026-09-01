@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react"; import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react"; import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { BarChart3, Check, ChevronDown, Clock3, Crown, Minus, Plus, Radio, Sparkles, UserRound, X } from "lucide-react";
 import { formatIranDate, formatIranTime } from "@/lib/football/time";
@@ -12,6 +12,7 @@ import { MatchAnalytics } from "./MatchAnalytics";
 import { MatchInsightsPanel } from "./MatchInsights";
 import { useToast } from "@/components/ToastProvider";
 import { friendlyError } from "@/lib/userErrors";
+import { closeMatchRoute, matchRoute, openMatchRoute } from "@/components/matchNavigation";
 
 type Team = { id: number; name: string; logoUrl: string | null };
 type Match = { providerMatchId: string; kickoffAt: Date | string; status: string; homeGoals?: number | null; awayGoals?: number | null; homeTeam: Team; awayTeam: Team };
@@ -19,7 +20,7 @@ type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number };
 type DrawerTeam = { name: string; logo: string | null };
 
 export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPredictionSaved, openOnMount = false, submitPrediction }: Props) {
-  const { language, t } = useLanguage(); const { showToast } = useToast(); const router = useRouter();
+  const { language, t } = useLanguage(); const { showToast } = useToast(); const router = useRouter(); const pathname = usePathname(); const [activePath, setActivePath] = useState(pathname);
   const [now, setNow] = useState(Date.now());
   const [home, setHome] = useState(initial?.homeGoals?.toString() ?? "");
   const [away, setAway] = useState(initial?.awayGoals?.toString() ?? "");
@@ -35,11 +36,15 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPr
   const finished = match.status === "FINISHED" || (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED");
   const live = !finished && (match.status === "LIVE" || now >= kickoff);
   const locked = live || finished;
-  useEffect(() => { if (!openOnMount || locked) return; setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange]);
+  useEffect(() => { const syncPath = () => setActivePath(window.location.pathname); window.addEventListener("popstate", syncPath); return () => window.removeEventListener("popstate", syncPath); }, []);
+  useEffect(() => { if (!openOnMount) return; if (activePath !== matchRoute(match.providerMatchId)) openMatchRoute(match.providerMatchId, pathname); if (locked) { setAnalyticsOpen(true); return; } setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange, activePath, match.providerMatchId, pathname]);
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
-  const closeDrawer = () => { setDrawerOpen(false); setInsightsOpen(false); onDrawerChange?.(false); };
-  const open = () => { if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
+  const isMatchRoute = activePath === matchRoute(match.providerMatchId);
+  const leaveMatchRoute = () => { if (!isMatchRoute) return; if (typeof window.history.state?.lowblockMatchOrigin === "string") closeMatchRoute(); else router.replace("/matches"); };
+  const closeDrawer = () => { setDrawerOpen(false); setInsightsOpen(false); onDrawerChange?.(false); leaveMatchRoute(); };
+  const closeAnalytics = () => { setAnalyticsOpen(false); leaveMatchRoute(); };
+  const open = () => { if (!isMatchRoute) openMatchRoute(match.providerMatchId, pathname); if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
   const update = (setter: (value: string) => void) => (value: string) => { setter(value); };
   async function submit() { if (home === "" || away === "" || locked) return; setBusy(true); setError(""); try { const response = await fetch("/api/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ matchId: match.providerMatchId, homeGoals: Number(home), awayGoals: Number(away) }) }); const data = await response.json().catch(() => ({})); if (!response.ok) { if (response.status === 401 || data.error === "AUTH_REQUIRED") { setError(""); setAuthToast(true); return; } throw new Error(getPredictionError(data.error, t)); } setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) }); onPredictionSaved?.({ homeGoals: Number(home), awayGoals: Number(away) }); closeDrawer(); } catch (reason) { setError(reason instanceof Error ? reason.message : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.")); } finally { setBusy(false); } }
   const statusText = live ? "LIVE" : finished ? `FT${hasResult ? ` · ${formatNumber(match.homeGoals ?? 0, language)} - ${formatNumber(match.awayGoals ?? 0, language)}` : ""}` : `${t("شروع تا", "STARTS IN")} ${formatCountdown(Math.max(0, kickoff - now), language)}`;
@@ -51,7 +56,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPr
       <div className="relative rounded-[15px] border border-brand/20 bg-transparent px-5 pb-14 pt-5 backdrop-blur-sm"><div className="mb-4 flex items-center justify-between text-[10px] font-bold text-white/80"><span className="inline-flex items-center gap-1.5 text-brand"><Crown size={13}/>{t("مسابقه رسمی", "Official match")}</span><span className={`rounded-full border px-2.5 py-1 ${live ? "border-red-400/50 bg-red-500/15 text-red-200" : "border-brand/30 bg-brand/10 text-brand"}`}>{live || finished ? statusText : <CountdownDisplay milliseconds={Math.max(0, kickoff - now)} language={language} />}</span></div><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3"><TeamBlock name={homeName} sourceName={match.homeTeam.name} logo={match.homeTeam.logoUrl}/><div className="text-center"><p className="mb-2 text-[9px] font-black tracking-wide text-brand">{t("پیش‌بینی شما", "YOUR PICK")}</p><div className="hidden items-center gap-1.5 rounded-lg border border-brand/25 bg-transparent p-1.5 md:flex"><ScoreInput value={home} setValue={update(setHome)} disabled={locked}/><b className="text-brand">:</b><ScoreInput value={away} setValue={update(setAway)} disabled={locked}/></div><button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); open(); }} className="flex min-w-28 flex-col items-center rounded-lg border border-brand/35 bg-transparent px-3 py-2 text-[10px] font-bold text-white md:hidden">{live ? <><Radio size={15} className="mb-1 animate-pulse text-red-300"/>LIVE</> : finished ? <><span className="text-lg font-black text-brand">{hasResult ? `${formatNumber(match.homeGoals ?? 0, language)} - ${formatNumber(match.awayGoals ?? 0, language)}` : "FT"}</span><span>{t("نتیجه نهایی", "Full time")}</span></> : <><span className="text-sm font-black text-brand">{saved ? `${formatNumber(Number(home), language)} - ${formatNumber(Number(away), language)}` : t("انتخاب کنید", "Predict")}</span><span className="mt-0.5 text-white/55">{t("نتیجه", "score")}</span></>}</button></div><TeamBlock name={awayName} sourceName={match.awayTeam.name} logo={match.awayTeam.logoUrl}/></div><div className="mt-4 text-center text-[10px] font-bold text-white/65">{formatIranDate(match.kickoffAt, language === "fa" ? "fa-IR" : "en-GB")} · {formatIranTime(match.kickoffAt, language === "fa" ? "fa-IR" : "en-GB")}</div>{error && <p role="alert" className="prediction-error-inline mt-3 rounded-lg border border-red-400/30 bg-red-950/25 p-2 text-center text-[10px] text-red-100">{error}</p>}</div><button type="button" disabled={busy || home === "" || away === "" || locked} onClick={submit} className="absolute bottom-2 left-1/2 hidden min-w-40 -translate-x-1/2 items-center justify-center gap-2 rounded-full border border-brand bg-brand px-5 py-2.5 text-xs font-black text-[#07100b] shadow-lg transition hover:-translate-y-0.5 hover:bg-brand/10 disabled:opacity-60 md:flex">{saved ? <><Check size={14}/>{t("ذخیره شد", "Saved")}</> : <><Sparkles size={14}/>{busy ? t("در حال ثبت…", "Saving…") : t("ثبت پیش‌بینی", "Save prediction")}</>}</button>
     </motion.article>
     <AnimatePresence initial={false}>{drawerOpen && <PredictionDrawer home={{ name: homeName, logo: match.homeTeam.logoUrl }} away={{ name: awayName, logo: match.awayTeam.logoUrl }} homeValue={home} awayValue={away} setHome={update(setHome)} setAway={update(setAway)} onClose={closeDrawer} onSubmit={submit} matchId={match.providerMatchId} insightsOpen={insightsOpen} onToggleInsights={() => setInsightsOpen((value) => !value)} busy={busy} saved={saved} error={error} language={language}/>}</AnimatePresence>
-    <AnimatePresence initial={false}>{analyticsOpen && <MatchAnalytics matchId={match.providerMatchId} onClose={() => setAnalyticsOpen(false)}/>}</AnimatePresence>
+    <AnimatePresence initial={false}>{analyticsOpen && <MatchAnalytics matchId={match.providerMatchId} onClose={closeAnalytics}/>}</AnimatePresence>
   </>;
 }
 

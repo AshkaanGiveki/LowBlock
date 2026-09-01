@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLeague } from "@/lib/football/leagues";
 import { getDb } from "@/lib/db/mongo";
@@ -10,6 +11,13 @@ import { LeagueStandings } from "@/components/LeagueStandings";
 import { LeagueLogo } from "@/components/LeagueLogo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
+  const { code } = await params;
+  const league = getLeague(code);
+  if (!league) return { title: "League not found", robots: { index: false, follow: false } };
+  return { title: `${league.enName} Football Predictions`, description: `Predict ${league.enName} matches, follow the league leaderboard, and compete on LowBlock.`, alternates: { canonical: `/leagues/${league.code}` } };
+}
 
 export default async function LeaguePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
 import {
@@ -19,6 +20,14 @@ import { PublicPredictionHistory } from "./PublicPredictionHistory";
 import { PublicAwardsSection } from "@/components/PublicAwardsSection";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params;
+  const db = await getDb();
+  const user = await db.collection<any>("users").findOne({ normalizedUsername: username.toLowerCase() }, { projection: { username: 1, bio: 1 } });
+  if (!user) return { title: "Profile not found", robots: { index: false, follow: false } };
+  return { title: `${user.username}'s Football Prediction Profile`, description: user.bio || `View ${user.username}'s public LowBlock football prediction profile, awards, and leaderboard performance.`, alternates: { canonical: `/u/${encodeURIComponent(user.username)}` } };
+}
 
 export default async function PublicProfile({
   params,

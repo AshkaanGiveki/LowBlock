@@ -10,6 +10,7 @@ import { HelpShortcut } from "@/components/HelpShortcut";
 import { BrandSwitcher } from "@/components/BrandSwitcher";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://lowblock.ir"),
   title: { default: "LowBlock | Football Predictions", template: "%s | LowBlock" },
   description: "Predict football scores, follow upcoming fixtures, and climb the LowBlock leaderboard. پیش‌بینی نتایج فوتبال، ثبت امتیاز و رقابت در جدول لوبلاک.",
   keywords: ["football predictions", "soccer predictions", "پیش‌بینی فوتبال", "LowBlock", "Premier League", "La Liga", "Bundesliga", "Serie A", "Ligue 1"],
@@ -19,10 +20,12 @@ export const metadata: Metadata = {
   publisher: "LowBlock",
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
   icons: { icon: "/icon.png", shortcut: "/icon.png", apple: "/icon.png" },
-  openGraph: { type: "website", siteName: "LowBlock", title: "LowBlock | Football Predictions", description: "Predict scores, track fixtures, and compete on the LowBlock leaderboard. پیش‌بینی فوتبال و رقابت در جدول امتیازات." },
+  openGraph: { type: "website", siteName: "LowBlock", title: "LowBlock | Football Predictions", description: "Predict scores, track fixtures, and compete on the LowBlock leaderboard. پیش‌بینی فوتبال و رقابت در جدول امتیازات.", url: "https://lowblock.ir", images: [{ url: "/lowblock.png", width: 512, height: 512, alt: "LowBlock football predictions" }] },
   twitter: { card: "summary_large_image", title: "LowBlock | Football Predictions", description: "Predict football scores and compete with LowBlock." },
 };
 export const viewport: Viewport = { themeColor: "#20b879" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="fa" dir="rtl"><body><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/><Providers><DesktopNavigation/><Nav/><BrandSwitcher/><HelpShortcut/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
+  const organization = { "@context": "https://schema.org", "@type": "Organization", name: "LowBlock", url: "https://lowblock.ir", logo: "https://lowblock.ir/lowblock.png", sameAs: ["https://t.me/lowblockapp"] };
+  const website = { "@context": "https://schema.org", "@type": "WebSite", name: "LowBlock", url: "https://lowblock.ir" };
+  return <html lang="fa" dir="rtl"><body><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organization) }}/><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(website) }}/><Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive"/><Providers><DesktopNavigation/><Nav/><BrandSwitcher/><HelpShortcut/><SwipeNavigation/><PageTransition>{children}</PageTransition></Providers></body></html>;
 }
