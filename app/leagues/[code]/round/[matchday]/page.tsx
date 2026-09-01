@@ -13,10 +13,13 @@ export const dynamic = "force-dynamic";
 
 export default async function RoundPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string; matchday: string }>;
+  searchParams: Promise<{ match?: string }>;
 }) {
   const { code, matchday } = await params;
+  const { match: focusMatchId } = await searchParams;
   const league = getLeague(code);
   if (!league) notFound();
   const day = Number(matchday);
@@ -118,6 +121,7 @@ export default async function RoundPage({
           </div>
         </div>
         <RoundMatchGrid
+          focusMatchId={focusMatchId}
           fixtures={matches.map((match) => ({
             providerMatchId: match.providerMatchId,
             kickoffAt: new Date(match.kickoffAt).toISOString(),

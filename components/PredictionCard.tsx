@@ -37,7 +37,7 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPr
   const live = !finished && (match.status === "LIVE" || now >= kickoff);
   const locked = live || finished;
   useEffect(() => { const syncPath = () => setActivePath(window.location.pathname); window.addEventListener("popstate", syncPath); return () => window.removeEventListener("popstate", syncPath); }, []);
-  useEffect(() => { if (!openOnMount) return; if (locked) { setAnalyticsOpen(true); return; } setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange]);
+  useEffect(() => { if (!openOnMount) return; if (activePath !== matchRoute(match.providerMatchId)) openMatchRoute(match.providerMatchId, pathname); if (locked) { setAnalyticsOpen(true); return; } setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange, activePath, match.providerMatchId, pathname]);
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
   const isMatchRoute = activePath === matchRoute(match.providerMatchId);
