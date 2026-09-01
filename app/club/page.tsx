@@ -484,7 +484,6 @@ function ClubLeaderboard({
             aria-label={t("جدول کامل", "Full table")}
             title={t("جدول کامل", "Full table")}
           >
-            {t("جدول کامل", "Full table")}
             <Table2 size={17} />
           </Link>
         </div>

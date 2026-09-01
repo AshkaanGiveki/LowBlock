@@ -1,11 +1,11 @@
 import { ObjectId, type Db } from "mongodb";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 
-export type DetailedSort = "rank" | "username" | "predictions" | "exact" | "correct" | "misses" | "points" | "average" | "awards";
+export type DetailedSort = "rank" | "username" | "predictions" | "exact" | "correct" | "wrongResults" | "misses" | "points" | "average" | "awards";
 export type DetailedScope = { clubId?: string | null; seasonStartYear?: number | null; weekly?: boolean; weeklyOffset?: number; page?: number; pageSize?: number; sort?: DetailedSort; direction?: "asc" | "desc"; viewerUserId?: string | null };
-export type DetailedRow = { userId: string; username: string; avatarUrl: string | null; clubId: string | null; clubName: string | null; predictions: number; exact: number; correct: number; misses: number; points: number; average: number; awards: number; rank: number; previousRank: number | null; placeChange: number };
+export type DetailedRow = { userId: string; username: string; avatarUrl: string | null; clubId: string | null; clubName: string | null; predictions: number; exact: number; correct: number; wrongResults: number; misses: number; points: number; average: number; awards: number; rank: number; previousRank: number | null; placeChange: number };
 
-const sortFields: DetailedSort[] = ["rank", "username", "predictions", "exact", "correct", "misses", "points", "average", "awards"];
+const sortFields: DetailedSort[] = ["rank", "username", "predictions", "exact", "correct", "wrongResults", "misses", "points", "average", "awards"];
 export function normalizeDetailedSort(value: string | null): DetailedSort { return sortFields.includes(value as DetailedSort) ? value as DetailedSort : "rank"; }
 
 function iranDayStart(date: Date) {
@@ -15,7 +15,7 @@ function iranDayStart(date: Date) {
 
 function comparison(a: Omit<DetailedRow, "rank" | "previousRank" | "placeChange">, b: Omit<DetailedRow, "rank" | "previousRank" | "placeChange">, sort: DetailedSort, direction: "asc" | "desc") {
   const sign = direction === "asc" ? 1 : -1;
-  const value = (row: typeof a): string | number => sort === "username" ? row.username.toLocaleLowerCase() : sort === "average" ? row.average : sort === "predictions" ? row.predictions : sort === "exact" ? row.exact : sort === "correct" ? row.correct : sort === "misses" ? row.misses : sort === "points" ? row.points : sort === "awards" ? row.awards : 0;
+  const value = (row: typeof a): string | number => sort === "username" ? row.username.toLocaleLowerCase() : sort === "average" ? row.average : sort === "predictions" ? row.predictions : sort === "exact" ? row.exact : sort === "correct" ? row.correct : sort === "wrongResults" ? row.wrongResults : sort === "misses" ? row.misses : sort === "points" ? row.points : sort === "awards" ? row.awards : 0;
   if (sort === "rank") return b.points - a.points || b.exact - a.exact || b.correct - a.correct || a.username.localeCompare(b.username);
   const left = value(a); const right = value(b);
   return (typeof left === "string" ? left.localeCompare(right as string) : (left as number) - (right as number)) * sign || b.points - a.points || a.username.localeCompare(b.username);
@@ -27,6 +27,9 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
   if (period) match["fixture.kickoffAt"] = { $gte: period.start, $lt: new Date(Math.min(period.end.getTime(), cutoff.getTime())) };
   if (scope.seasonStartYear != null) match.seasonStartYear = scope.seasonStartYear;
   if (scope.clubId) match.clubIdAtLock = scope.clubId;
+  const matchFilter: Record<string, unknown> = { kickoffAt: match["fixture.kickoffAt"] };
+  if (scope.seasonStartYear != null) matchFilter.seasonStartYear = scope.seasonStartYear;
+  const totalMatches = await db.collection<any>("matches").countDocuments(matchFilter);
   const rows = await db.collection<any>("predictionScores").aggregate([
     { $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } },
     { $unwind: "$fixture" },
@@ -45,7 +48,7 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
   const clubs = clubIds.length ? await db.collection<any>("clubs").find({ _id: { $in: clubIds.map(id => new ObjectId(id)) } }, { projection: { name: 1 } }).toArray() : [];
   const clubMap = new Map(clubs.map(club => [String(club._id), club.name]));
   const memberMap = new Map(memberships.map(row => [String(row.userId), String(row.clubId)]));
-  return rows.map(row => { const userId = String(row._id); const predictions = Number(row.predictions ?? 0); const points = Number(row.points ?? 0); const clubId = scope.clubId ?? memberMap.get(userId) ?? null; return { userId, username: userMap.get(userId)?.username ?? "LowBlock Player", avatarUrl: userMap.get(userId)?.avatarUrl ?? null, clubId, clubName: clubId ? clubMap.get(clubId) ?? null : null, predictions, exact: Number(row.exact ?? 0), correct: Number(row.correct ?? 0), misses: Math.max(0, predictions - Number(row.correct ?? 0)), points, average: predictions ? Number((points / predictions).toFixed(2)) : 0, awards: awardMap.get(userId) ?? 0 }; });
+  return rows.map(row => { const userId = String(row._id); const predictions = Number(row.predictions ?? 0); const exact = Number(row.exact ?? 0); const correct = Number(row.correct ?? 0); const points = Number(row.points ?? 0); const clubId = scope.clubId ?? memberMap.get(userId) ?? null; return { userId, username: userMap.get(userId)?.username ?? "LowBlock Player", avatarUrl: userMap.get(userId)?.avatarUrl ?? null, clubId, clubName: clubId ? clubMap.get(clubId) ?? null : null, predictions, exact, correct, wrongResults: Math.max(0, predictions - correct), misses: Math.max(0, totalMatches - predictions), points, average: predictions ? Number((points / predictions).toFixed(2)) : 0, awards: awardMap.get(userId) ?? 0 }; });
 }
 
 export async function getDetailedLeaderboard(db: Db, scope: DetailedScope) {
