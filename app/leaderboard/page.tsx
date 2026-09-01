@@ -3,6 +3,8 @@ import { currentUserId } from "@/lib/auth/session";
 import { LeaderboardView } from "@/components/LeaderboardView";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 
+export const metadata = { title: "Football Prediction Leaderboard", description: "See the LowBlock football prediction leaderboard and compare points, predictions, and exact scores.", alternates: { canonical: "/leaderboard" } };
+
 export const dynamic = "force-dynamic";
 
 type Row = { userId: string; points: number; predictions: number; exact: number; username: string; avatarUrl: string | null };

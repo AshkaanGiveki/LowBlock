@@ -6,6 +6,8 @@ import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
 import { BarChart3, Sparkles, Trophy, Users } from "lucide-react";
 
+export const metadata = { title: "Global Football Prediction Leaderboard", description: "Compare football prediction points with LowBlock players around the world and across major leagues.", alternates: { canonical: "/lowblock" } };
+
 export const dynamic = "force-dynamic";
 
 export default async function LowBlockPage({ searchParams }: { searchParams: Promise<{ scope?: string; league?: string; week?: string }> }) {
