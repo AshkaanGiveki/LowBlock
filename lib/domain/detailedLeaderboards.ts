@@ -2,7 +2,7 @@ import { ObjectId, type Db } from "mongodb";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 
 export type DetailedSort = "rank" | "username" | "predictions" | "exact" | "correct" | "misses" | "points" | "average" | "awards";
-export type DetailedScope = { clubId?: string | null; seasonStartYear?: number | null; weekly?: boolean; weeklyOffset?: number; page?: number; pageSize?: number; sort?: DetailedSort; direction?: "asc" | "desc" };
+export type DetailedScope = { clubId?: string | null; seasonStartYear?: number | null; weekly?: boolean; weeklyOffset?: number; page?: number; pageSize?: number; sort?: DetailedSort; direction?: "asc" | "desc"; viewerUserId?: string | null };
 export type DetailedRow = { userId: string; username: string; avatarUrl: string | null; clubId: string | null; clubName: string | null; predictions: number; exact: number; correct: number; misses: number; points: number; average: number; awards: number; rank: number; previousRank: number | null; placeChange: number };
 
 const sortFields: DetailedSort[] = ["rank", "username", "predictions", "exact", "correct", "misses", "points", "average", "awards"];
@@ -53,5 +53,5 @@ export async function getDetailedLeaderboard(db: Db, scope: DetailedScope) {
   const current = await aggregateRows(db, scope, now); const yesterday = await aggregateRows(db, scope, iranDayStart(now));
   const currentSorted = [...current].sort((a, b) => comparison(a, b, sort, direction)); const previousSorted = [...yesterday].sort((a, b) => comparison(a, b, sort, direction)); const previousRanks = new Map(previousSorted.map((row, index) => [row.userId, index + 1]));
   const ranked = currentSorted.map((row, index) => { const rank = index + 1; const previousRank = previousRanks.get(row.userId) ?? null; return { ...row, rank, previousRank, placeChange: previousRank == null ? 0 : previousRank - rank }; });
-  const start = (page - 1) * pageSize; return { rows: ranked.slice(start, start + pageSize), total: ranked.length, page, pageSize, pages: Math.max(1, Math.ceil(ranked.length / pageSize)), sort, direction };
+  const start = (page - 1) * pageSize; return { rows: ranked.slice(start, start + pageSize), viewerRow: scope.viewerUserId ? ranked.find(row => row.userId === scope.viewerUserId) ?? null : null, total: ranked.length, page, pageSize, pages: Math.max(1, Math.ceil(ranked.length / pageSize)), sort, direction };
 }

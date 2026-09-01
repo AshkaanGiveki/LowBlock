@@ -16,6 +16,6 @@ export async function GET(request: Request) {
   const latest = await db.collection<any>("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } });
   const weekly = url.searchParams.get("weekly") === "true";
   const year = weekly ? null : Number(url.searchParams.get("seasonStartYear") ?? latest?.seasonStartYear ?? new Date().getUTCFullYear());
-  const data = await getDetailedLeaderboard(db, { clubId, weekly, weeklyOffset: url.searchParams.get("week") === "previous" ? 1 : 0, seasonStartYear: year, page: Number(url.searchParams.get("page") ?? 1), pageSize: Number(url.searchParams.get("pageSize") ?? 25), sort: normalizeDetailedSort(url.searchParams.get("sort")), direction: url.searchParams.get("direction") === "asc" ? "asc" : "desc" });
+  const data = await getDetailedLeaderboard(db, { clubId, weekly, weeklyOffset: url.searchParams.get("week") === "previous" ? 1 : 0, seasonStartYear: year, viewerUserId: userId, page: Number(url.searchParams.get("page") ?? 1), pageSize: Number(url.searchParams.get("pageSize") ?? 25), sort: normalizeDetailedSort(url.searchParams.get("sort")), direction: url.searchParams.get("direction") === "asc" ? "asc" : "desc" });
   return NextResponse.json(data);
 }
