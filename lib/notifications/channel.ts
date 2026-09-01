@@ -27,7 +27,7 @@ function botLink(path: string) {
 
 async function sendChannelMessage(text: string, url = `${env.NEXT_PUBLIC_APP_URL}/matches`) {
   if (!env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_NOT_CONFIGURED");
-  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: CHANNEL_ID, text, parse_mode: "HTML", reply_markup: { inline_keyboard: [[{ text: "⚽ ثبت پیش‌بینی | Make a prediction", url: botLink(url) }]] } }) });
+  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: CHANNEL_ID, text, parse_mode: "HTML", reply_markup: { inline_keyboard: [[{ text: "⚽ ثبت پیش‌بینی | Make a prediction", style: "success", url: botLink(url) }]] } }) });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.ok) throw new Error(body?.description || `TELEGRAM_${response.status}`);
   return body.result;
