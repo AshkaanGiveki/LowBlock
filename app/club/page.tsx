@@ -26,6 +26,7 @@ import {
 import { LeaderboardFilters } from "@/components/LeaderboardFilters";
 import type { LeaderboardSelection } from "@/components/LeaderboardFilters";
 import { UserAvatar } from "@/components/UserAvatar";
+import { DetailedLeaderboard } from "@/components/DetailedLeaderboard";
 
 type Club = {
   _id: string;
@@ -229,7 +230,7 @@ export default function ClubPage() {
           showLeagues={false}
           onNavigate={changeLeaderboard}
         />
-        <ClubLeaderboard rows={leaderboard} t={t} clubId={club._id} />
+        <DetailedLeaderboard clubId={club._id} clubName={club.name} weekly={leaderboardScope === "weekly"} weekOffset={leaderboardWeekOffset} />
 
         {isOwner && (
           <OwnerRequestsBanner clubId={club._id} count={pendingCount} t={t} />
