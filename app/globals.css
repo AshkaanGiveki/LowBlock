@@ -433,6 +433,9 @@ html[dir="ltr"] body > header > div > div > div { left:0; right:auto; }
 
 html:dir(rtl) main > div.max-w-7xl > a:first-child svg { transform:rotateY(180deg); }
 
+.sticky[class*="start-[10px]"] > div { width:34px !important; height:34px !important; font-size:.5625rem !important; }
+.sticky.top-0.z-20 { z-index:30 !important; }
+
 /* Keep the honours drawer anchored while the carousel images settle. */
 .fixed.inset-0.z-\[100\].flex.items-end > aside { height:94dvh; min-height:0; }
 @media (max-width:767px) { main section.mt-8.grid.items-end.gap-3 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
