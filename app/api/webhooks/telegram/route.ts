@@ -48,7 +48,9 @@ export async function POST(req: Request) {
 function commandName(text: string) { return text.match(/^\/([a-z0-9_]+)(?:@[a-z0-9_]+)?(?:\s|$)/i)?.[1]?.toLowerCase() ?? ""; }
 function isCommand(text: string, command: string) { return commandName(text) === command; }
 
-type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; web_app?: { url: string }; url?: string }>> };
+type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; style?: "danger" | "success" | "primary"; web_app?: { url: string }; url?: string }>> };
+
+const greenButton = <T extends { text: string; web_app?: { url: string }; url?: string }>(button: T) => ({ ...button, style: "success" as const });
 
 async function handleCommand(command: string, chatId: string, providerUserId: string) {
   const identity = await getTelegramIdentity(providerUserId);
@@ -65,13 +67,13 @@ async function handleCommand(command: string, chatId: string, providerUserId: st
   }
   const url = env.NEXT_PUBLIC_APP_URL;
   const buttons: Record<string, InlineKeyboard> = {
-    matches: { inline_keyboard: [[{ text: language === "fa" ? "⚽ مسابقه‌های امروز" : "⚽ Today’s matches", web_app: { url: `${url}/matches` } }]] },
-    my_predictions: { inline_keyboard: [[{ text: language === "fa" ? "🎯 پیش‌بینی‌های من" : "🎯 My predictions", web_app: { url: `${url}/profile` } }]] },
-    results: { inline_keyboard: [[{ text: language === "fa" ? "📊 مشاهده نتایج" : "📊 View results", web_app: { url: `${url}/matches?tab=results` } }]] },
-    profile: { inline_keyboard: [[{ text: language === "fa" ? "👤 پروفایل من" : "👤 My profile", web_app: { url: `${url}/profile` } }]] },
-    reminders: { inline_keyboard: [[{ text: language === "fa" ? "🔔 تنظیم یادآوری‌ها" : "🔔 Reminder settings", web_app: { url: `${url}/profile` } }]] },
-    settings: { inline_keyboard: [[{ text: language === "fa" ? "⚙️ باز کردن تنظیمات" : "⚙️ Open settings", web_app: { url: `${url}/profile` } }]] },
-    language: { inline_keyboard: [[{ text: language === "fa" ? "🌐 Language settings" : "🌐 تنظیمات زبان", web_app: { url: `${url}/profile` } }]] },
+    matches: { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚽ مسابقه‌های امروز" : "⚽ Today’s matches", web_app: { url: `${url}/matches` } })]] },
+    my_predictions: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🎯 پیش‌بینی‌های من" : "🎯 My predictions", web_app: { url: `${url}/profile` } })]] },
+    results: { inline_keyboard: [[greenButton({ text: language === "fa" ? "📊 مشاهده نتایج" : "📊 View results", web_app: { url: `${url}/matches?tab=results` } })]] },
+    profile: { inline_keyboard: [[greenButton({ text: language === "fa" ? "👤 پروفایل من" : "👤 My profile", web_app: { url: `${url}/profile` } })]] },
+    reminders: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🔔 تنظیم یادآوری‌ها" : "🔔 Reminder settings", web_app: { url: `${url}/profile` } })]] },
+    settings: { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚙️ باز کردن تنظیمات" : "⚙️ Open settings", web_app: { url: `${url}/profile` } })]] },
+    language: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🌐 Language settings" : "🌐 تنظیمات زبان", web_app: { url: `${url}/profile` } })]] },
     help: mainKeyboard(language),
   };
   const messages: Record<string, [string, string]> = {
@@ -87,8 +89,8 @@ async function handleCommand(command: string, chatId: string, providerUserId: st
   await send(chatId, language === "fa" ? messages[command][0] : messages[command][1], buttons[command]);
 }
 
-function connectKeyboard(): InlineKeyboard { return { inline_keyboard: [[{ text: "🔗 Connect LowBlock", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` } }]] }; }
-function mainKeyboard(language: "fa" | "en"): InlineKeyboard { return { inline_keyboard: [[{ text: language === "fa" ? "⚽ مسابقه‌ها" : "⚽ Matches", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }, { text: language === "fa" ? "🏆 جدول" : "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/leaderboard` } }], [{ text: language === "fa" ? "👤 پروفایل" : "👤 Profile", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` } }]] }; }
+function connectKeyboard(): InlineKeyboard { return { inline_keyboard: [[greenButton({ text: "🔗 Connect LowBlock", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` } })]] }; }
+function mainKeyboard(language: "fa" | "en"): InlineKeyboard { return { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚽ مسابقه‌ها" : "⚽ Matches", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }), greenButton({ text: language === "fa" ? "🏆 جدول" : "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/leaderboard` } })], [greenButton({ text: language === "fa" ? "👤 پروفایل" : "👤 Profile", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` } })]] }; }
 async function getTelegramIdentity(providerUserId: string) { return (await getDb()).collection<any>("externalIdentities").findOne({ provider: "TELEGRAM", providerUserId }, { projection: { userId: 1 } }); }
 
 async function sendLeaderboard(chatId: string, providerUserId: string) {
@@ -120,7 +122,7 @@ async function send(chatId: string, text: string, keyboard: boolean | InlineKeyb
       chat_id: chatId,
       text,
       parse_mode: "HTML",
-      reply_markup: keyboard === true ? { inline_keyboard: [[{ text: "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/lowblock` } }, { text: "⚽ Predict", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }]] } : keyboard || undefined,
+      reply_markup: keyboard === true ? { inline_keyboard: [[greenButton({ text: "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/lowblock` } }), greenButton({ text: "⚽ Predict", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } })]] } : keyboard || undefined,
     }),
   });
 
