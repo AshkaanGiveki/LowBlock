@@ -2,6 +2,7 @@ import { ObjectId, type Db } from "mongodb";
 import type { ClubRecord, ClubMembershipRecord } from "@/lib/domain/types";
 import { withMongoTransaction } from "@/lib/db/mongo";
 
+// Minimum active membership required for a club to activate and participate.
 export const CLUB_MINIMUM_MEMBERS = 3;
 
 export async function currentMembership(db: Db, userId: string) {
