@@ -61,4 +61,22 @@ async function sendLeaderboard(chatId: string, providerUserId: string) {
 async function userForToken(token: string) { const { createHash } = await import("node:crypto"); const row = await getDb().then((db) => db.collection<{ userId: string }>("accountLinkTokens").findOne({ tokenHash: createHash("sha256").update(token).digest("hex"), provider: "TELEGRAM", usedAt: null, expiresAt: { $gt: new Date() } }, { projection: { userId: 1 } })); if (!row) throw Error("LINK_TOKEN_INVALID"); return row.userId; }
 async function userLanguage(userId: string) { const row = await getDb().then((db) => db.collection<{ language?: string }>("notificationPreferences").findOne({ userId }, { projection: { language: 1 } })); return row?.language === "en" ? "en" : "fa" as "fa" | "en"; }
 function escapeHtml(value: string) { return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-async function send(chatId: string, text: string, open = false) { if (!env.TELEGRAM_BOT_TOKEN) return; await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", reply_markup: open ? { inline_keyboard: [[{ text: "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/lowblock` } }, { text: "⚽ Predict", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }]] } : undefined }) }); }
+async function send(chatId: string, text: string, open = false) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+
+  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      reply_markup: open ? { inline_keyboard: [[{ text: "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/lowblock` } }, { text: "⚽ Predict", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }]] } : undefined,
+    }),
+  });
+
+  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string } | null;
+  if (!response.ok || !result?.ok) {
+    console.error("Telegram sendMessage failed", { status: response.status, description: result?.description });
+  }
+}
