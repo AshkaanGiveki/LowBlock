@@ -431,6 +431,8 @@ html[dir="ltr"] body > header > div > div > div { left:0; right:auto; }
 }
 .drawer-team-card { border:0 !important; background:transparent !important; padding:0 !important; box-shadow:none !important; }
 
+html:dir(rtl) main > div.max-w-7xl > a:first-child svg { transform:rotateY(180deg); }
+
 /* Keep the honours drawer anchored while the carousel images settle. */
 .fixed.inset-0.z-\[100\].flex.items-end > aside { height:94dvh; min-height:0; }
 @media (max-width:767px) { main section.mt-8.grid.items-end.gap-3 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
