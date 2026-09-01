@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { BarChart3, CalendarDays, ChevronRight, Radio } from "lucide-react";
-import { MatchAnalytics } from "@/components/MatchAnalytics";
 import { useLanguage } from "@/components/LanguageProvider";
 import { formatIranDate, formatIranTime } from "@/lib/football/time";
 import { teamName } from "@/lib/football/team-names";
@@ -11,7 +10,7 @@ type Fixture = { providerMatchId: string; kickoffAt: string; status: string; hom
 
 export function RoundMatchGrid({ fixtures }: { fixtures: Fixture[] }) {
   const { language, t } = useLanguage();
-  const [selected, setSelected] = useState<string | null>(null);
+  const router = useRouter();
   const locale = language === "fa" ? "fa-IR" : "en-GB";
   return <>
     <section className="mt-7">
@@ -19,14 +18,13 @@ export function RoundMatchGrid({ fixtures }: { fixtures: Fixture[] }) {
       <div className="grid gap-3 sm:grid-cols-2">{fixtures.map((fixture) => {
         const live = fixture.status === "LIVE";
         const finished = fixture.status === "FINISHED";
-        return <button key={fixture.providerMatchId} onClick={() => setSelected(fixture.providerMatchId)} className="group relative overflow-hidden rounded-[1.35rem] border border-white/[.08] bg-[linear-gradient(145deg,#14221a,#0d120f)] p-4 text-start transition hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_18px_45px_rgba(32,184,121,.14)]">
+        return <button key={fixture.providerMatchId} onClick={() => router.push(`/matches/${encodeURIComponent(fixture.providerMatchId)}`, { scroll: false })} className="group relative overflow-hidden rounded-[1.35rem] border border-white/[.08] bg-[linear-gradient(145deg,#14221a,#0d120f)] p-4 text-start transition hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_18px_45px_rgba(32,184,121,.14)]">
           <div className="flex items-center justify-between text-[10px] text-[var(--muted)]"><span className="inline-flex items-center gap-1.5"><CalendarDays size={13}/>{formatIranDate(fixture.kickoffAt, locale)} · {formatIranTime(fixture.kickoffAt, locale)}</span><span className={`inline-flex items-center gap-1 font-black ${live ? "text-red-300" : finished ? "text-brand" : ""}`}>{live && <Radio size={11} className="animate-pulse"/>}{fixture.status}</span></div>
           <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center"><Team team={fixture.homeTeam} language={language}/><div><strong className="block text-2xl font-black tracking-tight">{fixture.homeGoals === null ? "—" : `${fixture.homeGoals} - ${fixture.awayGoals}`}</strong><span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-brand"><BarChart3 size={12}/>{t("تحلیل", "Analysis")}</span></div><Team team={fixture.awayTeam} language={language}/></div>
           <div className="mt-4 flex items-center justify-end gap-1 text-[10px] font-black text-white/45 transition group-hover:text-brand">{t("مشاهده جزئیات", "View details")}<ChevronRight size={14}/></div>
         </button>;
       })}</div>
     </section>
-    {selected && <MatchAnalytics matchId={selected} onClose={() => setSelected(null)} />}
   </>;
 }
 
