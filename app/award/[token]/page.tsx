@@ -9,6 +9,7 @@ import { SharedPredictionExperience } from "@/components/SharedPredictionExperie
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 async function load(token: string) {
   if (!/^[A-Za-z0-9_-]{6}$/.test(token) && !/^[A-Za-z0-9_-]{40,60}$/.test(token)) return null;
@@ -43,5 +44,5 @@ async function load(token: string) {
   };
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> { const { token } = await params; const data = await load(token); return { title: data ? `${data.award.competitionName} Round Winner | LowBlock` : "LowBlock Award", description: "Think you can take the next crown? Make your prediction." }; }
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> { const { token } = await params; const data = await load(token); const image = `https://lowblock.ir/api/awards/share/${encodeURIComponent(token)}/image`; return { metadataBase: new URL("https://lowblock.ir"), title: data ? `${data.award.competitionName} Round Winner | LowBlock` : "LowBlock Award", description: "Think you can take the next crown? Make your prediction.", openGraph: { title: data ? `${data.award.competitionName} Round Winner | LowBlock` : "LowBlock Award", description: "Think you can take the next crown? Make your prediction.", type: "website", images: [{ url: image, width: 1200, height: 630, alt: "LowBlock award card" }] }, twitter: { card: "summary_large_image", images: [image] } }; }
 export default async function AwardSharePage({ params }: { params: Promise<{ token: string }> }) { const { token } = await params; const data = await load(token); if (!data) notFound(); return <SharedPredictionExperience token={token} {...data} />; }
