@@ -26,7 +26,6 @@ import {
 import { LeaderboardFilters } from "@/components/LeaderboardFilters";
 import type { LeaderboardSelection } from "@/components/LeaderboardFilters";
 import { UserAvatar } from "@/components/UserAvatar";
-import { DetailedLeaderboard } from "@/components/DetailedLeaderboard";
 
 type Club = {
   _id: string;
@@ -230,7 +229,7 @@ export default function ClubPage() {
           showLeagues={false}
           onNavigate={changeLeaderboard}
         />
-        <DetailedLeaderboard clubId={club._id} clubName={club.name} weekly={leaderboardScope === "weekly"} weekOffset={leaderboardWeekOffset} />
+        <ClubLeaderboard rows={leaderboard} t={t} clubId={club._id} />
 
         {isOwner && (
           <OwnerRequestsBanner clubId={club._id} count={pendingCount} t={t} />
@@ -479,8 +478,8 @@ function ClubLeaderboard({
             </p>
           </div>
           <Link
-            href={`/club/${clubId}/members`}
-            className="hidden items-center gap-1 text-xs font-black text-brand sm:inline-flex"
+            href={`/club/${clubId}/standings`}
+            className="inline-flex items-center gap-1 text-xs font-black text-brand"
           >
             {t("جدول کامل", "Full table")}
             <ArrowUpRight size={14} />
