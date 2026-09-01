@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowUpRight,
+  Table2,
   BarChart3,
   CalendarDays,
   ChevronRight,
@@ -478,11 +479,12 @@ function ClubLeaderboard({
             </p>
           </div>
           <Link
-            href={`/club/${clubId}/members`}
-            className="hidden items-center gap-1 text-xs font-black text-brand sm:inline-flex"
+            href={`/club/${clubId}/standings`}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand transition hover:border-brand/50 hover:bg-brand/15"
+            aria-label={t("جدول کامل", "Full table")}
+            title={t("جدول کامل", "Full table")}
           >
-            {t("جدول کامل", "Full table")}
-            <ArrowUpRight size={14} />
+            <Table2 size={17} />
           </Link>
         </div>
       </div>
