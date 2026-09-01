@@ -12,6 +12,7 @@ import { MatchAnalytics } from "./MatchAnalytics";
 import { MatchInsightsPanel } from "./MatchInsights";
 import { useToast } from "@/components/ToastProvider";
 import { friendlyError } from "@/lib/userErrors";
+import { closeMatchRoute, matchRoute, openMatchRoute } from "@/components/matchNavigation";
 
 type Team = { id: number; name: string; logoUrl: string | null };
 type Match = { providerMatchId: string; kickoffAt: Date | string; status: string; homeGoals?: number | null; awayGoals?: number | null; homeTeam: Team; awayTeam: Team };
@@ -19,7 +20,7 @@ type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number };
 type DrawerTeam = { name: string; logo: string | null };
 
 export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPredictionSaved, openOnMount = false, submitPrediction }: Props) {
-  const { language, t } = useLanguage(); const { showToast } = useToast(); const router = useRouter(); const pathname = usePathname();
+  const { language, t } = useLanguage(); const { showToast } = useToast(); const router = useRouter(); const pathname = usePathname(); const [activePath, setActivePath] = useState(pathname);
   const [now, setNow] = useState(Date.now());
   const [home, setHome] = useState(initial?.homeGoals?.toString() ?? "");
   const [away, setAway] = useState(initial?.awayGoals?.toString() ?? "");
@@ -35,14 +36,15 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPr
   const finished = match.status === "FINISHED" || (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED");
   const live = !finished && (match.status === "LIVE" || now >= kickoff);
   const locked = live || finished;
+  useEffect(() => { const syncPath = () => setActivePath(window.location.pathname); window.addEventListener("popstate", syncPath); return () => window.removeEventListener("popstate", syncPath); }, []);
   useEffect(() => { if (!openOnMount) return; if (locked) { setAnalyticsOpen(true); return; } setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange]);
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
-  const isMatchRoute = pathname === `/matches/${encodeURIComponent(match.providerMatchId)}`;
-  const leaveMatchRoute = () => { if (isMatchRoute) router.back(); };
+  const isMatchRoute = activePath === matchRoute(match.providerMatchId);
+  const leaveMatchRoute = () => { if (!isMatchRoute) return; if (typeof window.history.state?.lowblockMatchOrigin === "string") closeMatchRoute(); else router.replace("/matches"); };
   const closeDrawer = () => { setDrawerOpen(false); setInsightsOpen(false); onDrawerChange?.(false); leaveMatchRoute(); };
   const closeAnalytics = () => { setAnalyticsOpen(false); leaveMatchRoute(); };
-  const open = () => { if (!isMatchRoute) { router.push(`/matches/${encodeURIComponent(match.providerMatchId)}`, { scroll: false }); return; } if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
+  const open = () => { if (!isMatchRoute) openMatchRoute(match.providerMatchId, pathname); if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
   const update = (setter: (value: string) => void) => (value: string) => { setter(value); };
   async function submit() { if (home === "" || away === "" || locked) return; setBusy(true); setError(""); try { const response = await fetch("/api/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ matchId: match.providerMatchId, homeGoals: Number(home), awayGoals: Number(away) }) }); const data = await response.json().catch(() => ({})); if (!response.ok) { if (response.status === 401 || data.error === "AUTH_REQUIRED") { setError(""); setAuthToast(true); return; } throw new Error(getPredictionError(data.error, t)); } setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) }); onPredictionSaved?.({ homeGoals: Number(home), awayGoals: Number(away) }); closeDrawer(); } catch (reason) { setError(reason instanceof Error ? reason.message : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.")); } finally { setBusy(false); } }
   const statusText = live ? "LIVE" : finished ? `FT${hasResult ? ` · ${formatNumber(match.homeGoals ?? 0, language)} - ${formatNumber(match.awayGoals ?? 0, language)}` : ""}` : `${t("شروع تا", "STARTS IN")} ${formatCountdown(Math.max(0, kickoff - now), language)}`;
