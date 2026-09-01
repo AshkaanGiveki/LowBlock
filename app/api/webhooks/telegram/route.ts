@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { consumeLinkToken } from "@/lib/platform/identity";
+import { ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
       const userId = await userForToken(token);
       language = await userLanguage(userId);
       await consumeLinkToken(token, "TELEGRAM", userId, { id: String(providerUserId), username: from.username, displayName: [from.first_name, from.last_name].filter(Boolean).join(" "), chatId: String(chatId), allowsWrite: true });
-      await send(String(chatId), language === "fa" ? "تلگرام با موفقیت متصل شد ✓\n\nحساب تلگرام شما به LowBlock متصل است.\n\nدستورهای موجود:\n/matches — مسابقه‌های امروز\n/my_predictions — پیش‌بینی‌های من\n/results — نتایج\n/leaderboard — جدول جهانی\n/profile — پروفایل\n/reminders — یادآوری‌ها\n/language — تغییر زبان\n/help — راهنما" : "Telegram connected ✓\n\nYour Telegram account is now connected to LowBlock.\n\nAvailable commands:\n/matches — Today’s fixtures\n/my_predictions — My predictions\n/results — Results\n/leaderboard — Global leaderboard\n/profile — Profile\n/reminders — Reminders\n/language — Change language\n/help — Help", true);
+      await send(String(chatId), language === "fa" ? "تلگرام با موفقیت متصل شد ✓\n\nحساب تلگرام شما به LowBlock متصل است.\n\nدستورهای موجود:\n/matches — مسابقه‌های امروز\n/my_predictions — پیش‌بینی‌های من\n/results — نتایج\n/leaderboard — جدول جهانی\n/weekly — جدول هفتگی\n/group — جدول گروه\n/profile — پروفایل\n/reminders — یادآوری‌ها\n/language — تغییر زبان\n/help — راهنما" : "Telegram connected ✓\n\nYour Telegram account is now connected to LowBlock.\n\nAvailable commands:\n/matches — Today’s fixtures\n/my_predictions — My predictions\n/results — Results\n/leaderboard — Global leaderboard\n/weekly — Weekly leaderboard\n/group — Group leaderboard\n/profile — Profile\n/reminders — Reminders\n/language — Change language\n/help — Help", true);
     } catch (error) {
       if (error instanceof Error && error.message === "PLATFORM_IDENTITY_CONFLICT") await send(String(chatId), language === "fa" ? "این حساب تلگرام قبلاً به یک حساب LowBlock دیگر متصل شده است." : "This Telegram account is already connected to another LowBlock account.");
       else await send(String(chatId), language === "fa" ? "لینک اتصال نامعتبر یا منقضی شده است. از تنظیمات LowBlock دوباره شروع کنید." : "This connection link is invalid or expired. Start again from LowBlock settings.");
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   }
 
   const command = commandName(text);
-  if (["matches", "my_predictions", "results", "profile", "reminders", "settings", "language", "help"].includes(command)) {
+  if (["matches", "my_predictions", "results", "profile", "reminders", "settings", "language", "group", "weekly", "help"].includes(command)) {
     await handleCommand(command, String(chatId), String(providerUserId));
   }
 
@@ -65,15 +66,36 @@ async function handleCommand(command: string, chatId: string, providerUserId: st
     await send(chatId, nextLanguage === "fa" ? "زبان ربات به فارسی تغییر کرد. ✅" : "Bot language changed to English. ✅", mainKeyboard(nextLanguage));
     return;
   }
+  if (command === "weekly") {
+    const rows = await getCanonicalLeaderboard(await getDb(), { weekly: true }, 10);
+    await send(chatId, formatLeaderboard(rows, language, "weekly"), mainKeyboard(language));
+    return;
+  }
+  if (command === "group") {
+    const db = await getDb();
+    const membership = await db.collection<any>("clubMemberships").findOne({ userId: identity.userId, leftAt: null }, { projection: { clubId: 1 } });
+    if (!membership?.clubId) {
+      await send(chatId, language === "fa" ? "شما هنوز عضو هیچ گروهی نیستید." : "You are not a member of a group yet.", { inline_keyboard: [[greenButton({ text: language === "fa" ? "👥 کشف گروه‌ها" : "👥 Discover groups", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/club/discover` } })]] });
+      return;
+    }
+    const club = ObjectId.isValid(membership.clubId) ? await db.collection<any>("clubs").findOne({ _id: new ObjectId(membership.clubId) }, { projection: { name: 1 } }) : null;
+    const latest = await db.collection<any>("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } });
+    const rows = await getCanonicalLeaderboard(db, { clubId: membership.clubId, seasonStartYear: Number(latest?.seasonStartYear ?? new Date().getUTCFullYear()) }, 10);
+    await send(chatId, formatLeaderboard(rows, language, "group", club?.name), mainKeyboard(language));
+    return;
+  }
   const url = env.NEXT_PUBLIC_APP_URL;
+  const db = await getDb();
+  const user = ObjectId.isValid(identity.userId) ? await db.collection<any>("users").findOne({ _id: new ObjectId(identity.userId) }, { projection: { username: 1 } }) : null;
+  const profileUrl = user?.username ? `${url}/u/${encodeURIComponent(user.username)}` : `${url}/profile`;
   const buttons: Record<string, InlineKeyboard> = {
     matches: { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚽ مسابقه‌های امروز" : "⚽ Today’s matches", web_app: { url: `${url}/matches` } })]] },
-    my_predictions: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🎯 پیش‌بینی‌های من" : "🎯 My predictions", web_app: { url: `${url}/profile` } })]] },
+    my_predictions: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🎯 پیش‌بینی‌های من" : "🎯 My predictions", web_app: { url: profileUrl } })]] },
     results: { inline_keyboard: [[greenButton({ text: language === "fa" ? "📊 مشاهده نتایج" : "📊 View results", web_app: { url: `${url}/matches?tab=results` } })]] },
-    profile: { inline_keyboard: [[greenButton({ text: language === "fa" ? "👤 پروفایل من" : "👤 My profile", web_app: { url: `${url}/profile` } })]] },
-    reminders: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🔔 تنظیم یادآوری‌ها" : "🔔 Reminder settings", web_app: { url: `${url}/profile` } })]] },
-    settings: { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚙️ باز کردن تنظیمات" : "⚙️ Open settings", web_app: { url: `${url}/profile` } })]] },
-    language: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🌐 Language settings" : "🌐 تنظیمات زبان", web_app: { url: `${url}/profile` } })]] },
+    profile: { inline_keyboard: [[greenButton({ text: language === "fa" ? "👤 پروفایل من" : "👤 My profile", web_app: { url: profileUrl } })]] },
+    reminders: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🔔 تنظیم یادآوری‌ها" : "🔔 Reminder settings", web_app: { url: profileUrl } })]] },
+    settings: { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚙️ باز کردن تنظیمات" : "⚙️ Open settings", web_app: { url: profileUrl } })]] },
+    language: { inline_keyboard: [[greenButton({ text: language === "fa" ? "🌐 Language settings" : "🌐 تنظیمات زبان", web_app: { url: profileUrl } })]] },
     help: mainKeyboard(language),
   };
   const messages: Record<string, [string, string]> = {
@@ -84,7 +106,7 @@ async function handleCommand(command: string, chatId: string, providerUserId: st
     reminders: ["🔔 وضعیت یادآوری‌ها را از پروفایل LowBlock مدیریت کنید.", "🔔 Manage your prediction reminders from your LowBlock profile."],
     settings: ["⚙️ تنظیمات حساب و اتصال‌های شما در LowBlock.", "⚙️ Manage your account settings and connected platforms in LowBlock."],
     language: ["زبان پیام‌های ربات از تنظیمات زبان LowBlock خوانده می‌شود.", "The bot language follows your language setting in LowBlock."],
-    help: ["دستورهای LowBlock:\n/matches — مسابقه‌های امروز\n/my_predictions — پیش‌بینی‌های من\n/results — نتایج\n/leaderboard — جدول جهانی\n/profile — پروفایل\n/reminders — یادآوری‌ها\n/language — زبان\n/help — راهنما", "LowBlock commands:\n/matches — Today’s fixtures\n/my_predictions — My predictions\n/results — Results\n/leaderboard — Global leaderboard\n/profile — Profile\n/reminders — Reminders\n/language — Language\n/help — Help"],
+    help: ["دستورهای LowBlock:\n/matches — مسابقه‌های امروز\n/my_predictions — پیش‌بینی‌های من\n/results — نتایج\n/leaderboard — جدول جهانی\n/weekly — جدول هفتگی\n/group — جدول گروه\n/profile — پروفایل\n/reminders — یادآوری‌ها\n/language — زبان\n/help — راهنما", "LowBlock commands:\n/matches — Today’s fixtures\n/my_predictions — My predictions\n/results — Results\n/leaderboard — Global leaderboard\n/weekly — Weekly leaderboard\n/group — Group leaderboard\n/profile — Profile\n/reminders — Reminders\n/language — Language\n/help — Help"],
   };
   await send(chatId, language === "fa" ? messages[command][0] : messages[command][1], buttons[command]);
 }
@@ -92,6 +114,7 @@ async function handleCommand(command: string, chatId: string, providerUserId: st
 function connectKeyboard(): InlineKeyboard { return { inline_keyboard: [[greenButton({ text: "🔗 Connect LowBlock", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` } })]] }; }
 function mainKeyboard(language: "fa" | "en"): InlineKeyboard { return { inline_keyboard: [[greenButton({ text: language === "fa" ? "⚽ مسابقه‌ها" : "⚽ Matches", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }), greenButton({ text: language === "fa" ? "🏆 جدول" : "🏆 Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/leaderboard` } })], [greenButton({ text: language === "fa" ? "👤 پروفایل" : "👤 Profile", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` } })]] }; }
 async function getTelegramIdentity(providerUserId: string) { return (await getDb()).collection<any>("externalIdentities").findOne({ provider: "TELEGRAM", providerUserId }, { projection: { userId: 1 } }); }
+function formatLeaderboard(rows: any[], language: "fa" | "en", kind: "weekly" | "group", groupName?: string) { const title = kind === "weekly" ? (language === "fa" ? "🏆 جدول هفتگی جهانی LowBlock" : "🏆 LowBlock Global Weekly Leaderboard") : (language === "fa" ? `👥 جدول گروه ${escapeHtml(groupName || "شما")}` : `👥 ${escapeHtml(groupName || "Your group")} Leaderboard`); const lines = rows.length ? rows.map((row, index) => `${["🥇", "🥈", "🥉"][index] ?? `${index + 1}.`} <b>${escapeHtml(row.username)}</b>  <code>${row.points} ${language === "fa" ? "امتیاز" : "pts"}</code>`).join("\n") : (language === "fa" ? "هنوز امتیازی ثبت نشده است." : "No scored predictions yet."); return `${title}\n<i>${language === "fa" ? "۱۰ نفر برتر" : "Top 10"}</i>\n\n${lines}`; }
 
 async function sendLeaderboard(chatId: string, providerUserId: string) {
   const db = await getDb();
