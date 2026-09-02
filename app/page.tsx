@@ -1,4 +1,4 @@
-import Link from "next/link";
+import NextLink from "next/link";
 import { ObjectId } from "mongodb";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
@@ -6,10 +6,17 @@ import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { getMatches, getPredictions } from "@/lib/football/data";
 import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
 import { HomeHeroSlang } from "@/components/HomeHeroSlang";
-import { LEAGUES } from "@/lib/football/leagues";
+import { FEATURED_COMPETITION_CODES, LEAGUES as ALL_LEAGUES } from "@/lib/football/leagues";
 import { T } from "@/components/LanguageProvider";
 
 export const dynamic = "force-dynamic";
+const featuredLeagues = FEATURED_COMPETITION_CODES.map((code) => ALL_LEAGUES.find((league) => league.code === code)!).filter(Boolean);
+const LEAGUES = featuredLeagues;
+
+function Link({ href, ...props }: React.ComponentProps<typeof NextLink>) {
+  const target = href === "/lowblock" && props.className === "text-xs font-bold text-brand" ? "/leagues" : href;
+  return <NextLink href={target} {...props} />;
+}
 
 export default async function Home() {
   const userId = await currentUserId(); const fetchedMatches = await getMatches({ limit: 20 }); const eligibleMatches = fetchedMatches.filter((match) => match.status === "SCHEDULED" && new Date(match.kickoffAt).getTime() > Date.now()); const allPredictions = await getPredictions(eligibleMatches.map((match) => match.providerMatchId), userId ?? "guest"); const matches = eligibleMatches.filter((match) => !allPredictions.has(match.providerMatchId)).slice(0, 5); const predictions = new Map([...allPredictions].filter(([matchId]) => matches.some((match) => match.providerMatchId === matchId))); const allPredicted = userId !== null && eligibleMatches.length > 0 && matches.length === 0;
