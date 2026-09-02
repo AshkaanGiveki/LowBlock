@@ -41,6 +41,7 @@ export type LeagueCode = typeof LEAGUES[number]["code"];
 export function getLeague(code: string) { return LEAGUES.find((league) => league.code === code); }
 export const GLOBAL_LEAGUE_CODES = LEAGUES.filter((league) => league.globalLeaderboard).map((league) => league.code);
 export const DEFAULT_CLUB_LEAGUE_CODES = LEAGUES.filter((league) => league.defaultClubLeaderboard).map((league) => league.code);
+export const FEATURED_COMPETITION_CODES = ["GB1", "ES1", "L1", "IT1", "FR1", "UCL"] as const;
 export function isGlobalCompetition(code: string) { return Boolean(LEAGUES.find((league) => league.code === code)?.globalLeaderboard); }
 export function isH2HCompetition(code: string) { return Boolean(LEAGUES.find((league) => league.code === code)?.h2h); }
 
