@@ -79,6 +79,8 @@ html[dir="rtl"] .logo-loop-track { animation-name:logo-loop-rtl; }
 .glow-card > div > div:first-child { position:relative; min-height:1.75rem; }
 .glow-card > div > div:first-child > span:first-child { display:none; }
 .glow-card > div > div:first-child > span:last-child { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; }
+.glow-card > div { padding-bottom:2.75rem !important; }
+.glow-card > div > div:first-child { margin-bottom:1.15rem; }
 /* The home competition rail is intentionally compact on phones: six useful cards, two per row. */
 @media (max-width:639px) {
   main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(2) > div.grid,
