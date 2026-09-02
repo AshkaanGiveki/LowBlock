@@ -37,7 +37,7 @@ export default function LeaguesPage() {
             {LEAGUES.map((league) => (
               <Link key={league.code} href={`/leagues/${league.code}`} className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-[#101512] p-4 transition hover:-translate-y-0.5 hover:border-brand/40 hover:bg-[#142019]">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[.04] p-2">
-                  <img src={league.logo} alt="" className="league-logo h-full w-full object-contain" />
+                  <img src={league.logo} alt="" className="h-full w-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-bold"><T fa={league.faName} en={league.enName} /></span>

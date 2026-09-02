@@ -13,7 +13,10 @@ export function MatchesView({ matches, predictions, focusMatchId }: { matches: M
   const { t } = useLanguage();
   const [selected, setSelected] = useState<string[]>([]);
   const availableLeagues = useMemo(() => LEAGUES.filter((league) => matches.some((match) => match.leagueCode === league.code)), [matches]);
-  const filtered = useMemo(() => selected.length ? matches.filter((match) => selected.includes(match.leagueCode)) : matches, [matches, selected]);
+  const filtered = useMemo(() => {
+    const visible = selected.length ? matches.filter((match) => selected.includes(match.leagueCode)) : matches;
+    return [...visible].sort((a, b) => Number(!LEAGUES.find((league) => league.code === a.leagueCode)?.globalLeaderboard) - Number(!LEAGUES.find((league) => league.code === b.leagueCode)?.globalLeaderboard) || new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
+  }, [matches, selected]);
   useEffect(() => { if (!focusMatchId) return; const timer = window.setTimeout(() => document.querySelector(`[data-match-id="${CSS.escape(focusMatchId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80); return () => window.clearTimeout(timer); }, [focusMatchId]);
 
   return (
