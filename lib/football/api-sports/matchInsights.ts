@@ -59,10 +59,12 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
   const now = new Date();
   const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const force = options.force === true;
-  const upcoming = await db.collection<any>("matches").find(
+  const upcomingRows = await db.collection<any>("matches").find(
     { status: "SCHEDULED", kickoffAt: { $gte: now, $lte: horizon } },
     { projection: { providerMatchId: 1, leagueCode: 1, seasonStartYear: 1, homeTeamProviderId: 1, awayTeamProviderId: 1, homeTeam: 1, awayTeam: 1 } },
   ).sort({ kickoffAt: 1 }).toArray();
+  const today = dayKey(now);
+  const upcoming = upcomingRows.filter((match) => dayKey(new Date(match.kickoffAt)) === today);
 
   let h2hRequests = 0;
   let providerRequests = 0;
