@@ -3,6 +3,7 @@ import { ObjectId, type Db } from "mongodb";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { getClubRoundAsset, getRoundWinnerAsset, LOWBLOCK_SCOPE, ROUND_WINNER_TYPE, CLUB_ROUND_WINNER_TYPE, WEEKLY_WINNER_TYPE, CLUB_WEEKLY_WINNER_TYPE, LEAGUE_WINNER_TYPE, GLOBAL_WINNER_TYPE, CLUB_LEAGUE_WINNER_TYPE, MONTHLY_EXACT_WINNER_TYPE, CLUB_MONTHLY_EXACT_WINNER_TYPE } from "@/lib/awards/config";
+import { GLOBAL_LEAGUE_CODES, isGlobalCompetition } from "@/lib/football/leagues";
 
 export const LEAGUE_SEASON_MATCHDAYS: Record<string, number> = { FR1: 34, L1: 34, GB1: 38, ES1: 38, IT1: 38 };
 export const CLUB_AWARD_MINIMUM_MEMBERS = 5;
@@ -34,7 +35,7 @@ export async function grantFinalRoundWinnerAwards(db: Db) {
   const rounds = await db.collection<any>("rounds").find({ status: "FINAL" }).toArray(); let granted = 0;
   for (const round of rounds) {
     const seasonStartYear = Number(round.seasonId); const roundNumber = Number(round.number); const asset = getRoundWinnerAsset(round.leagueCode, seasonStartYear, roundNumber); const clubAsset = getClubRoundAsset(round.leagueCode, seasonStartYear, roundNumber); const competitionName = asset?.leagueName ?? clubAsset?.leagueName ?? round.leagueCode;
-    const leaderboard = await getCanonicalLeaderboard(db, { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber }, 1); const winner = leaderboard[0];
+    const leaderboard = isGlobalCompetition(round.leagueCode) ? await getCanonicalLeaderboard(db, { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber }, 1) : []; const winner = leaderboard[0];
     if (winner) granted += await issue(db, { awardKey: `ROUND_WINNER:${LOWBLOCK_SCOPE}:${round.leagueCode}:${seasonStartYear}:${roundNumber}`, userId: winner.userId, type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, competitionName, seasonId: String(round.seasonId), seasonStartYear, roundId: String(round.id), roundNumber }, { type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, seasonId: String(round.seasonId), roundId: String(round.id) });
     const activeClubs = await eligibleClubIds(db);
     const clubs = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber, clubIdAtLock: { $ne: null } } }, { $group: { _id: "$clubIdAtLock" } }]).toArray();
@@ -76,7 +77,7 @@ function iranMonthPeriod(now = new Date()) { const parts = new Intl.DateTimeForm
 
 async function grantMonthlyExactAward(db: Db) {
   const period = iranMonthPeriod(); if (!period.isFirstDay) return 0;
-  const base = [{ $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } }, { $unwind: "$fixture" }, { $match: { "fixture.kickoffAt": { $gte: period.start, $lt: period.end } } }, { $lookup: { from: "predictions", let: { uid: "$userId", mid: "$matchId" }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$uid"] }, { $eq: ["$matchId", "$$mid"] }] } } }, { $project: { createdAt: 1 } }], as: "prediction" } }, { $unwind: { path: "$prediction", preserveNullAndEmptyArrays: true } }];
+  const base = [{ $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } }, { $unwind: "$fixture" }, { $match: { "fixture.kickoffAt": { $gte: period.start, $lt: period.end }, "fixture.leagueCode": { $in: GLOBAL_LEAGUE_CODES } } }, { $lookup: { from: "predictions", let: { uid: "$userId", mid: "$matchId" }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$uid"] }, { $eq: ["$matchId", "$$mid"] }] } } }, { $project: { createdAt: 1 } }], as: "prediction" } }, { $unwind: { path: "$prediction", preserveNullAndEmptyArrays: true } }];
   const rank = async (groupId: string | Record<string, string>) => {
     const rows = await db.collection<any>("predictionScores").aggregate([...base, { $group: { _id: groupId, points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, correct: { $sum: { $cond: ["$correctOutcome", 1, 0] } }, predictions: { $sum: 1 }, earliest: { $min: "$prediction.createdAt" } } }]).toArray();
     const userIds = rows.map(row => String(typeof row._id === "object" ? row._id.userId : row._id)); const stats = await db.collection<any>("leaderboardStats").find({ userId: { $in: userIds }, scope: "GLOBAL" }, { projection: { userId: 1, points: 1 } }).toArray(); const global = new Map(stats.map(row => [String(row.userId), Number(row.points ?? 0)]));

@@ -1,5 +1,6 @@
 import type { Db } from "mongodb";
 import { apiRequest, remainingApiRequests } from "./client";
+import { isH2HCompetition } from "@/lib/football/leagues";
 
 type ProviderFixture = {
   fixture: { id: number; date: string; status: { short: string } };
@@ -54,22 +55,6 @@ function normalizeH2H(item: ProviderFixture) {
   };
 }
 
-async function fetchStandings(db: Db, leagueCode: string, leagueId: number, season: number, now: Date, force: boolean) {
-  const day = dayKey(now);
-  if (!force) {
-    const cached = await db.collection<any>("leagueInsightStandings").findOne({ leagueCode, season, day });
-    if (cached?.status === "UNAVAILABLE" || cached?.rows?.length) return cached.rows ?? [];
-  }
-  const response = await apiRequest<{ league?: { standings?: ProviderStanding[][] } }>({ league: String(leagueId), season: String(season) }, "standings");
-  const rows = response.response[0]?.league?.standings?.flatMap((group) => group.map(normalizeStanding)) ?? [];
-  await db.collection("leagueInsightStandings").updateOne(
-    { leagueCode, season, day },
-    { $set: { leagueCode, season, day, rows, provider: "football-api", fetchedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } },
-    { upsert: true },
-  );
-  return rows;
-}
-
 export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
   const now = new Date();
   const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -79,11 +64,6 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
     { projection: { providerMatchId: 1, leagueCode: 1, seasonStartYear: 1, homeTeamProviderId: 1, awayTeamProviderId: 1, homeTeam: 1, awayTeam: 1 } },
   ).sort({ kickoffAt: 1 }).toArray();
 
-  const leagueIds = new Map<string, number>([
-    ["GB1", 39], ["ES1", 140], ["L1", 78], ["IT1", 135], ["FR1", 61],
-  ]);
-  const standings = new Map<string, any[]>();
-  let standingsRequests = 0;
   let h2hRequests = 0;
   let providerRequests = 0;
   const providerErrors: string[] = [];
@@ -95,35 +75,17 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
   };
   const available = await remainingApiRequests();
 
-  for (const match of upcoming) {
-    const key = `${match.leagueCode}:${Number(match.seasonStartYear)}`;
-    if (standings.has(key)) continue;
-    const leagueId = leagueIds.get(match.leagueCode);
-    if (!leagueId || providerRequests >= available) continue;
-    try {
-      await throttleProvider();
-      standings.set(key, await fetchStandings(db, match.leagueCode, leagueId, Number(match.seasonStartYear), now, force));
-      standingsRequests++;
-      providerRequests++;
-    } catch (error) {
-      providerRequests++;
-      const message = error instanceof Error ? error.message : "request failed";
-      providerErrors.push(`standings:${match.leagueCode}:${String(match.seasonStartYear)}:${message}`);
-      standings.set(key, []);
-      await db.collection("leagueInsightStandings").updateOne(
-        { leagueCode: match.leagueCode, season: Number(match.seasonStartYear), day: dayKey(now) },
-        { $set: { leagueCode: match.leagueCode, season: Number(match.seasonStartYear), day: dayKey(now), rows: [], status: "UNAVAILABLE", error: message, fetchedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } },
-        { upsert: true },
-      );
-    }
-  }
-
   const pairs = [...new Map(upcoming.map((match) => {
     const ids = [Number(match.homeTeamProviderId), Number(match.awayTeamProviderId)].sort((a, b) => a - b);
     return [`${ids[0]}-${ids[1]}`, `${ids[0]}-${ids[1]}`];
   })).values()];
 
   for (const pairKey of pairs) {
+    const match = upcoming.find((candidate) => {
+      const ids = [Number(candidate.homeTeamProviderId), Number(candidate.awayTeamProviderId)].sort((a, b) => a - b);
+      return `${ids[0]}-${ids[1]}` === pairKey;
+    });
+    if (!match || !isH2HCompetition(match.leagueCode)) continue;
     const cached = await db.collection<any>("h2hInsights").findOne({ pairKey });
     const fresh = cached?.updatedAt && now.getTime() - new Date(cached.updatedAt).getTime() < 24 * 60 * 60 * 1000;
     if (!force && fresh) continue;
@@ -155,10 +117,7 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
     const homeId = Number(match.homeTeamProviderId);
     const awayId = Number(match.awayTeamProviderId);
     const ids = [homeId, awayId].sort((a, b) => a - b);
-    const h2h = await db.collection<any>("h2hInsights").findOne({ pairKey: `${ids[0]}-${ids[1]}` });
-    const table = standings.get(`${match.leagueCode}:${Number(match.seasonStartYear)}`) ?? [];
-    const homeStanding = table.find((row) => row.team.id === homeId) ?? null;
-    const awayStanding = table.find((row) => row.team.id === awayId) ?? null;
+    const h2h = isH2HCompetition(match.leagueCode) ? await db.collection<any>("h2hInsights").findOne({ pairKey: `${ids[0]}-${ids[1]}` }) : null;
     await db.collection("matchInsights").updateOne(
       { matchId: String(match.providerMatchId) },
       {
@@ -166,9 +125,9 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
           matchId: String(match.providerMatchId),
           provider: "football-api",
           fetchedAt: now,
-          home: { id: homeId, name: match.homeTeam.name, logoUrl: match.homeTeam.logoUrl, form: homeStanding?.form ?? "", standing: homeStanding },
-          away: { id: awayId, name: match.awayTeam.name, logoUrl: match.awayTeam.logoUrl, form: awayStanding?.form ?? "", standing: awayStanding },
-          standings: table,
+          home: { id: homeId, name: match.homeTeam.name, logoUrl: match.homeTeam.logoUrl, form: "", standing: null },
+          away: { id: awayId, name: match.awayTeam.name, logoUrl: match.awayTeam.logoUrl, form: "", standing: null },
+          standings: [],
           h2h: h2h?.meetings ?? [],
           updatedAt: now,
         },
@@ -179,5 +138,5 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
     snapshots++;
   }
 
-  return { providerRequests, h2hRequests, standingsRequests, snapshots, availableAtStart: available, matches: upcoming.length, providerErrors };
+  return { providerRequests, h2hRequests, standingsRequests: 0, snapshots, availableAtStart: available, matches: upcoming.length, providerErrors };
 }

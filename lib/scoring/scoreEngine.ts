@@ -1,7 +1,9 @@
+import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db/mongo";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
 import { createLockSnapshot, isPredictionLocked, SCORING_VERSION } from "@/lib/domain/predictionLock";
 import { grantAutomaticAwards } from "@/lib/awards/service";
+import { DEFAULT_CLUB_LEAGUE_CODES, isGlobalCompetition } from "@/lib/football/leagues";
 
 type Match = { _id?: unknown; providerMatchId: string; leagueCode: string; seasonStartYear: number; matchday: number; roundId?: string | null; status: string; kickoffAt: Date; homeGoals: number | null; awayGoals: number | null };
 type Prediction = { _id?: unknown; userId: string; matchId: string; homeGoals: number; awayGoals: number };
@@ -13,7 +15,7 @@ async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
     const rows = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear: Number(round.seasonId), matchday: round.number } }, { $group: { _id: { userId: "$userId", clubId: "$clubIdAtLock" }, points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } }, { $sort: { points: -1, exact: -1, predictions: -1, "_id.userId": 1 } }]).toArray();
     await db.collection("roundWinners").deleteMany({ roundId: round.id });
     const scopes = new Map<string, any>();
-    for (const row of rows) { const clubId = row._id.clubId ?? null; const key = clubId ?? "GLOBAL"; if (!scopes.has(key)) scopes.set(key, row); }
+    for (const row of rows) { const clubId = row._id.clubId ?? null; if (!clubId && !isGlobalCompetition(round.leagueCode)) continue; const key = clubId ?? "GLOBAL"; if (!scopes.has(key)) scopes.set(key, row); }
     if (scopes.size) await db.collection("roundWinners").insertMany([...scopes.values()].map((row) => ({ roundId: round.id, userId: String(row._id.userId), clubId: row._id.clubId ?? null, points: Number(row.points ?? 0), exact: Number(row.exact ?? 0), predictions: Number(row.predictions ?? 0), createdAt: new Date() })));
   }
   return rounds.length;
@@ -36,6 +38,9 @@ export async function runScoreEngine() {
     if (!isPredictionLocked(byMatch.get(prediction.matchId)!)) continue;
     snapshots.set(`${prediction.userId}:${prediction.matchId}`, await createLockSnapshot(db, prediction, new Date(byMatch.get(prediction.matchId)!.kickoffAt)));
   }
+  const clubIds = [...new Set([...snapshots.values()].map((snapshot) => snapshot.clubIdAtLock).filter(Boolean) as string[])];
+  const clubs = clubIds.length ? await db.collection<any>("clubs").find({ _id: { $in: clubIds.filter(ObjectId.isValid).map((id) => new ObjectId(id)) } }, { projection: { leaderboardCompetitionCodes: 1 } }).toArray() : [];
+  const clubCompetitionCodes = new Map(clubs.map((club) => [String(club._id), Array.isArray(club.leaderboardCompetitionCodes) ? club.leaderboardCompetitionCodes : DEFAULT_CLUB_LEAGUE_CODES]));
   const scoreOps = predictions.map(prediction => {
     const match = byMatch.get(prediction.matchId)!;
     const score = calculatePredictionScore(prediction.homeGoals, prediction.awayGoals, match.homeGoals, match.awayGoals);
@@ -48,8 +53,9 @@ export async function runScoreEngine() {
     const match = byMatch.get(prediction.matchId)!;
     const score = calculatePredictionScore(prediction.homeGoals, prediction.awayGoals, match.homeGoals, match.awayGoals);
     const snapshot = snapshots.get(`${prediction.userId}:${prediction.matchId}`);
-    const scopes = [`LEAGUE:${match.leagueCode}:${match.seasonStartYear}`, `ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`, `SEASON:${match.seasonStartYear}`, "GLOBAL"];
-    if (snapshot?.clubIdAtLock) scopes.push(`CLUB:${snapshot.clubIdAtLock}:OVERALL:${match.seasonStartYear}`, `CLUB:${snapshot.clubIdAtLock}:LEAGUE:${match.leagueCode}:${match.seasonStartYear}`, `CLUB:${snapshot.clubIdAtLock}:ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`);
+    const scopes = [`LEAGUE:${match.leagueCode}:${match.seasonStartYear}`, `ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`, `SEASON:${match.seasonStartYear}`];
+    if (isGlobalCompetition(match.leagueCode)) scopes.push("GLOBAL");
+    if (snapshot?.clubIdAtLock && (clubCompetitionCodes.get(snapshot.clubIdAtLock) ?? DEFAULT_CLUB_LEAGUE_CODES).includes(match.leagueCode)) scopes.push(`CLUB:${snapshot.clubIdAtLock}:OVERALL:${match.seasonStartYear}`, `CLUB:${snapshot.clubIdAtLock}:LEAGUE:${match.leagueCode}:${match.seasonStartYear}`, `CLUB:${snapshot.clubIdAtLock}:ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`);
     for (const scope of scopes) { const key = `${prediction.userId}:${scope}`; const row = aggregates.get(key) ?? { userId: prediction.userId, scope, points: 0, predictions: 0, exact: 0 }; row.points += score.points; row.predictions++; row.exact += score.category === "EXACT_SCORE" ? 1 : 0; aggregates.set(key, row); }
   }
   const statOps = [...aggregates.values()].map(row => ({ updateOne: { filter: { userId: row.userId, scope: row.scope }, update: { $set: { ...row, totalPoints: row.points, predictionCount: row.predictions, exactScores: row.exact, updatedAt: now } }, upsert: true } }));

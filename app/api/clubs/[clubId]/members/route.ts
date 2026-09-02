@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ clubId:
   if (!viewer || !ObjectId.isValid(clubId)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = await getDb();
   const membership = await db.collection<any>("clubMemberships").findOne({ clubId, userId: viewer, leftAt: null });
-  const club = await db.collection<any>("clubs").findOne({ _id: new ObjectId(clubId) }, { projection: { name: 1, ownerId: 1, state: 1, discoveryMode: 1, visibility: 1, imageUrl: 1 } });
+  const club = await db.collection<any>("clubs").findOne({ _id: new ObjectId(clubId) }, { projection: { name: 1, ownerId: 1, state: 1, discoveryMode: 1, visibility: 1, imageUrl: 1, leaderboardCompetitionCodes: 1 } });
   if (!club || !membership) return NextResponse.json({ error: "Club membership required" }, { status: 403 });
   const members = await db.collection<any>("clubMemberships").aggregate([
     { $match: { clubId, leftAt: null } },

@@ -2,6 +2,7 @@ import { ObjectId, type Db } from "mongodb";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
+import { DEFAULT_CLUB_LEAGUE_CODES, GLOBAL_LEAGUE_CODES } from "@/lib/football/leagues";
 
 export type LeaderboardScope = { clubId?: string | null; seasonStartYear?: number | null; leagueCode?: string | null; matchday?: number | null; weekly?: boolean; weeklyOffset?: number };
 export type LeaderboardRow = Rankable & { avatarUrl: string | null; isDefendingChampion: boolean; rank: number };
@@ -16,6 +17,11 @@ function scoreMatch(scope: LeaderboardScope) {
 }
 
 export async function getCanonicalLeaderboard(db: Db, scope: LeaderboardScope, limit = 100, cursor?: { points: number; exact: number; predictions: number; userId: string }) {
+  let allowedClubCodes: string[] | null = null;
+  if (scope.clubId) {
+    const club = await db.collection<any>("clubs").findOne({ _id: new ObjectId(scope.clubId) }, { projection: { leaderboardCompetitionCodes: 1 } });
+    allowedClubCodes = Array.isArray(club?.leaderboardCompetitionCodes) ? club.leaderboardCompetitionCodes : DEFAULT_CLUB_LEAGUE_CODES;
+  }
   const period = scope.weekly ? getIranWeeklyPeriod(new Date(), scope.weeklyOffset ?? 0) : null;
   const pipeline: any[] = [];
   if (period) pipeline.push(
@@ -24,6 +30,7 @@ export async function getCanonicalLeaderboard(db: Db, scope: LeaderboardScope, l
     { $match: { "fixture.kickoffAt": { $gte: period.start, $lt: period.end } } },
   );
   pipeline.push(
+    ...(allowedClubCodes ? [{ $match: { leagueCode: { $in: allowedClubCodes } } }] : (!scope.clubId && !scope.leagueCode && !scope.matchday ? [{ $match: { leagueCode: { $in: GLOBAL_LEAGUE_CODES } } }] : [])),
     { $lookup: { from: "predictions", let: { uid: "$userId", mid: "$matchId" }, pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$uid"] }, { $eq: ["$matchId", "$$mid"] }] } } }, { $project: { createdAt: 1 } }], as: "prediction" } },
     { $unwind: { path: "$prediction", preserveNullAndEmptyArrays: true } },
     { $match: scoreMatch(scope) },
