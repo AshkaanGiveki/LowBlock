@@ -44,9 +44,10 @@ function normalizeStanding(row: ProviderStanding) {
 }
 
 function normalizeH2H(item: ProviderFixture) {
+  const kickoff = new Date(item.fixture.date);
   return {
     fixtureId: String(item.fixture.id),
-    date: new Date(item.fixture.date).toISOString(),
+    date: kickoff.toISOString(),
     homeTeam: { id: item.teams.home.id, name: item.teams.home.name, logoUrl: item.teams.home.logo },
     awayTeam: { id: item.teams.away.id, name: item.teams.away.name, logoUrl: item.teams.away.logo },
     homeGoals: item.goals.home,
@@ -64,7 +65,7 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
     { projection: { providerMatchId: 1, leagueCode: 1, seasonStartYear: 1, homeTeamProviderId: 1, awayTeamProviderId: 1, homeTeam: 1, awayTeam: 1 } },
   ).sort({ kickoffAt: 1 }).toArray();
   const today = dayKey(now);
-  const upcoming = upcomingRows.filter((match) => dayKey(new Date(match.kickoffAt)) === today);
+  const upcoming = upcomingRows.filter((match) => { const kickoff = new Date(match.kickoffAt); return Number.isFinite(kickoff.getTime()) && dayKey(kickoff) === today; });
 
   let h2hRequests = 0;
   let providerRequests = 0;
@@ -96,7 +97,7 @@ export async function syncMatchInsights(db: Db, options: InsightOptions = {}) {
       await throttleProvider();
       const response = await apiRequest<ProviderFixture>({ h2h: pairKey }, "fixtures/headtohead");
       const meetings = response.response
-        .filter((item) => finished(item.fixture.status.short) && item.goals.home != null && item.goals.away != null)
+        .filter((item) => finished(item.fixture.status.short) && item.goals.home != null && item.goals.away != null && Number.isFinite(new Date(item.fixture.date).getTime()))
         .sort((a, b) => new Date(b.fixture.date).getTime() - new Date(a.fixture.date).getTime())
         .slice(0, 5)
         .map(normalizeH2H);

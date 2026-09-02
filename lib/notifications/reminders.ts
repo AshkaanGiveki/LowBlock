@@ -3,11 +3,32 @@ import { scheduleMatchReminder } from "./qstash";
 import { env } from "@/lib/env";
 import { teamName } from "@/lib/football/team-names";
 import { readableFa } from "@/lib/text";
+import { isGlobalCompetition } from "@/lib/football/leagues";
 
 type Provider = "TELEGRAM" | "BALE";
 const preferenceField = (provider: Provider) => provider === "TELEGRAM" ? "telegramPredictionRemindersEnabled" : "balePredictionRemindersEnabled";
 
-export async function scheduleUpcomingReminders() { const db = await getDb(); const matches = await db.collection<any>("matches").find({ kickoffAt: { $gt: new Date() }, status: "SCHEDULED" }).toArray(); let scheduled = 0; for (const match of matches) { const at = new Date(new Date(match.kickoffAt).getTime() - 1800000); if (at <= new Date()) continue; try { if (await scheduleMatchReminder(match.providerMatchId, at)) scheduled++; } catch (error) { console.error("match_reminder_scheduling_failed", { matchId: match.providerMatchId, error: error instanceof Error ? error.message : "unknown" }); } } return scheduled; }
+export async function scheduleUpcomingReminders() {
+  const db = await getDb();
+  const now = Date.now();
+  const matches = await db.collection<any>("matches").find({ kickoffAt: { $gt: new Date(now) }, status: "SCHEDULED" }).toArray();
+  let scheduled = 0;
+  for (const match of matches) {
+    const kickoff = new Date(match.kickoffAt);
+    if (!Number.isFinite(kickoff.getTime())) {
+      console.error("match_reminder_invalid_kickoff", { matchId: match.providerMatchId, kickoffAt: match.kickoffAt });
+      continue;
+    }
+    const runAt = new Date(kickoff.getTime() - 30 * 60 * 1000);
+    if (runAt.getTime() <= now + 60 * 1000) continue;
+    try {
+      if (await scheduleMatchReminder(match.providerMatchId, runAt)) scheduled++;
+    } catch (error) {
+      console.error("match_reminder_scheduling_failed", { matchId: match.providerMatchId, error: error instanceof Error ? error.message : "unknown" });
+    }
+  }
+  return scheduled;
+}
 
 export async function processMatchReminder(matchId: string) {
   const db = await getDb(); const match = await db.collection<any>("matches").findOne({ providerMatchId: matchId }); if (!match || match.status !== "SCHEDULED") return { sent: 0, skipped: "match" };
@@ -20,6 +41,7 @@ export async function processMatchReminder(matchId: string) {
   ]).toArray(); let sent = 0;
   for (const identity of identities) {
     const provider = String(identity.provider) as Provider; const preferences = identity.preferences?.[0]; if (preferences?.[preferenceField(provider)] === false) continue;
+    if (provider === "TELEGRAM" && preferences?.telegramReminderScope !== "ALL_MATCHES" && !isGlobalCompetition(String(match.leagueCode ?? ""))) continue;
     const channel = provider; const deliveryFilter = { userId: identity.userId, matchId, channel, type: "MISSING_PREDICTION_30_MIN" }; const reservation = await db.collection("notificationDeliveries").updateOne(deliveryFilter, { $setOnInsert: { ...deliveryFilter, status: "PROCESSING", createdAt: new Date(), updatedAt: new Date() } }, { upsert: true }); if (!reservation.upsertedCount) continue;
     try { const language = preferences?.language === "en" ? "en" : "fa"; const result = await sendPlatform(provider, String(identity.chatId || identity.providerUserId), match, language); await db.collection("notificationDeliveries").updateOne(deliveryFilter, { $set: { status: "SENT", sentAt: new Date(), externalMessageId: String(result?.message_id ?? result?.id ?? "sent"), updatedAt: new Date() } }); sent++; } catch (error) { await db.collection("notificationDeliveries").updateOne(deliveryFilter, { $set: { status: "FAILED", errorCode: error instanceof Error ? error.message : `${provider}_ERROR`, updatedAt: new Date() } }); }
   }
