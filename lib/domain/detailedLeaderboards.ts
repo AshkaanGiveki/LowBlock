@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
+import { DEFAULT_CLUB_LEAGUE_CODES, GLOBAL_LEAGUE_CODES } from "@/lib/football/leagues";
 
 export type DetailedSort = "rank" | "username" | "predictions" | "exact" | "correct" | "wrongResults" | "misses" | "points" | "average" | "awards";
 export type DetailedScope = { clubId?: string | null; seasonStartYear?: number | null; weekly?: boolean; weeklyOffset?: number; page?: number; pageSize?: number; sort?: DetailedSort; direction?: "asc" | "desc"; viewerUserId?: string | null };
@@ -27,8 +28,20 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
   if (period) match["fixture.kickoffAt"] = { $gte: period.start, $lt: new Date(Math.min(period.end.getTime(), cutoff.getTime())) };
   if (scope.seasonStartYear != null) match.seasonStartYear = scope.seasonStartYear;
   if (scope.clubId) match.clubIdAtLock = scope.clubId;
+  if (scope.clubId) {
+    const club = await db.collection<any>("clubs").findOne({ _id: new ObjectId(scope.clubId) }, { projection: { leaderboardCompetitionCodes: 1 } });
+    match["fixture.leagueCode"] = { $in: Array.isArray(club?.leaderboardCompetitionCodes) ? club.leaderboardCompetitionCodes : DEFAULT_CLUB_LEAGUE_CODES };
+  } else {
+    match["fixture.leagueCode"] = { $in: GLOBAL_LEAGUE_CODES };
+  }
   const matchFilter: Record<string, unknown> = { kickoffAt: match["fixture.kickoffAt"] };
   if (scope.seasonStartYear != null) matchFilter.seasonStartYear = scope.seasonStartYear;
+  if (scope.clubId) {
+    const club = await db.collection<any>("clubs").findOne({ _id: new ObjectId(scope.clubId) }, { projection: { leaderboardCompetitionCodes: 1 } });
+    matchFilter.leagueCode = { $in: Array.isArray(club?.leaderboardCompetitionCodes) ? club.leaderboardCompetitionCodes : DEFAULT_CLUB_LEAGUE_CODES };
+  } else {
+    matchFilter.leagueCode = { $in: GLOBAL_LEAGUE_CODES };
+  }
   const totalMatches = await db.collection<any>("matches").countDocuments(matchFilter);
   const rows = await db.collection<any>("predictionScores").aggregate([
     { $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } },

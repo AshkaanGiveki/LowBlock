@@ -29,6 +29,7 @@ export type ClubRecord = {
   discoveryMode: ClubDiscoveryMode;
   visibility: ClubVisibility;
   ownerId: string;
+  leaderboardCompetitionCodes?: string[];
   activatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -76,4 +77,3 @@ export type CanonicalPredictionScore = {
   scoringVersion: string;
   calculatedAt: Date;
 };
-
