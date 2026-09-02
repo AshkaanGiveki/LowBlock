@@ -23,6 +23,8 @@ const getCachedMatches = unstable_cache(async (leagueCode: string, matchday: num
     provider: "football-api" as const,
     // Only expose records written from a verified Football API response.
     rawApiResponse: { $exists: true },
+    // 207 is Switzerland's Super League, not Turkey's Super Cup (551).
+    $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
     kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
     ...(leagueCode ? { leagueCode } : {}),
@@ -42,6 +44,7 @@ export async function getMatch(providerMatchId: string) {
     provider: "football-api",
     providerMatchId,
     rawApiResponse: { $exists: true },
+    $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
   });
 }
