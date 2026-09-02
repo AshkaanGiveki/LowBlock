@@ -12,6 +12,7 @@ type Match = React.ComponentProps<typeof MatchAnalyticsCard>["match"] & { league
 export function MatchesView({ matches, predictions, focusMatchId }: { matches: Match[]; predictions: Record<string, { homeGoals: number; awayGoals: number }>; focusMatchId?: string }) {
   const { t } = useLanguage();
   const [selected, setSelected] = useState<string[]>([]);
+  const availableLeagues = useMemo(() => LEAGUES.filter((league) => matches.some((match) => match.leagueCode === league.code)), [matches]);
   const filtered = useMemo(() => selected.length ? matches.filter((match) => selected.includes(match.leagueCode)) : matches, [matches, selected]);
   useEffect(() => { if (!focusMatchId) return; const timer = window.setTimeout(() => document.querySelector(`[data-match-id="${CSS.escape(focusMatchId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80); return () => window.clearTimeout(timer); }, [focusMatchId]);
 
@@ -24,7 +25,7 @@ export function MatchesView({ matches, predictions, focusMatchId }: { matches: M
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">{t("یک نتیجه برای هر مسابقه ثبت کنید و در تمام جدول‌های LowBlock رقابت کنید.", "Make one prediction for each fixture and compete across every LowBlock leaderboard.")}</p>
         </div>
         <div className="desktop-league-filter mb-8 flex flex-wrap gap-2">
-          {LEAGUES.map((league, index) => {
+          {availableLeagues.map((league, index) => {
             const on = selected.includes(league.code);
             return <motion.button key={league.code} initial={{ opacity: 0, scale: .8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * .055 }} aria-pressed={on} aria-label={league.enName} onClick={() => setSelected((current) => on ? current.filter((code) => code !== league.code) : [...current, league.code])} className={`relative grid h-12 w-12 place-items-center rounded-lg border ${on ? "border-brand bg-brand/15" : "border-white/10 bg-white/[.03]"}`}><img src={league.logo} alt="" className="league-logo h-7 w-7 object-contain" />{on && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-brand"><Check size={11} /></span>}</motion.button>;
           })}
