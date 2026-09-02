@@ -16,7 +16,7 @@ export async function GET() {
   ]);
   const connected = { telegram: identities.some(row => row.provider === "TELEGRAM"), bale: identities.some(row => row.provider === "BALE") };
   const enabled = { telegram: connected.telegram && preferences?.telegramPredictionRemindersEnabled !== false, bale: connected.bale && preferences?.balePredictionRemindersEnabled !== false };
-  return NextResponse.json({ enabled: enabled.telegram, language: preferences?.language === "en" ? "en" : "fa", connected, providers: enabled, telegramReminderScope: preferences?.telegramReminderScope === "GLOBAL_LEADERBOARD" ? "GLOBAL_LEADERBOARD" : "ALL_MATCHES" });
+  return NextResponse.json({ enabled: enabled.telegram, language: preferences?.language === "en" ? "en" : "fa", connected, providers: enabled, telegramReminderScope: preferences?.telegramReminderScope === "ALL_MATCHES" ? "ALL_MATCHES" : "GLOBAL_LEADERBOARD" });
 }
 
 export async function PUT(req: Request) {

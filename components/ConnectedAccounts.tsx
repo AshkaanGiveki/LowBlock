@@ -13,14 +13,14 @@ export function ConnectedAccounts() {
   const { t } = useLanguage();
   const [accounts, setAccounts] = useState<{ telegram: Item | null; bale: Item | null }>({ telegram: null, bale: null });
   const [enabled, setEnabled] = useState(false);
-  const [scope, setScope] = useState<TelegramReminderScope>("ALL_MATCHES");
+  const [scope, setScope] = useState<TelegramReminderScope>("GLOBAL_LEADERBOARD");
   const [busy, setBusy] = useState("");
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const load = () => Promise.all([fetch("/api/account/connections").then((r) => r.json()), fetch("/api/notifications/preferences").then((r) => r.json())]).then(([a, p]) => {
     setAccounts({ telegram: a.telegram ?? null, bale: a.bale ?? null });
     setEnabled(p.enabled === true);
-    setScope(p.telegramReminderScope === "GLOBAL_LEADERBOARD" ? "GLOBAL_LEADERBOARD" : "ALL_MATCHES");
+    setScope(p.telegramReminderScope === "ALL_MATCHES" ? "ALL_MATCHES" : "GLOBAL_LEADERBOARD");
   });
   useEffect(() => { load(); }, []);
 
