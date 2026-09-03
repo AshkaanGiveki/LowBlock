@@ -35,7 +35,7 @@ const getCachedMatches = unstable_cache(async (leagueCode: string, matchday: num
 
 export async function getMatches(filters: { leagueCode?: string; matchday?: number; limit?: number } = {}) {
   const now = Date.now();
-  return getCachedMatches(filters.leagueCode ?? "", filters.matchday ?? null, filters.limit ?? 50, now - 2 * 60 * 60 * 1000, now + 14 * 864e5);
+  return getCachedMatches(filters.leagueCode ?? "", filters.matchday ?? null, filters.limit ?? 50, now - 24 * 60 * 60 * 1000, now + 14 * 864e5);
 }
 
 export async function getMatch(providerMatchId: string) {
