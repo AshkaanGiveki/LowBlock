@@ -2,8 +2,8 @@ import { randomInt } from "node:crypto";
 import { ObjectId, type Db } from "mongodb";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
-import { getClubRoundAsset, getRoundWinnerAsset, LOWBLOCK_SCOPE, ROUND_WINNER_TYPE, CLUB_ROUND_WINNER_TYPE, WEEKLY_WINNER_TYPE, CLUB_WEEKLY_WINNER_TYPE, LEAGUE_WINNER_TYPE, GLOBAL_WINNER_TYPE, CLUB_LEAGUE_WINNER_TYPE, MONTHLY_EXACT_WINNER_TYPE, CLUB_MONTHLY_EXACT_WINNER_TYPE } from "@/lib/awards/config";
-import { GLOBAL_LEAGUE_CODES, isGlobalCompetition } from "@/lib/football/leagues";
+import { getClubRoundAsset, getRoundWinnerAsset, LOWBLOCK_SCOPE, ROUND_WINNER_TYPE, CLUB_ROUND_WINNER_TYPE, WEEKLY_WINNER_TYPE, CLUB_WEEKLY_WINNER_TYPE, LEAGUE_WINNER_TYPE, GLOBAL_WINNER_TYPE, CLUB_LEAGUE_WINNER_TYPE, MONTHLY_EXACT_WINNER_TYPE, CLUB_MONTHLY_EXACT_WINNER_TYPE, TOURNAMENT_WINNER_TYPE } from "@/lib/awards/config";
+import { GLOBAL_LEAGUE_CODES, isGlobalCompetition, getLeague, LEAGUES } from "@/lib/football/leagues";
 
 export const LEAGUE_SEASON_MATCHDAYS: Record<string, number> = { FR1: 34, L1: 34, GB1: 38, ES1: 38, IT1: 38 };
 export const CLUB_AWARD_MINIMUM_MEMBERS = 5;
@@ -32,8 +32,9 @@ async function issue(db: Db, award: Omit<AwardRecord, "awardedAt" | "revealedAt"
 }
 
 export async function grantFinalRoundWinnerAwards(db: Db) {
-  const rounds = await db.collection<any>("rounds").find({ status: "FINAL" }).toArray(); let granted = 0;
+  const rounds = await db.collection<any>("rounds").find({ status: "FINAL", $expr: { $and: [{ $gt: ["$expectedFixtures", 0] }, { $eq: ["$completedFixtures", "$expectedFixtures"] }, { $eq: ["$eligibleFixtures", "$expectedFixtures"] }] } }).toArray(); let granted = 0;
   for (const round of rounds) {
+    if (getLeague(String(round.leagueCode))?.kind !== "LEAGUE") continue;
     const seasonStartYear = Number(round.seasonId); const roundNumber = Number(round.number); const asset = getRoundWinnerAsset(round.leagueCode, seasonStartYear, roundNumber); const clubAsset = getClubRoundAsset(round.leagueCode, seasonStartYear, roundNumber); const competitionName = asset?.leagueName ?? clubAsset?.leagueName ?? round.leagueCode;
     const leaderboard = isGlobalCompetition(round.leagueCode) ? await getCanonicalLeaderboard(db, { leagueCode: round.leagueCode, seasonStartYear, matchday: roundNumber }, 1) : []; const winner = leaderboard[0];
     if (winner) granted += await issue(db, { awardKey: `ROUND_WINNER:${LOWBLOCK_SCOPE}:${round.leagueCode}:${seasonStartYear}:${roundNumber}`, userId: winner.userId, type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, competitionName, seasonId: String(round.seasonId), seasonStartYear, roundId: String(round.id), roundNumber }, { type: ROUND_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: round.leagueCode, seasonId: String(round.seasonId), roundId: String(round.id) });
@@ -51,6 +52,22 @@ async function grantWeeklyAwards(db: Db) {
   const activeClubs = await eligibleClubIds(db);
   const clubs = await db.collection("predictionScores").aggregate([{ $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } }, { $unwind: "$fixture" }, { $match: { "fixture.kickoffAt": { $gte: period.start, $lt: period.end }, clubIdAtLock: { $ne: null } } }, { $group: { _id: "$clubIdAtLock" } }]).toArray();
   for (const club of clubs) { const clubId = String(club._id); if (!activeClubs.has(clubId)) continue; const clubWinner = (await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, 1))[0]; if (!clubWinner) continue; granted += await issue(db, { awardKey: `CLUB_WEEKLY_WINNER:${clubId}:${periodId}`, userId: clubWinner.userId, type: CLUB_WEEKLY_WINNER_TYPE, scope: "CLUB", competitionName: "Club Weekly", periodId }); }
+  return granted;
+}
+
+async function grantCompletedTournamentAwards(db: Db) {
+  let granted = 0;
+  for (const league of LEAGUES.filter((item) => item.kind === "TOURNAMENT")) {
+    const finals = await db.collection<any>("matches").find({ leagueCode: league.code, $or: [{ providerRound: /^final$/i }, { "rawApiResponse.league.round": /^final$/i }] }).toArray();
+    const seasons = new Map<number, any[]>();
+    for (const match of finals) seasons.set(Number(match.seasonStartYear), [...(seasons.get(Number(match.seasonStartYear)) ?? []), match]);
+    for (const [seasonStartYear, matches] of seasons) {
+      if (!Number.isFinite(seasonStartYear) || !matches.length || matches.some((match) => match.status !== "FINISHED" || match.homeGoals == null || match.awayGoals == null)) continue;
+      const winner = (await getCanonicalLeaderboard(db, { leagueCode: league.code, seasonStartYear }, 1))[0];
+      if (!winner) continue;
+      granted += await issue(db, { awardKey: `TOURNAMENT_WINNER:${LOWBLOCK_SCOPE}:${league.code}:${seasonStartYear}`, userId: winner.userId, type: TOURNAMENT_WINNER_TYPE, scope: LOWBLOCK_SCOPE, competitionId: league.code, competitionName: league.enName, seasonId: String(seasonStartYear), seasonStartYear });
+    }
+  }
   return granted;
 }
 
@@ -95,5 +112,6 @@ export async function grantAutomaticAwards(db: Db) {
   const weekly = await grantWeeklyAwards(db);
   const leagues = await grantCompletedLeagueAwards(db);
   const monthly = await grantMonthlyExactAward(db);
-  return { round, weekly, leagues, monthly };
+  const tournaments = await grantCompletedTournamentAwards(db);
+  return { round, weekly, leagues, monthly, tournaments };
 }
