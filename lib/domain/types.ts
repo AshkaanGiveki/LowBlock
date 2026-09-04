@@ -5,7 +5,7 @@ export type ClubDiscoveryMode = "INVITE_ONLY" | "RECRUITING";
 export type RoundStatus = "UPCOMING" | "LIVE" | "PENDING" | "FINAL";
 
 export type SeasonRecord = { id: string; label: string; startsAt: Date; endsAt: Date };
-export type LeagueSeasonRecord = { id: string; leagueCode: string; seasonId: string };
+export type LeagueSeasonRecord = { id: string; leagueCode: string; seasonId: string; teamCount?: number; expectedFixturesPerRound?: number };
 export type RoundRecord = {
   id: string;
   leagueSeasonId: string;
@@ -18,6 +18,7 @@ export type RoundRecord = {
   status: RoundStatus;
   completedFixtures: number;
   eligibleFixtures: number;
+  expectedFixtures: number | null;
   updatedAt: Date;
 };
 

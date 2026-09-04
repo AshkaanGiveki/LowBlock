@@ -3,6 +3,7 @@ export const CLUB_ROUND_WINNER_TYPE = "CLUB_ROUND_WINNER" as const;
 export const WEEKLY_WINNER_TYPE = "WEEKLY_WINNER" as const;
 export const CLUB_WEEKLY_WINNER_TYPE = "CLUB_WEEKLY_WINNER" as const;
 export const LEAGUE_WINNER_TYPE = "LEAGUE_WINNER" as const;
+export const TOURNAMENT_WINNER_TYPE = "TOURNAMENT_WINNER" as const;
 export const GLOBAL_WINNER_TYPE = "GLOBAL_WINNER" as const;
 export const CLUB_LEAGUE_WINNER_TYPE = "CLUB_LEAGUE_WINNER" as const;
 export const MONTHLY_EXACT_WINNER_TYPE = "MONTHLY_EXACT_WINNER" as const;
@@ -54,7 +55,8 @@ export function getAwardAsset(award: { type?: string; competitionId?: string; se
     case MONTHLY_EXACT_WINNER_TYPE: return GLOBAL_EXACT_PICKER_ASSET;
     case CLUB_MONTHLY_EXACT_WINNER_TYPE: return CLUB_EXACT_PICKER_ASSET;
     case GLOBAL_WINNER_TYPE:
-    case LEAGUE_WINNER_TYPE: return GLOBAL_LEAGUE_WINNER_ASSET;
+    case LEAGUE_WINNER_TYPE:
+    case TOURNAMENT_WINNER_TYPE: return GLOBAL_LEAGUE_WINNER_ASSET;
     case CLUB_LEAGUE_WINNER_TYPE: return CLUB_LEAGUE_WINNER_ASSET;
     case CLUB_ROUND_WINNER_TYPE: return award.competitionId && award.seasonStartYear ? getClubRoundAsset(award.competitionId, award.seasonStartYear, award.roundNumber ?? 1) : null;
     case ROUND_WINNER_TYPE: return award.competitionId && award.seasonStartYear ? getRoundWinnerAsset(award.competitionId, award.seasonStartYear, award.roundNumber ?? 1) : null;

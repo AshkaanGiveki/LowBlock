@@ -5,4 +5,5 @@ describe("round lifecycle", () => {
   it("keeps postponed fixtures pending", () => expect(deriveRoundStatus([{ status: "FINISHED", kickoffAt: "2026-08-21T12:00:00Z", homeGoals: 1, awayGoals: 0 }, { status: "POSTPONED", kickoffAt: "2026-08-21T14:00:00Z", homeGoals: null, awayGoals: null }], now).status).toBe("PENDING"));
   it("does not count void fixtures toward finalization", () => expect(deriveRoundStatus([{ status: "FINISHED", kickoffAt: "2026-08-21T12:00:00Z", homeGoals: 1, awayGoals: 0 }, { status: "VOID", kickoffAt: "2026-08-21T14:00:00Z", homeGoals: null, awayGoals: null }], now).status).toBe("FINAL"));
   it("marks suspended play live until resolved", () => expect(deriveRoundStatus([{ status: "SUSPENDED", kickoffAt: "2026-08-21T12:00:00Z", homeGoals: 1, awayGoals: 1 }], now).status).toBe("PENDING"));
+  it("does not finalize a partial imported round", () => expect(deriveRoundStatus([{ status: "FINISHED", kickoffAt: "2026-08-21T12:00:00Z", homeGoals: 1, awayGoals: 0 }], now, 10).status).toBe("PENDING"));
 });
