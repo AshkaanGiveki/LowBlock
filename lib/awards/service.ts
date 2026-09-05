@@ -90,7 +90,7 @@ async function grantCompletedLeagueAwards(db: Db) {
   return granted;
 }
 
-function iranMonthPeriod(now = new Date()) { const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now); const value = (type: string) => parts.find((part) => part.type === type)?.value ?? ""; const currentYear = Number(value("year")); const currentMonth = Number(value("month")); const day = Number(value("day")); const isFirstDay = day === 1; const target = new Date(Date.UTC(currentYear, currentMonth - 1 - (isFirstDay ? 1 : 0), 1)); const year = target.getUTCFullYear(); const month = target.getUTCMonth() + 1; const start = new Date(Date.UTC(year, month - 1, 1) - 210 * 60000); const end = new Date(Date.UTC(year, month, 1) - 210 * 60000); return { start, end, id: `${year}-${String(month).padStart(2, "0")}`, isFirstDay }; }
+function iranMonthPeriod(now = new Date()) { const year = now.getUTCFullYear(); const month = now.getUTCMonth(); const day = now.getUTCDate(); const isFirstDay = day === 1; const target = new Date(Date.UTC(year, month - (isFirstDay ? 1 : 0), 1)); const targetYear = target.getUTCFullYear(); const targetMonth = target.getUTCMonth(); const start = new Date(Date.UTC(targetYear, targetMonth, 1)); const end = new Date(Date.UTC(targetYear, targetMonth + 1, 1)); return { start, end, id: `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`, isFirstDay }; }
 
 async function grantMonthlyExactAward(db: Db) {
   const period = iranMonthPeriod(); if (!period.isFirstDay) return 0;

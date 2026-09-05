@@ -23,7 +23,7 @@ type ProviderStanding = {
 };
 
 type InsightOptions = { force?: boolean };
-const dayKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: process.env.APP_TIMEZONE || "Asia/Tehran" }).format(date);
+const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 const finished = (status: string) => ["FT", "AET", "PEN"].includes(status);
 
 function normalizeStanding(row: ProviderStanding) {

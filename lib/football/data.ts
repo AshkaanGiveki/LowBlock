@@ -1,6 +1,5 @@
 import { getDb } from "@/lib/db/mongo";
 import { unstable_cache } from "next/cache";
-import { env } from "@/lib/env";
 import { GLOBAL_LEAGUE_CODES } from "@/lib/football/leagues";
 
 export type MatchRecord = {
@@ -43,8 +42,8 @@ export async function getMatches(filters: { leagueCode?: string; matchday?: numb
 export type MatchPageCursor = { globalPriority: 0 | 1; kickoffAt: string; providerMatchId: string };
 
 function todayBounds() {
-  const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const start = new Date(`${dateKey}T00:00:00+03:30`);
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const start = new Date(`${dateKey}T00:00:00.000Z`);
   return { start, end: new Date(start.getTime() + 86_400_000) };
 }
 

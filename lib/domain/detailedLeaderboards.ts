@@ -9,10 +9,7 @@ export type DetailedRow = { userId: string; username: string; avatarUrl: string 
 const sortFields: DetailedSort[] = ["rank", "username", "predictions", "exact", "correct", "wrongResults", "misses", "points", "average", "awards"];
 export function normalizeDetailedSort(value: string | null): DetailedSort { return sortFields.includes(value as DetailedSort) ? value as DetailedSort : "rank"; }
 
-function iranDayStart(date: Date) {
-  const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
-  return new Date(`${key}T00:00:00+03:30`);
-}
+function iranDayStart(date: Date) { return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())); }
 
 function comparison(a: Omit<DetailedRow, "rank" | "previousRank" | "placeChange">, b: Omit<DetailedRow, "rank" | "previousRank" | "placeChange">, sort: DetailedSort, direction: "asc" | "desc") {
   const sign = direction === "asc" ? 1 : -1;
