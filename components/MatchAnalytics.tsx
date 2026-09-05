@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, GripHorizontal, Trophy, Users, X } from "lucide-react";
+import { BarChart3, Check, GripHorizontal, Radio, Trophy, Users, X } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
@@ -30,11 +30,19 @@ export function MatchAnalytics({
     home === null || away === null ? "—" : `${number(home)} - ${number(away)}`;
   useEffect(() => {
     const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
-    fetch(`/api/matches/${matchId}/analytics${query}`)
+    fetch(`/api/matches/${matchId}/analytics${query}`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then(setData)
       .catch(() => setData(null));
   }, [matchId, clubId]);
+  useEffect(() => {
+    if (data?.match.status !== "LIVE" && data?.match.status !== "SUSPENDED") return;
+    const timer = window.setInterval(() => {
+      const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
+      fetch(`/api/matches/${matchId}/analytics${query}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((next) => { if (next) setData(next); }).catch(() => undefined);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [data?.match.status, matchId, clubId]);
   const close = () => {
     setVisible(false);
     window.setTimeout(onClose, 280);
@@ -175,6 +183,7 @@ export function MatchAnalytics({
                         data.match.awayTeam.name,
                       )}
                     </h2>
+                    <AnalyticsStatus match={data.match} language={language} />
                   </div>
                   <Crest team={data.match.awayTeam} />
                 </div>
@@ -192,7 +201,7 @@ export function MatchAnalytics({
                   <Stat
                     icon={<Trophy size={15} />}
                     value={score(data.match.homeGoals, data.match.awayGoals)}
-                    label={t("نتیجه واقعی", "final result")}
+                    label={t("نتیجه زنده", data.match.status === "LIVE" ? "live score" : "final result")}
                   />
                 </div>
                 <div className="mt-5 rounded-2xl border border-white/[.06] bg-black/20 p-4">
@@ -243,6 +252,17 @@ export function MatchAnalytics({
       )}
     </AnimatePresence>
   );
+}
+
+function AnalyticsStatus({ match, language }: { match: any; language: "fa" | "en" }) {
+  const kickoff = new Date(match.kickoffAt).getTime();
+  const started = match.status === "LIVE" || match.status === "SUSPENDED" || (match.status === "SCHEDULED" && kickoff <= Date.now());
+  const finished = match.status === "FINISHED" || match.status === "FT";
+  const score = match.homeGoals != null && match.awayGoals != null ? `${formatNumber(match.homeGoals, language)} - ${formatNumber(match.awayGoals, language)}` : "—";
+  const minute = match.elapsed ?? Math.max(1, Math.floor((Date.now() - kickoff) / 60_000));
+  if (started && !finished) return <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-red-100 shadow-[0_0_24px_rgba(248,113,113,.12)]"><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-300 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-400" /></span><b className="tracking-[.12em]">LIVE</b><strong className="text-sm text-white">{score}</strong><small className="rounded-md bg-white/10 px-1.5 py-0.5 font-black">{formatNumber(minute, language)}′</small></div>;
+  if (finished) return <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-brand shadow-[0_0_24px_rgba(32,184,121,.1)]"><span className="grid h-4 w-4 place-items-center rounded-full bg-brand/20"><Check size={10} /></span><b>FT</b><strong className="text-sm text-white">{score}</strong></div>;
+  return null;
 }
 
 function Crest({ team }: { team: any }) {

@@ -10,6 +10,7 @@ export type MatchRecord = {
   matchday: number;
   kickoffAt: Date;
   status: string;
+  elapsed?: number | null;
   homeGoals: number | null;
   awayGoals: number | null;
   homeTeam: { id: number; name: string; logoUrl: string | null };
