@@ -4,7 +4,10 @@ import { env } from "@/lib/env";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 
 const CHANNEL_ID = env.TELEGRAM_CHANNEL_ID || "@lowblockapp";
-const CHANNEL_DAILY_TYPES = ["LEADERBOARD", "MATCHES"] as const;
+const CHANNEL_PUBLICATION_TYPES = ["LEADERBOARD", "MATCHES", "FIRST_MATCH"] as const;
+type ChannelPublicationType = typeof CHANNEL_PUBLICATION_TYPES[number];
+const TELEGRAM_MESSAGE_LIMIT = 4096;
+const STALE_PROCESSING_AFTER_MS = 10 * 60_000;
 
 function tehranDateKey(date = new Date()) { return new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(date); }
 function tehranDayBounds(dateKey: string) { const start = new Date(`${dateKey}T00:00:00+03:30`); return { start, end: new Date(start.getTime() + 86400000) }; }
@@ -19,23 +22,75 @@ async function sendChannelMessage(text: string, url = `${env.NEXT_PUBLIC_APP_URL
   if (!response.ok || !body?.ok) throw new Error(body?.description || `TELEGRAM_${response.status}`);
   return body.result;
 }
-async function claimPublication(db: Db, dateKey: string, type: typeof CHANNEL_DAILY_TYPES[number]) { const result = await db.collection("channelPublications").updateOne({ dateKey, type }, { $setOnInsert: { dateKey, type, status: "PROCESSING", createdAt: new Date() }, $set: { updatedAt: new Date() } }, { upsert: true }); return result.upsertedCount === 1; }
-async function markSent(db: Db, dateKey: string, type: string, messageId: number) { await db.collection("channelPublications").updateOne({ dateKey, type }, { $set: { status: "SENT", messageId, sentAt: new Date(), updatedAt: new Date() } }); }
+function splitTelegramText(text: string) {
+  const chunks: string[] = [];
+  let chunk = "";
+  for (const line of text.split("\n")) {
+    const candidate = chunk ? `${chunk}\n${line}` : line;
+    if (candidate.length <= TELEGRAM_MESSAGE_LIMIT) {
+      chunk = candidate;
+      continue;
+    }
+    if (chunk) chunks.push(chunk);
+    if (line.length <= TELEGRAM_MESSAGE_LIMIT) {
+      chunk = line;
+      continue;
+    }
+    for (let offset = 0; offset < line.length; offset += TELEGRAM_MESSAGE_LIMIT) chunks.push(line.slice(offset, offset + TELEGRAM_MESSAGE_LIMIT));
+    chunk = "";
+  }
+  if (chunk) chunks.push(chunk);
+  return chunks.length ? chunks : [""];
+}
+async function sendChannelMessages(text: string, url = `${env.NEXT_PUBLIC_APP_URL}/matches`) {
+  const results = [];
+  for (const chunk of splitTelegramText(text)) results.push(await sendChannelMessage(chunk, url));
+  return results;
+}
+async function claimPublication(db: Db, dateKey: string, type: ChannelPublicationType) {
+  const now = new Date();
+  const existing = await db.collection<any>("channelPublications").findOne({ dateKey, type }, { projection: { status: 1, updatedAt: 1 } });
+  if (!existing) {
+    try {
+      await db.collection("channelPublications").insertOne({ dateKey, type, status: "PROCESSING", createdAt: now, updatedAt: now });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (existing.status === "SENT") return false;
+  const stale = existing.status === "PROCESSING" && new Date(existing.updatedAt ?? 0).getTime() >= now.getTime() - STALE_PROCESSING_AFTER_MS;
+  if (stale) return false;
+  const result = await db.collection("channelPublications").updateOne(
+    { dateKey, type, status: { $in: ["FAILED", "PROCESSING"] }, updatedAt: existing.updatedAt },
+    { $set: { status: "PROCESSING", updatedAt: now } },
+  );
+  return result.modifiedCount === 1;
+}
+async function markSent(db: Db, dateKey: string, type: ChannelPublicationType, messageIds: number[]) { await db.collection("channelPublications").updateOne({ dateKey, type }, { $set: { status: "SENT", messageId: messageIds[0], messageIds, sentAt: new Date(), updatedAt: new Date() } }); }
+async function markFailed(db: Db, dateKey: string, type: ChannelPublicationType, error: unknown) { await db.collection("channelPublications").updateOne({ dateKey, type }, { $set: { status: "FAILED", error: error instanceof Error ? error.message : String(error), updatedAt: new Date() } }); }
 
 export async function publishChannelLeaderboard(db: Db, date = new Date()) {
   const dateKey = tehranDateKey(date); if (!await claimPublication(db, dateKey, "LEADERBOARD")) return { sent: false, reason: "already-published" };
   const latest = await db.collection<any>("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } });
   const rows = await getCanonicalLeaderboard(db, { seasonStartYear: Number(latest?.seasonStartYear ?? new Date().getUTCFullYear()) }, 10);
   const lines = rows.length ? rows.map((row, index) => `${index + 1}. <b>${escapeHtml(row.username)}</b> — ${row.points} pts`).join("\n") : "No leaderboard points yet.";
-  const result = await sendChannelMessage(`🏆 <b>LowBlock Global Leaderboard</b>\n📅 ${dateKey}\n\n${lines}`, "/leaderboard");
-  await markSent(db, dateKey, "LEADERBOARD", result.message_id); return { sent: true, messageId: result.message_id, rows: rows.length };
+  try {
+    const results = await sendChannelMessages(`🏆 <b>LowBlock Global Leaderboard</b>\n📅 ${dateKey}\n\n${lines}`, "/leaderboard");
+    const messageIds = results.map((result) => result.message_id);
+    await markSent(db, dateKey, "LEADERBOARD", messageIds); return { sent: true, messageId: messageIds[0], messageIds, rows: rows.length };
+  } catch (error) { await markFailed(db, dateKey, "LEADERBOARD", error); throw error; }
 }
 
 export async function publishChannelMatches(db: Db, date = new Date()) {
   const dateKey = tehranDateKey(date); if (!await claimPublication(db, dateKey, "MATCHES")) return { sent: false, reason: "already-published" };
   const bounds = tehranDayBounds(dateKey); const matches = await db.collection<any>("matches").find({ kickoffAt: { $gte: bounds.start, $lt: bounds.end }, status: { $nin: ["VOID", "CANCELLED"] } }).sort({ kickoffAt: 1 }).toArray();
   const rows = matches.length ? matches.map((match) => { const names = fixtureNames(match); const time = new Intl.DateTimeFormat("en-GB", { timeZone: env.APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }).format(new Date(match.kickoffAt)); return `⚽ <b>${escapeHtml(names.home)} vs ${escapeHtml(names.away)}</b> — ${time}`; }).join("\n\n") : "No matches today.";
-  const result = await sendChannelMessage(`📅 <b>Today’s fixtures</b>\n\n${rows}`, "/matches"); await markSent(db, dateKey, "MATCHES", result.message_id); return { sent: true, messageId: result.message_id, matches: matches.length };
+  try {
+    const results = await sendChannelMessages(`📅 <b>Today’s fixtures</b>\n\n${rows}`, "/matches");
+    const messageIds = results.map((result) => result.message_id);
+    await markSent(db, dateKey, "MATCHES", messageIds); return { sent: true, messageId: messageIds[0], messageIds, matches: matches.length };
+  } catch (error) { await markFailed(db, dateKey, "MATCHES", error); throw error; }
 }
 
 export async function scheduleFirstMatchChannelReminder(db: Db, date = new Date()) {
@@ -48,5 +103,14 @@ export async function scheduleChannelDailyPosts(date = new Date()) {
   for (const job of jobs) { if (job.runAt <= new Date()) continue; await new Client({ token: env.QSTASH_TOKEN }).publishJSON({ url: `${env.NEXT_PUBLIC_APP_URL}${job.path}`, body: { dateKey }, notBefore: Math.floor(job.runAt.getTime() / 1000), deduplicationId: `lowblock-channel-${job.type}-${dateKey}` }); scheduled++; } return scheduled;
 }
 export async function publishFirstMatchChannelReminder(db: Db, dateKey: string, matchId: string) {
-  const match = await db.collection<any>("matches").findOne({ providerMatchId: matchId, status: "SCHEDULED" }); if (!match) return { sent: false, reason: "match-unavailable" }; const names = fixtureNames(match); const text = `⏰ <b>30 minutes until today’s first match</b>\n\n${escapeHtml(names.home)} vs ${escapeHtml(names.away)}\n\nOpen LowBlock to make your prediction.`; const result = await sendChannelMessage(text, `/matches?match=${encodeURIComponent(matchId)}`); return { sent: true, dateKey, messageId: result.message_id };
+  const match = await db.collection<any>("matches").findOne({ providerMatchId: matchId, kickoffAt: { $gt: new Date() }, status: { $nin: ["VOID", "CANCELLED", "POSTPONED", "FINISHED"] } });
+  if (!match) return { sent: false, reason: "match-unavailable" };
+  if (!await claimPublication(db, dateKey, "FIRST_MATCH")) return { sent: false, reason: "already-published" };
+  const names = fixtureNames(match);
+  const text = `⏰ <b>30 minutes until today’s first match</b>\n\n${escapeHtml(names.home)} vs ${escapeHtml(names.away)}\n\nOpen LowBlock to make your prediction.`;
+  try {
+    const result = await sendChannelMessage(text, `/matches?match=${encodeURIComponent(matchId)}`);
+    await markSent(db, dateKey, "FIRST_MATCH", [result.message_id]);
+    return { sent: true, dateKey, messageId: result.message_id };
+  } catch (error) { await markFailed(db, dateKey, "FIRST_MATCH", error); throw error; }
 }
