@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Compass } from "lucide-react";
-import { LocaleChevron } from "@/components/LocaleChevron";
 import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
+import { LeagueBrowser } from "@/components/LeagueBrowser";
 
 export const metadata: Metadata = {
   title: "Competitions | LowBlock",
@@ -33,20 +32,7 @@ export default function LeaguesPage() {
             <h2 className="text-xl font-black md:text-2xl"><T fa="Ù‡Ù…Ù‡ Ù„ÛŒÚ¯â€ŒÙ‡Ø§" en="Browse competitions" /></h2>
             <span className="text-xs font-bold text-white/40">{LEAGUES.length}</span>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {LEAGUES.map((league) => (
-              <Link key={league.code} href={`/leagues/${league.code}`} className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-[#101512] p-4 transition hover:-translate-y-0.5 hover:border-brand/40 hover:bg-[#142019]">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[.04] p-2">
-                  <img src={league.logo} alt="" className="h-full w-full object-contain" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold"><T fa={league.faName} en={league.enName} /></span>
-                  <span className="mt-1 block text-[10px] font-black tracking-[.15em] text-white/35">{league.code}</span>
-                </div>
-                <LocaleChevron className="shrink-0 text-white/35 transition group-hover:text-brand" />
-              </Link>
-            ))}
-          </div>
+          <LeagueBrowser />
         </section>
       </div>
     </main>
