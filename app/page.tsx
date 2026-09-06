@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
-import { getMatches, getPredictions } from "@/lib/football/data";
+import { getMatchesPage, getPredictions } from "@/lib/football/data";
 import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
 import { HomeHeroSlang } from "@/components/HomeHeroSlang";
 import { FEATURED_COMPETITION_CODES, LEAGUES as ALL_LEAGUES } from "@/lib/football/leagues";
@@ -14,7 +14,7 @@ const featuredLeagues = FEATURED_COMPETITION_CODES.map((code) => ALL_LEAGUES.fin
 const LEAGUES = featuredLeagues;
 
 export default async function Home() {
-  const userId = await currentUserId(); const fetchedMatches = await getMatches({ limit: 20 }); const eligibleMatches = fetchedMatches.filter((match) => match.status === "SCHEDULED" && new Date(match.kickoffAt).getTime() > Date.now()); const allPredictions = await getPredictions(eligibleMatches.map((match) => match.providerMatchId), userId ?? "guest"); const matches = eligibleMatches.filter((match) => !allPredictions.has(match.providerMatchId)).slice(0, 5); const predictions = new Map([...allPredictions].filter(([matchId]) => matches.some((match) => match.providerMatchId === matchId))); const allPredicted = userId !== null && eligibleMatches.length > 0 && matches.length === 0;
+  const userId = await currentUserId(); const { matches: fetchedMatches } = await getMatchesPage(50); const eligibleMatches = fetchedMatches.filter((match) => match.status === "SCHEDULED" && new Date(match.kickoffAt).getTime() > Date.now()); const allPredictions = await getPredictions(eligibleMatches.map((match) => match.providerMatchId), userId ?? "guest"); const matches = eligibleMatches.filter((match) => !allPredictions.has(match.providerMatchId)).slice(0, 5); const predictions = new Map([...allPredictions].filter(([matchId]) => matches.some((match) => match.providerMatchId === matchId))); const allPredicted = userId !== null && eligibleMatches.length > 0 && matches.length === 0;
   let username = ""; let rank: number | string = "—"; let points = 0; let exact = 0; let club: any = null;
   if (userId) { const db = await getDb(); const user = await db.collection<any>("users").findOne({ _id: new ObjectId(userId) }, { projection: { username: 1 } }); username = user?.username ?? ""; const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear()); const mine = (await getCanonicalLeaderboard(db, { seasonStartYear: year }, 1000)).find((row) => row.userId === userId); rank = mine?.rank ?? "—"; points = mine?.points ?? 0; exact = mine?.exact ?? 0; const membership = await db.collection<any>("clubMemberships").findOne({ userId, leftAt: null }); club = membership ? await db.collection<any>("clubs").findOne({ _id: new ObjectId(membership.clubId) }, { projection: { name: 1 } }) : null; }
   return <main className="min-h-screen pb-24 pt-20"><div className="mx-auto max-w-7xl px-4 md:px-8">
