@@ -16,6 +16,7 @@ import { closeMatchRoute, matchRoute, openMatchRoute } from "@/components/matchN
 import { getLeague } from "@/lib/football/leagues";
 import { BadgeMinus } from "lucide-react";
 import { DrawerCompetitionMeta } from "./DrawerCompetitionMeta";
+import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
 
 type Team = { id: number; name: string; logoUrl: string | null };
 type Match = { providerMatchId: string; leagueCode?: string; kickoffAt: Date | string; status: string; elapsed?: number | null; homeGoals?: number | null; awayGoals?: number | null; homeTeam: Team; awayTeam: Team };
@@ -37,8 +38,9 @@ export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPr
   const kickoff = new Date(match.kickoffAt).getTime();
   const hasResult = match.homeGoals != null && match.awayGoals != null;
   const finished = match.status === "FINISHED" || match.status === "FT";
-  const live = !finished && (match.status === "LIVE" || match.status === "SUSPENDED" || now >= kickoff);
-  const locked = live || finished;
+  const started = !finished && (match.status === "LIVE" || match.status === "SUSPENDED" || now >= kickoff);
+  const live = LIVE_SCORE_UI_ENABLED && started;
+  const locked = started || finished;
   useEffect(() => { const syncPath = () => setActivePath(window.location.pathname); window.addEventListener("popstate", syncPath); return () => window.removeEventListener("popstate", syncPath); }, []);
   useEffect(() => { if (!openOnMount) return; if (activePath !== matchRoute(match.providerMatchId)) openMatchRoute(match.providerMatchId, pathname); if (locked) { setAnalyticsOpen(true); return; } setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange, activePath, match.providerMatchId, pathname]);
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);

@@ -28,7 +28,7 @@ export default async function ClubRoundPage({ params }: { params: Promise<{ club
   const year = Number(matches[0].seasonStartYear);
   const rows = await getCanonicalLeaderboard(db, { clubId, leagueCode: code, seasonStartYear: year, matchday: day }, 100);
   const final = matches.every((match) => match.status === "FINISHED");
-  const live = matches.some((match) => match.status === "LIVE");
+  const live = false;
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-4xl">
     <BackButton />
     <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_40%),linear-gradient(145deg,#14251c,#0a0f0c)] p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black tracking-[.2em] text-brand">{club.name} · {league.enName}</p><h1 className="mt-2 text-3xl font-black"><T fa={`دور ${day}`} en={`Round ${day}`} /></h1><div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-bold text-white/70">{final ? <T fa="نهایی" en="FINAL" /> : live ? <T fa="زنده" en="LIVE" /> : <T fa="در جریان" en="IN PROGRESS" />}</div></div><CalendarCheck className="text-brand" size={25} /></div></section>

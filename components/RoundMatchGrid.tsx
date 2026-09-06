@@ -7,6 +7,7 @@ import { MatchAnalytics } from "@/components/MatchAnalytics";
 import { formatIranDate, formatIranTime } from "@/lib/football/time";
 import { teamName } from "@/lib/football/team-names";
 import { closeMatchRoute, openMatchRoute } from "@/components/matchNavigation";
+import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
 
 type Fixture = { providerMatchId: string; kickoffAt: string; status: string; homeGoals: number | null; awayGoals: number | null; homeTeam: { id: number; name: string; logoUrl: string | null }; awayTeam: { id: number; name: string; logoUrl: string | null } };
 
@@ -18,8 +19,8 @@ export function RoundMatchGrid({ fixtures, focusMatchId }: { fixtures: Fixture[]
   return <>
     <section className="mt-7">
       <div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-black tracking-[.18em] text-brand">{t("مسابقه‌های دور", "ROUND FIXTURES")}</p><h2 className="mt-1 text-2xl font-black">{t("همه بازی‌های این دور", "Every match in this round")}</h2></div><span className="text-xs text-[var(--muted)]">{fixtures.length} {t("بازی", "matches")}</span></div>
-      <div className="grid gap-3 sm:grid-cols-2">{fixtures.map((fixture) => {
-        const live = fixture.status === "LIVE";
+      <div className="grid gap-3 sm:grid-cols-2">{fixtures.map((rawFixture) => { const fixture = LIVE_SCORE_UI_ENABLED ? rawFixture : { ...rawFixture, status: rawFixture.status === "LIVE" ? "" : rawFixture.status };
+        const live = LIVE_SCORE_UI_ENABLED && fixture.status === "LIVE";
         const finished = fixture.status === "FINISHED";
         return <button key={fixture.providerMatchId} data-match-id={fixture.providerMatchId} onClick={() => { openMatchRoute(fixture.providerMatchId, window.location.pathname); setSelected(fixture.providerMatchId); }} className="group relative overflow-hidden rounded-[1.35rem] border border-white/[.08] bg-[linear-gradient(145deg,#14221a,#0d120f)] p-4 text-start transition hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_18px_45px_rgba(32,184,121,.14)]">
           <div className="flex items-center justify-between text-[10px] text-[var(--muted)]"><span className="inline-flex items-center gap-1.5"><CalendarDays size={13}/>{formatIranDate(fixture.kickoffAt, locale)} · {formatIranTime(fixture.kickoffAt, locale)}</span><span className={`inline-flex items-center gap-1 font-black ${live ? "text-red-300" : finished ? "text-brand" : ""}`}>{live && <Radio size={11} className="animate-pulse"/>}{fixture.status}</span></div>

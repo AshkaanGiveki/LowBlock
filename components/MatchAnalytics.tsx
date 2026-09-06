@@ -9,6 +9,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 import { UserAvatar } from "@/components/UserAvatar";
+import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
 
 export function MatchAnalytics({
   matchId,
@@ -27,7 +28,7 @@ export function MatchAnalytics({
   const number = (value: number) =>
     formatNumber(value, language, { maximumFractionDigits: 1 });
   const score = (home: number | null, away: number | null) =>
-    home === null || away === null ? "—" : `${number(home)} - ${number(away)}`;
+    data?.match.status !== "FINISHED" && data?.match.status !== "FT" ? "—" : home === null || away === null ? "—" : `${number(home)} - ${number(away)}`;
   useEffect(() => {
     const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
     fetch(`/api/matches/${matchId}/analytics${query}`, { cache: "no-store" })
@@ -36,7 +37,7 @@ export function MatchAnalytics({
       .catch(() => setData(null));
   }, [matchId, clubId]);
   useEffect(() => {
-    if (data?.match.status !== "LIVE" && data?.match.status !== "SUSPENDED") return;
+    if (!LIVE_SCORE_UI_ENABLED || (data?.match.status !== "LIVE" && data?.match.status !== "SUSPENDED")) return;
     const timer = window.setInterval(() => {
       const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
       fetch(`/api/matches/${matchId}/analytics${query}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((next) => { if (next) setData(next); }).catch(() => undefined);
@@ -201,7 +202,7 @@ export function MatchAnalytics({
                   <Stat
                     icon={<Trophy size={15} />}
                     value={score(data.match.homeGoals, data.match.awayGoals)}
-                    label={t("نتیجه زنده", data.match.status === "LIVE" ? "live score" : "final result")}
+                    label={t("نتیجه", "result")}
                   />
                 </div>
                 <div className="mt-5 rounded-2xl border border-white/[.06] bg-black/20 p-4">
@@ -256,7 +257,7 @@ export function MatchAnalytics({
 
 function AnalyticsStatus({ match, language }: { match: any; language: "fa" | "en" }) {
   const kickoff = new Date(match.kickoffAt).getTime();
-  const started = match.status === "LIVE" || match.status === "SUSPENDED" || (match.status === "SCHEDULED" && kickoff <= Date.now());
+  const started = LIVE_SCORE_UI_ENABLED && (match.status === "LIVE" || match.status === "SUSPENDED" || (match.status === "SCHEDULED" && kickoff <= Date.now()));
   const finished = match.status === "FINISHED" || match.status === "FT";
   const score = match.homeGoals != null && match.awayGoals != null ? `${formatNumber(match.homeGoals, language)} - ${formatNumber(match.awayGoals, language)}` : "—";
   const minute = match.elapsed ?? Math.max(1, Math.floor((Date.now() - kickoff) / 60_000));

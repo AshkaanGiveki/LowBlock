@@ -13,12 +13,12 @@ type Tab = "open" | "started";
 type Cursor = { globalPriority: 0 | 1; kickoffAt: string; providerMatchId: string } | null;
 type MatchPage = { matches: Match[]; predictions: Record<string, { homeGoals: number; awayGoals: number }>; nextCursor: Cursor; hasMore: boolean };
 
-function stateOf(match: Match, now: number) { const kickoff = new Date(match.kickoffAt).getTime(); const finished = match.status === "FINISHED" || (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED"); const live = !finished && (match.status === "LIVE" || (match.status === "SCHEDULED" && now >= kickoff)); return { finished, live, started: live || finished || match.status === "SUSPENDED" }; }
+function stateOf(match: Match, now: number) { const kickoff = new Date(match.kickoffAt).getTime(); const finished = match.status === "FINISHED" || (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED"); const started = finished || match.status === "LIVE" || match.status === "SUSPENDED" || (match.status === "SCHEDULED" && now >= kickoff); return { finished, live: false, started }; }
 function encodeCursor(cursor: Exclude<Cursor, null>) { return btoa(JSON.stringify(cursor)); }
 function isGlobal(code: string) { return Boolean(LEAGUES.find((league) => league.code === code)?.globalLeaderboard); }
 
 export function MatchesView({ matches: initialMatches, predictions: initialPredictions, nextCursor: initialCursor, hasMore: initialHasMore, initialSelectedLeagues = [], initialShowAllMatches = false, focusMatchId, initialTab = "open" }: { matches: Match[]; predictions: Record<string, { homeGoals: number; awayGoals: number }>; nextCursor?: Cursor; hasMore?: boolean; initialSelectedLeagues?: string[]; initialShowAllMatches?: boolean; focusMatchId?: string; initialTab?: Tab }) {
-  const { t } = useLanguage(); const pathname = usePathname(); const router = useRouter();
+  const { t: translate, language } = useLanguage(); const t = (fa: string, en: string) => en === "Live & results" ? language === "fa" ? "نتایج" : "Results" : translate(fa, en); const pathname = usePathname(); const router = useRouter();
   const [matches, setMatches] = useState<Match[]>(initialMatches); const [predictions, setPredictions] = useState(initialPredictions); const [nextCursor, setNextCursor] = useState<Cursor>(initialCursor ?? null); const [hasMore, setHasMore] = useState(initialHasMore ?? false); const [loadingMore, setLoadingMore] = useState(false); const [selected, setSelected] = useState<string[]>(initialSelectedLeagues); const [showAllMatches, setShowAllMatches] = useState(initialShowAllMatches); const [tab, setTab] = useState<Tab>(initialTab);
   const loadLock = useRef(false); const loadSentinel = useRef<HTMLDivElement>(null);
   const availableLeagues = useMemo(() => LEAGUES.filter((league) => matches.some((match) => match.leagueCode === league.code)), [matches]);

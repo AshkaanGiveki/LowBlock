@@ -7,8 +7,9 @@ import { T, useLanguage } from "@/components/LanguageProvider";
 
 type Round = { number: number; count: number; active: boolean; completed: boolean; live?: boolean };
 
-export function LeagueRoundRail({ code, rounds, basePath }: { code: string; rounds: Round[]; basePath?: string }) {
+export function LeagueRoundRail({ code, rounds: inputRounds, basePath }: { code: string; rounds: Round[]; basePath?: string }) {
   const { language } = useLanguage();
+  const rounds = inputRounds.map((round) => round.live ? { ...round, live: false } : round);
   const activeRef = useRef<HTMLAnchorElement>(null);
   const base = basePath ?? `/leagues/${code}`;
   useEffect(() => { activeRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: language === "fa" ? "center" : "center" }); }, [language, rounds]);
