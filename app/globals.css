@@ -74,7 +74,18 @@ button { cursor:pointer; } button:disabled { cursor:not-allowed; }
 @keyframes logo-loop-rtl { to { transform:translateX(33.333%); } }
 html[dir="rtl"] .logo-loop-track { animation-name:logo-loop-rtl; }
 .logo-loop-track img { opacity:.72; }
-.league-logo { display:block; min-width:0; max-width:100%; max-height:100%; object-fit:contain; filter:brightness(0) invert(1) !important; }
+.league-logo { display:block; min-width:0; max-width:100%; max-height:100%; object-fit:contain; filter:none; }
+.league-logo--homepage { filter:brightness(0) invert(1) !important; }
+/* Keep the six featured homepage marks white while every other surface keeps
+   the original tournament colors. */
+main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(2) img.league-logo,
+main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3) img.league-logo { filter:brightness(0) invert(1) !important; }
+/* Normalize the four narrow source marks to the same square-safe presentation
+   used by the Premier League asset. */
+img[src="/leagues/ligue-1.png"] { content:url("/leagues/ligue-1-fit.png"); }
+img[src="/leagues/fa-cup.png"] { content:url("/leagues/fa-cup-fit.png"); }
+img[src="/leagues/europa-league.png"] { content:url("/leagues/europa-league-fit.png"); }
+img[src="/leagues/conference-league.png"] { content:url("/leagues/conference-league-fit.png"); }
 /* Match cards keep the useful state only: competition logo, centered countdown, and an icon for non-global fixtures. */
 .glow-card > div > div:first-child { position:relative; min-height:1.75rem; }
 .glow-card > div > div:first-child > span:first-child { display:none; }
