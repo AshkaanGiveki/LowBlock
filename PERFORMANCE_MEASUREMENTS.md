@@ -42,6 +42,35 @@ The application now emits LCP, INP, CLS, long-task, navigation, and load telemet
 
 The response reported `X-Response-Bytes: 331458` and `Cache-Control: public, s-maxage=30, stale-while-revalidate=60`. This confirms the instrumentation is live and also confirms that the leaderboard query remains the dominant local bottleneck.
 
+## Production hosting sample
+
+Measured 2026-09-07 against `https://www.lowblock.ir` and the public Vercel deployment:
+
+| Request | Status | TTFB | Total | Cache evidence |
+| --- | ---: | ---: | ---: | --- |
+| `/` | 200 | 0.504 s | 1.390 s | private, `MISS` |
+| `/leagues` | 200 | 0.684 s | 0.841 s | public, `HIT` |
+| `/how-scoring-works` | 200 | 0.620 s | 0.622 s | public, `HIT` |
+| `/matches` | 200 | 0.494 s | 0.861 s | private, `MISS` |
+| `/leaderboard` | 200 | 0.522 s | 2.143 s | private, `MISS` |
+| `/api/leaderboards?limit=20` | 200 | 1.481 s | 1.862 s | public header, `MISS` on two requests |
+
+The public route responses prove the deployment is serving static/ISR-style cached content on Vercel while keeping user-sensitive pages and API responses uncached. The API response was intentionally not recorded with a body because it contains user avatar data. The preview deployment URL is Vercel-protected, so measurements use the public production domain.
+
+## Index verification after deployment
+
+The performance indexes were applied to the configured deployment database (`test`) with `npm run ensure:performance-indexes` and verified with `listIndexes`. The relevant indexes are `leaderboard_rank_order`, `prediction_scores_scope_time`, and `matches_public_schedule`.
+
+After index creation, explain plans showed:
+
+- canonical leaderboard: 17 keys and 17 documents examined, no in-memory sort;
+- current-user rank: index-backed OR branches, zero documents examined for the sampled rank;
+- club leaderboard: 285 keys and 20 documents examined, with the expected final sort after the scope-prefix scan;
+- match schedule: 317 keys and 30 documents examined; status filtering is index-backed, but kickoff ordering still sorts in memory;
+- detailed leaderboard: the season/league compound index is used before grouping.
+
+The browser service was requested for real LCP, INP, CLS, long-task, and client-navigation samples, but the environment reported that no browser is available. Those metrics remain explicitly unmeasured rather than inferred from server timing.
+
 ## Validation
 
 - `npm test`: 12 files and 33 tests passed.

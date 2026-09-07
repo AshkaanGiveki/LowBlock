@@ -17,6 +17,7 @@
     "rebuild:leaderboards": "tsx scripts/rebuild-leaderboards.ts",
     "validate:env": "tsx scripts/validate-env.ts",
     "explain:performance": "tsx scripts/explain-performance.ts",
+    "ensure:performance-indexes": "tsx scripts/ensure-performance-indexes.ts",
     "measure:performance": "tsx scripts/measure-performance.ts"
   },
   "dependencies": {

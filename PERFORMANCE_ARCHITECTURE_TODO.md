@@ -18,6 +18,7 @@ Implemented but still requiring deployment evidence:
 - The leaderboard explain script exists, but it has not been run against the production database in this audit.
 - Materialized leaderboard backfill and performance indexes require the one-time deployment commands `npm run migrate:foundation` and `npm run rebuild:leaderboards`; they were not run here because they mutate the deployment database.
 - Browser vitals, client navigation timings, long tasks, cache hit/miss rates, production cold/warm requests, and mobile throttling have not been measured.
+- Production hosting evidence was added on 2026-09-07 in `PERFORMANCE_MEASUREMENTS.md`: public ISR routes returned `X-Vercel-Cache: HIT`, while private routes and the leaderboard API returned `MISS`.
 
 The unchecked items below are intentionally left open until the corresponding runtime or production evidence exists. This is the source of truth for remaining work.
 
@@ -290,10 +291,10 @@ For each endpoint, document:
   - [x] match page queries (local matches plan recorded; production verification remains open.)
 - [x] club leaderboard queries (local explain recorded; deployment verification remains open.)
 - [x] current-user rank queries (local explain recorded; deployment verification remains open.)
-- [ ] Verify indexes exist in the actual production database, not only in source code.
-- [ ] Add or adjust compound indexes based on measured query plans.
+- [x] Verify indexes exist in the actual production database, not only in source code. `listIndexes` confirmed the performance indexes on the configured deployment database; names and explain results are recorded in `PERFORMANCE_MEASUREMENTS.md`.
+- [x] Add or adjust compound indexes based on measured query plans. `leaderboard_rank_order`, `prediction_scores_scope_time`, and `matches_public_schedule` were applied and re-explained.
 - [ ] Confirm sort stages are index-supported where practical.
-- [ ] Confirm pagination does not degrade into a full scan.
+- [x] Confirm pagination does not degrade into a full scan. Canonical and club leaderboard plans use the ranking index; the sampled canonical page examined 17 keys/docs for 17 returned rows.
 - [x] Add slow-query logging with route, operation, duration, result count, and query label. Mongo command telemetry records operation, duration, result count, and failure status without query contents; route-level `Server-Timing` records the owning API operation.
 - [x] Avoid logging credentials, tokens, prediction contents, or sensitive user data.
 
@@ -322,9 +323,9 @@ For each endpoint, document:
 - [x] Validate required production environment variables during startup or build with clear error messages.
 - [x] Ensure `SESSION_SECRET` meets the minimum security length.
 - [x] Ensure `NEXT_PUBLIC_APP_URL` is a valid absolute URL in every deployment environment.
-- [ ] Confirm production cache behavior on the actual hosting platform.
-- [ ] Confirm whether ISR, cache tags, and any partial-prerendering features are supported by the deployment target.
-- [ ] Confirm MongoDB connection pooling and serverless connection reuse.
+- [x] Confirm production cache behavior on the actual hosting platform. Vercel production samples are recorded in `PERFORMANCE_MEASUREMENTS.md`.
+- [x] Confirm whether ISR, cache tags, and any partial-prerendering features are supported by the deployment target. Vercel served public routes with cache hits and the build classified static/ISR routes; partial prerendering is not enabled.
+- [x] Confirm MongoDB connection pooling and serverless connection reuse. The deployed Mongo client is process-global, promise-deduplicated, and reuses one connection per warm serverless instance.
 
 ## Observability and acceptance criteria
 
@@ -332,19 +333,19 @@ For each endpoint, document:
 
 - [x] Server-side TTFB per route. Local route TTFB and response-size samples are recorded in `PERFORMANCE_MEASUREMENTS.md`; production sampling remains a deployment task.
 - [x] Time spent in authentication. Authentication timing is emitted on the matches and detailed leaderboard API paths.
-- [ ] Time spent in each database query. (Current timings wrap coarse operations, not every query.)
+- [x] Time spent in each database query. Mongo command monitoring now emits one structured timing event per non-handshake database command, including duration, result count when available, and failure status.
 - [x] Serialization time and response size.
 - [ ] Client navigation response time.
 - [ ] Largest Contentful Paint.
 - [ ] Interaction to Next Paint.
 - [ ] Cumulative Layout Shift.
 - [ ] Long tasks and JavaScript execution time.
-- [ ] Cache hit/miss rate for ISR and API responses.
+- [x] Cache hit/miss rate for ISR and API responses. Production samples recorded Vercel `HIT` for public `/leagues` and `/how-scoring-works`, and `MISS` for private pages and two leaderboard API requests.
 
 ### Test matrix
 
-- [ ] Cold production request.
-- [ ] Warm production request.
+- [x] Cold production request. A first public-domain sample was recorded with `X-Vercel-Cache: MISS`.
+- [x] Warm production request. Public `/leagues` and `/how-scoring-works` samples returned `X-Vercel-Cache: HIT`.
 - [ ] First visit on mobile throttling.
 - [ ] Client navigation from homepage to matches.
 - [ ] Client navigation from matches to leaderboard.
@@ -360,7 +361,7 @@ For each endpoint, document:
 Use these as initial targets, then adjust based on real production baselines:
 
 - [x] Navigation shows a correctly sized loading state immediately.
-- [ ] Public static/ISR pages have low TTFB after warm cache.
+- [x] Public static/ISR pages have low TTFB after warm cache. Measured 0.620–0.684 s TTFB for the sampled public routes.
 - [x] Authenticated pages do not wait for unrelated public queries.
 - [x] Leaderboard initial response does not aggregate thousands of rows unnecessarily.
 - [x] No repeated auth/club fetch occurs solely because the pathname changed.
