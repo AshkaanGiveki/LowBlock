@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (isCommand(text, "sync_now") && env.TELEGRAM_ADMIN_CHAT_ID === String(chatId)) {
     if (!process.env.TELEGRAM_WEBHOOK_SECRET || req.headers.get("x-telegram-bot-api-secret-token") !== process.env.TELEGRAM_WEBHOOK_SECRET) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     if (update?.update_id == null || !(await claimTelegramUpdate(update.update_id))) return NextResponse.json({ ok: true });
-    await handleAdminSync(String(chatId));
+    after(() => handleAdminSync(String(chatId)));
     return NextResponse.json({ ok: true });
   }
 
