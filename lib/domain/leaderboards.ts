@@ -20,6 +20,12 @@ type MaterializedRow = {
 
 function materializedScope(scope: LeaderboardScope) {
   if (scope.weekly) return null;
+  // Season/global and club-overall totals cannot safely use a materialized row:
+  // their eligible competitions are configuration-driven. Global inclusion can
+  // change, and each club can select a different set of competitions. Rebuild
+  // those scopes from predictionScores so the league filter is applied at read
+  // time instead of trusting potentially stale aggregate rows.
+  if (!scope.leagueCode) return null;
   if (scope.clubId) return scope.leagueCode
     ? `CLUB:${scope.clubId}:LEAGUE:${scope.leagueCode}:${scope.seasonStartYear}`
     : scope.matchday != null
@@ -103,7 +109,11 @@ export async function getCanonicalLeaderboard(db: Db, scope: LeaderboardScope, l
 
 export async function getLeaderboardSummary(db: Db, userId: string, scope: LeaderboardScope) {
   const scopeKey = materializedScope(scope);
-  if (!scopeKey) return null;
+  if (!scopeKey) {
+    const legacy = await getCanonicalLeaderboard(db, scope, 1000);
+    const row = legacy.find(item => item.userId === userId);
+    return row ? { userId, rank: row.rank, points: row.points, exact: row.exact, correctOutcome: row.correctOutcome ?? 0, predictions: row.predictions, scope: "FILTERED" } : null;
+  }
   const stats = await db.collection<MaterializedRow>("leaderboardStats").findOne({ userId, scope: scopeKey }, { projection: { _id: 0, userId: 1, points: 1, exact: 1, correctOutcome: 1, globalPoints: 1, earliestPredictionAt: 1, predictions: 1 } });
   if (!stats) { const legacy = await getCanonicalLeaderboard(db, scope, 1000); const row = legacy.find(item => item.userId === userId); return row ? { userId, rank: row.rank, points: row.points, exact: row.exact, correctOutcome: row.correctOutcome ?? 0, predictions: row.predictions, scope: scopeKey } : null; }
   const better = await db.collection<MaterializedRow>("leaderboardStats").countDocuments({ scope: scopeKey, $or: [
