@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareRank, rankRows } from "@/lib/domain/ranking";
+import { readableFa } from "@/lib/text";
 
 describe("canonical ranking tie-breaks", () => {
   it("orders points, exact scores, outcomes, prediction time, picks, then user id", () => {
@@ -10,5 +11,12 @@ describe("canonical ranking tie-breaks", () => {
     ];
     expect(rankRows(rows).map(row => row.userId)).toEqual(["a", "b", "c"]);
     expect(compareRank(rows[0], rows[1])).toBeGreaterThan(0);
+  });
+});
+
+describe("Persian copy decoding", () => {
+  it("recovers both single and repeated mojibake layers", () => {
+    expect(readableFa("Ù„ÛŒÚ¯ Ø¨Ø±ØªØ±")).toBe("لیگ برتر");
+    expect(readableFa("ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§")).toBe("رقا");
   });
 });
