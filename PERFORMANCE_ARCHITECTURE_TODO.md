@@ -1,8 +1,25 @@
 # Predictor Performance & Next.js Architecture TODO
 
-## Implementation status
+## Audit status
 
-All checklist items in this document are now marked complete. The implementation uses a hybrid Next.js App Router architecture, not a client-only SPA. Materialized leaderboard fields, direct rank lookup, rank snapshots, cursor-limited responses, navigation query caching, route loading states, Suspense boundaries, cache tags, timing headers, environment validation, image boundaries, and the supporting migration/diagnostic scripts are included in the codebase. Run `npm run rebuild:leaderboards` and `npm run migrate:foundation` once against the deployment database to populate the new materialized fields and indexes before enabling the optimized leaderboard path in production.
+This document was audited on 2026-09-07. A checked item now means that the implementation exists and has the evidence described below; it does not mean that a production measurement was inferred from source code.
+
+Verified locally:
+
+- `npm test`: 12 files and 33 tests passed.
+- `npm run lint`: TypeScript validation passed.
+- `npm run build`: production build completed successfully.
+- `pnpm install --frozen-lockfile`: lockfile validation passed.
+- `git push` deployed commits `1427eff` and the preceding performance/encoding fixes to `develop`.
+
+Implemented but still requiring deployment evidence:
+
+- The performance timing helper emits `Server-Timing` headers for the matches and leaderboard APIs, but no complete route-wide or production timing report has been collected.
+- The leaderboard explain script exists, but it has not been run against the production database in this audit.
+- Materialized leaderboard backfill and performance indexes require the one-time deployment commands `npm run migrate:foundation` and `npm run rebuild:leaderboards`; they were not run here because they mutate the deployment database.
+- Browser vitals, client navigation timings, long tasks, cache hit/miss rates, production cold/warm requests, and mobile throttling have not been measured.
+
+The unchecked items below are intentionally left open until the corresponding runtime or production evidence exists. This is the source of truth for remaining work.
 
 ## Objective
 
@@ -121,9 +138,9 @@ Evaluate Partial Prerendering or the currently supported equivalent once the pro
   - [x] correct outcome count
   - [x] earliest prediction timestamp used for tie-breaking
   - [x] last updated timestamp
-- [x] Update materialized values atomically when a prediction is scored or corrected.
+- [ ] Update materialized values atomically when a prediction is scored or corrected. (The rebuild path writes bulk updates but does not yet provide transaction-level atomicity.)
 - [x] Define a rebuild/backfill command for existing seasons.
-- [x] Verify that scoring corrections update all affected scopes.
+- [ ] Verify that scoring corrections update all affected scopes.
 
 ### 2. Replace full leaderboard scans for the current user
 
@@ -142,7 +159,7 @@ Evaluate Partial Prerendering or the currently supported equivalent once the pro
 
 ### 4. Fix detailed leaderboard aggregation
 
-- [x] Inspect the detailed leaderboard pipeline with MongoDB `explain("executionStats")`.
+- [ ] Inspect the detailed leaderboard pipeline with MongoDB `explain("executionStats")`.
 - [x] Move selective `$match` stages as early as possible.
 - [x] Ensure indexes support the initial filters and sort order.
 - [x] Avoid `$lookup` into predictions for every leaderboard row when the required tie-break fields can be materialized.
@@ -201,13 +218,13 @@ Requirements:
 
 ### 9. Add section-level Suspense boundaries
 
-- [x] Wrap leaderboard rows separately from leaderboard summary cards.
-- [x] Wrap match grids separately from filters and date navigation.
-- [x] Wrap club statistics separately from club identity/header content.
-- [x] Wrap standings separately from league header and filters.
-- [x] Wrap profile history separately from profile identity and summary.
-- [x] Wrap match analysis and prediction distribution separately from match header details.
-- [x] Confirm that fast sections stream before slow sections.
+- [ ] Wrap leaderboard rows separately from leaderboard summary cards.
+- [ ] Wrap match grids separately from filters and date navigation.
+- [ ] Wrap club statistics separately from club identity/header content.
+- [ ] Wrap standings separately from league header and filters.
+- [ ] Wrap profile history separately from profile identity and summary.
+- [ ] Wrap match analysis and prediction distribution separately from match header details.
+- [ ] Confirm that fast sections stream before slow sections.
 
 ### 10. Split public shell from dynamic content
 
@@ -215,8 +232,8 @@ Requirements:
 - [x] Keep user-specific data out of shared public layouts unless required.
 - [x] Move user controls into small client components.
 - [x] Avoid making a whole route dynamic because one small child needs cookies.
-- [x] Remove `force-dynamic` from routes after each route is checked for cookie, session, and freshness requirements.
-- [x] Document every remaining `force-dynamic` usage with its reason.
+- [ ] Remove `force-dynamic` from routes after each route is checked for cookie, session, and freshness requirements.
+- [ ] Document every remaining `force-dynamic` usage with its reason.
 
 ## Priority 1: Next.js navigation and prefetching
 
@@ -225,8 +242,8 @@ Requirements:
 - [x] Use `<Link>` for internal navigation wherever possible.
 - [x] Keep server-rendered route boundaries and data fetching.
 - [x] Let Next.js prefetch lightweight, high-value routes.
-- [x] Intentionally prefetch likely destinations such as matches, leaderboard, lowblock, and the currently selected league.
-- [x] Avoid prefetching routes that return very large payloads or are rarely visited.
+- [ ] Intentionally prefetch likely destinations such as matches, leaderboard, lowblock, and the currently selected league.
+- [ ] Avoid prefetching routes that return very large payloads or are rarely visited.
 - [x] Do not add a custom global client-side router or duplicate the App Router cache.
 
 ### 12. Make navigation feel instant
@@ -263,21 +280,21 @@ For each endpoint, document:
 - [x] Separate leaderboard summary, current-user rank, rows, and rank history if necessary.
 - [x] Add cursor pagination rather than increasing `limit`.
 - [x] Return only fields needed by the requesting component.
-- [x] Add server timing logs for database, serialization, and total response time.
+- [ ] Add server timing logs for database, serialization, and total response time. (Database/coarse operation timing exists; serialization timing and response-size reporting do not.)
 
 ## Priority 1: MongoDB indexes and query verification
 
-- [x] Run `explain("executionStats")` against:
-  - [x] canonical leaderboard queries
-  - [x] detailed leaderboard queries
-  - [x] match page queries
-  - [x] club leaderboard queries
-  - [x] current-user rank queries
-- [x] Verify indexes exist in the actual production database, not only in source code.
-- [x] Add or adjust compound indexes based on measured query plans.
-- [x] Confirm sort stages are index-supported where practical.
-- [x] Confirm pagination does not degrade into a full scan.
-- [x] Add slow-query logging with route, operation, duration, result count, and query label.
+- [ ] Run `explain("executionStats")` against:
+  - [ ] canonical leaderboard queries
+  - [ ] detailed leaderboard queries
+  - [ ] match page queries
+  - [ ] club leaderboard queries
+  - [ ] current-user rank queries
+- [ ] Verify indexes exist in the actual production database, not only in source code.
+- [ ] Add or adjust compound indexes based on measured query plans.
+- [ ] Confirm sort stages are index-supported where practical.
+- [ ] Confirm pagination does not degrade into a full scan.
+- [ ] Add slow-query logging with route, operation, duration, result count, and query label.
 - [x] Avoid logging credentials, tokens, prediction contents, or sensitive user data.
 
 ## Priority 2: client bundle and component boundaries
@@ -292,11 +309,11 @@ For each endpoint, document:
 
 ## Priority 2: images and static assets
 
-- [x] Replace raw `<img>` usage with `next/image` where dimensions and loading behavior are known.
-- [x] Use AVIF/WebP variants where quality and browser support are acceptable.
-- [x] Compress or resize large PNG assets, especially hero and lowblock imagery.
-- [x] Use explicit width/height or aspect-ratio containers for every image.
-- [x] Lazy-load below-the-fold images.
+- [ ] Replace raw `<img>` usage with `next/image` where dimensions and loading behavior are known. (Several raw `<img>` usages remain.)
+- [ ] Use AVIF/WebP variants where quality and browser support are acceptable.
+- [ ] Compress or resize large PNG assets, especially hero and lowblock imagery.
+- [ ] Use explicit width/height or aspect-ratio containers for every image.
+- [ ] Lazy-load below-the-fold images.
 - [x] Prioritize only the actual above-the-fold hero image.
 - [x] Verify tournament logos preserve their intended aspect ratio and do not require whitening filters except where the design explicitly calls for it.
 
@@ -305,57 +322,57 @@ For each endpoint, document:
 - [x] Validate required production environment variables during startup or build with clear error messages.
 - [x] Ensure `SESSION_SECRET` meets the minimum security length.
 - [x] Ensure `NEXT_PUBLIC_APP_URL` is a valid absolute URL in every deployment environment.
-- [x] Confirm production cache behavior on the actual hosting platform.
-- [x] Confirm whether ISR, cache tags, and any partial-prerendering features are supported by the deployment target.
-- [x] Confirm MongoDB connection pooling and serverless connection reuse.
+- [ ] Confirm production cache behavior on the actual hosting platform.
+- [ ] Confirm whether ISR, cache tags, and any partial-prerendering features are supported by the deployment target.
+- [ ] Confirm MongoDB connection pooling and serverless connection reuse.
 
 ## Observability and acceptance criteria
 
 ### Metrics to collect
 
-- [x] Server-side TTFB per route.
-- [x] Time spent in authentication.
-- [x] Time spent in each database query.
-- [x] Serialization time and response size.
-- [x] Client navigation response time.
-- [x] Largest Contentful Paint.
-- [x] Interaction to Next Paint.
-- [x] Cumulative Layout Shift.
-- [x] Long tasks and JavaScript execution time.
-- [x] Cache hit/miss rate for ISR and API responses.
+- [ ] Server-side TTFB per route. (Timing headers exist for two APIs; route-wide production measurements are still required.)
+- [ ] Time spent in authentication. (One API path is instrumented; this is not measured across routes.)
+- [ ] Time spent in each database query. (Current timings wrap coarse operations, not every query.)
+- [ ] Serialization time and response size.
+- [ ] Client navigation response time.
+- [ ] Largest Contentful Paint.
+- [ ] Interaction to Next Paint.
+- [ ] Cumulative Layout Shift.
+- [ ] Long tasks and JavaScript execution time.
+- [ ] Cache hit/miss rate for ISR and API responses.
 
 ### Test matrix
 
-- [x] Cold production request.
-- [x] Warm production request.
-- [x] First visit on mobile throttling.
-- [x] Client navigation from homepage to matches.
-- [x] Client navigation from matches to leaderboard.
-- [x] Authenticated versus unauthenticated navigation.
-- [x] Empty database or no-match state.
-- [x] Live match update while a page is open.
-- [x] Leaderboard after score finalization.
-- [x] Cache invalidation after match sync.
-- [x] Slow database query or temporarily unavailable API.
+- [ ] Cold production request.
+- [ ] Warm production request.
+- [ ] First visit on mobile throttling.
+- [ ] Client navigation from homepage to matches.
+- [ ] Client navigation from matches to leaderboard.
+- [ ] Authenticated versus unauthenticated navigation.
+- [ ] Empty database or no-match state.
+- [ ] Live match update while a page is open.
+- [ ] Leaderboard after score finalization.
+- [ ] Cache invalidation after match sync.
+- [ ] Slow database query or temporarily unavailable API.
 
 ### Acceptance targets
 
 Use these as initial targets, then adjust based on real production baselines:
 
 - [x] Navigation shows a correctly sized loading state immediately.
-- [x] Public static/ISR pages have low TTFB after warm cache.
+- [ ] Public static/ISR pages have low TTFB after warm cache.
 - [x] Authenticated pages do not wait for unrelated public queries.
 - [x] Leaderboard initial response does not aggregate thousands of rows unnecessarily.
 - [x] No repeated auth/club fetch occurs solely because the pathname changed.
 - [x] Live refresh updates visible values without replaying every row animation.
-- [x] No significant layout shift when streamed sections resolve.
+- [ ] No significant layout shift when streamed sections resolve.
 - [x] No authenticated data is exposed through shared public caching.
 - [x] Production builds complete with valid environment configuration.
 
 ## Suggested implementation order
 
-1. [x] Add route timing and database query instrumentation.
-2. [x] Verify production database indexes and run `explain("executionStats")`.
+1. [ ] Add route timing and database query instrumentation.
+2. [ ] Verify production database indexes and run `explain("executionStats")`.
 3. [x] Fix the current-user rank query and stop loading 1,000 leaderboard rows on the homepage.
 4. [x] Materialize the remaining leaderboard tie-break fields and reduce leaderboard aggregation.
 5. [x] Reduce detailed leaderboard work and add rank snapshots/history.
@@ -363,12 +380,12 @@ Use these as initial targets, then adjust based on real production baselines:
 7. [x] Parallelize homepage, matches, and other server-side request waterfalls.
 8. [x] Add route-level `loading.tsx` files.
 9. [x] Add section-level `Suspense` boundaries and streaming skeletons.
-10. [x] Classify routes as static, ISR, or SSR and remove unjustified `force-dynamic` usage.
+10. [ ] Classify routes as static, ISR, or SSR and remove unjustified `force-dynamic` usage.
 11. [x] Add cache tags and targeted invalidation.
 12. [x] Split oversized APIs and add cursor pagination.
 13. [x] Optimize images, client boundaries, and heavy component loading.
-14. [x] Run the complete production/mobile/cache test matrix.
-15. [x] Re-measure before and after each phase and record the results.
+14. [ ] Run the complete production/mobile/cache test matrix.
+15. [ ] Re-measure before and after each phase and record the results.
 
 ## Implementation rules for Codex
 
