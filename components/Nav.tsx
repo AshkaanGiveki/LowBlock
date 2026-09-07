@@ -67,6 +67,7 @@ export function Nav() {
       <header className="fixed inset-x-0 top-0 z-50 h-[70px] border-b border-white/[.07] bg-[#080b0a]/85 backdrop-blur-2xl">
         <div className="relative mx-auto h-full max-w-7xl px-5 md:px-8">
           <LanguageMenu language={language} setLanguage={setLanguage} fa={fa} />
+          <DesktopUtilityBar avatar={avatar} language={language} setLanguage={setLanguage} fa={fa} />
         </div>
         {loading && (
           <motion.span
@@ -77,7 +78,7 @@ export function Nav() {
           />
         )}
       </header>
-      <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around lg:hidden">
+      <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around xl:hidden">
         {routes.map(({ href, icon: Component, label }) => (
           <Link
             key={href}
@@ -152,7 +153,7 @@ function LanguageMenu({
   ];
   const current = options.find((option) => option.code === language)!;
   return (
-    <div className="language-menu absolute top-1/2 -translate-y-1/2">
+    <div className="mobile-language-menu language-menu absolute top-1/2 -translate-y-1/2">
       <button
         type="button"
         aria-label="Change language"
@@ -214,4 +215,8 @@ function LanguageMenu({
       </AnimatePresence>
     </div>
   );
+}
+
+function DesktopUtilityBar({ avatar, language, setLanguage, fa }: { avatar: string | null; language: "fa" | "en"; setLanguage: (value: "fa" | "en") => void; fa: boolean }) {
+  return <div className="desktop-utility-only"><Link href="/profile" className="desktop-user-chip"><UserAvatar name={fa ? "پروفایل" : "Profile"} avatarUrl={avatar} className="h-8 w-8 text-[10px]" /><span><small>{fa ? "حساب شما" : "YOUR ACCOUNT"}</small><b>{fa ? "پروفایل من" : "My profile"}</b></span><ChevronDown size={14} /></Link><button type="button" className="desktop-utility-button" onClick={() => setLanguage(fa ? "en" : "fa")} aria-label={fa ? "Switch to English" : "تغییر زبان به فارسی"}>{fa ? "EN" : "فا"}</button><Link href="/help" className="desktop-utility-button" aria-label={fa ? "راهنما" : "Help"}><Globe2 size={17} /></Link></div>;
 }
