@@ -32,7 +32,16 @@ These results prove the diagnostic path works, but they are not production measu
 
 ## Browser metrics
 
-The application now emits LCP, INP, CLS, long-task, navigation, and load telemetry to `/api/telemetry`. The configured in-app browser was unavailable during this audit, so no browser-vitals sample is claimed here. Production logs must be sampled after deployment.
+The application emits LCP, INP, CLS, long-task, navigation, and load telemetry to `/api/telemetry`.
+
+Measured 2026-09-07 in the local in-app browser against the development server. These are cold/dev measurements and should not be compared directly with the production table above:
+
+| Route | Navigation TTFB | LCP | CLS | Route result |
+| --- | ---: | ---: | ---: | --- |
+| `/matches` | 2.324 s | 2.508 s | 0.0000 | 200; 30 match cards rendered |
+| `/lowblock` | 5.439 s | 5.744 s | 0.0000 | 200; summary and leaderboard rows rendered |
+
+Long-task telemetry was emitted on both routes, including initial samples of 441 ms on `/matches` and 416 ms on `/lowblock`. INP was instrumented but no interaction exceeded the browser observer threshold during this pass. The browser navigation from `/matches` to `/lowblock` also completed successfully with route content visible after navigation.
 
 ## API timing sample
 
@@ -68,6 +77,8 @@ After index creation, explain plans showed:
 - club leaderboard: 285 keys and 20 documents examined, with the expected final sort after the scope-prefix scan;
 - match schedule: 317 keys and 30 documents examined; status filtering is index-backed, but kickoff ordering still sorts in memory;
 - detailed leaderboard: the season/league compound index is used before grouping.
+
+Read-only recheck on 2026-09-07 confirmed the same index-backed plans: canonical leaderboard examined 17 keys/docs for 17 rows, club leaderboard examined 285 keys and 20 documents, and current-user rank used four OR branches over `leaderboard_rank_order` with zero documents examined for the sampled user. The match schedule and prediction-score plans still contain in-memory kickoff sorts, so those remain measured follow-up work rather than being marked fully index-supported.
 
 The browser service was requested for real LCP, INP, CLS, long-task, and client-navigation samples, but the environment reported that no browser is available. Those metrics remain explicitly unmeasured rather than inferred from server timing.
 

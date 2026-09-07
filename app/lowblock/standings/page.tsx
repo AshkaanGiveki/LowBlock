@@ -4,7 +4,7 @@ import { ArrowLeft, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { getLatestSeasonStartYear } from "@/lib/football/data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 export const metadata = { title: "Complete Global Football Prediction Standings", description: "Detailed LowBlock global standings with predictions, exact scores, correct results, points, averages, rank movement, and awards." };
 
 export default async function GlobalStandingsPage() {

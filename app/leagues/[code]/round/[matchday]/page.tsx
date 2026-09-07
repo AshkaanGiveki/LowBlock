@@ -9,6 +9,7 @@ import { BackButton } from "@/components/BackButton";
 import { LeagueRoundLeaderboard } from "@/components/LeagueRoundLeaderboard";
 import { RoundMatchGrid } from "@/components/RoundMatchGrid";
 import { LeagueLogo } from "@/components/LeagueLogo";
+import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -128,7 +129,7 @@ export default async function RoundPage({
             </div>
           </div>
         </div>
-        <RoundMatchGrid
+        <Suspense fallback={<div className="mt-6 h-72 animate-pulse rounded-3xl bg-white/[.06]" />}><RoundMatchGrid
           focusMatchId={focusMatchId}
           fixtures={matches.map((match) => ({
             providerMatchId: match.providerMatchId,
@@ -139,8 +140,8 @@ export default async function RoundPage({
             homeTeam: match.homeTeam,
             awayTeam: match.awayTeam,
           }))}
-        />
-        <LeagueRoundLeaderboard players={players} />
+        /></Suspense>
+        <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-3xl bg-white/[.06]" />}><LeagueRoundLeaderboard players={players} /></Suspense>
       </div>
     </main>
   );

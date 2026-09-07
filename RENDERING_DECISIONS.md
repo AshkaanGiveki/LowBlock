@@ -6,6 +6,9 @@ Static/ISR routes:
 
 - `/how-scoring-works`: static with one-day revalidation.
 - `/leagues`: ISR with 30-minute revalidation.
+- `/lowblock/standings`: ISR with 60-second revalidation; its detailed table is fetched from an authenticated-aware API boundary.
+- `/u/[username]`: ISR with 60-second revalidation; the rendered profile is public and viewer-independent, while prediction history is loaded through its own public API boundary.
+- `/sitemap.xml`: ISR with one-hour revalidation; match URLs are refreshed hourly instead of forcing every sitemap request to render dynamically.
 - Locale marketing routes: static generation.
 
 Request-time routes and reasons:
