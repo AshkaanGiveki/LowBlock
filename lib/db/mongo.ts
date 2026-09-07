@@ -1,8 +1,24 @@
 import { MongoClient, type Db } from "mongodb"; import { env } from "@/lib/env";
 const globalForMongo=globalThis as unknown as {mongo?:MongoClient; mongoPromise?:Promise<MongoClient>};
 function directUri(){if(!env.MONGODB_URI||!env.MONGODB_DIRECT_HOSTS)return undefined; const match=env.MONGODB_URI.match(/^mongodb\+srv:\/\/([^@]+)@([^/?]+)(?:\/[^?]*)?(?:\?.*)?$/); if(!match)return undefined; const replica=env.MONGODB_REPLICA_SET?`&replicaSet=${encodeURIComponent(env.MONGODB_REPLICA_SET)}`:""; return `mongodb://${match[1]}@${env.MONGODB_DIRECT_HOSTS}/?authSource=admin&tls=true${replica}`;}
-const mongoOptions = { serverSelectionTimeoutMS: 10_000, connectTimeoutMS: 10_000, socketTimeoutMS: 10_000, waitQueueTimeoutMS: 10_000, retryWrites: true } as const;
-async function connect(){if(!env.MONGODB_URI)throw new Error("MONGODB_URI is not configured"); const fallback=directUri(); const client=globalForMongo.mongo??new MongoClient(fallback??env.MONGODB_URI,mongoOptions); try{return await client.connect();}catch(error){if(!fallback)throw error; const srv=new MongoClient(env.MONGODB_URI,mongoOptions); await srv.connect(); return srv;}}
+const mongoOptions = { serverSelectionTimeoutMS: 10_000, connectTimeoutMS: 10_000, socketTimeoutMS: 10_000, waitQueueTimeoutMS: 10_000, retryWrites: true, monitorCommands: true } as const;
+const ignoredMongoCommands = new Set(["hello", "ismaster", "saslContinue", "getMore"]);
+function instrumentMongoClient(client: MongoClient) {
+  const started = new Map<number, number>();
+  client.on("commandStarted", event => { if (!ignoredMongoCommands.has(event.commandName)) started.set(event.requestId, performance.now()); });
+  client.on("commandSucceeded", event => {
+    const start = started.get(event.requestId); started.delete(event.requestId); if (start === undefined) return;
+    const reply = event.reply as { n?: number; cursor?: { firstBatch?: unknown[] } };
+    const resultCount = typeof reply.n === "number" ? reply.n : reply.cursor?.firstBatch?.length;
+    console.info(JSON.stringify({ type: "lowblock.db.query", operation: event.commandName, durationMs: Math.round((performance.now() - start) * 100) / 100, resultCount: resultCount ?? null }));
+  });
+  client.on("commandFailed", event => {
+    const start = started.get(event.requestId); started.delete(event.requestId); if (start === undefined) return;
+    console.warn(JSON.stringify({ type: "lowblock.db.query", operation: event.commandName, durationMs: Math.round((performance.now() - start) * 100) / 100, resultCount: null, failed: true }));
+  });
+  return client;
+}
+async function connect(){if(!env.MONGODB_URI)throw new Error("MONGODB_URI is not configured"); const fallback=directUri(); const client=globalForMongo.mongo??instrumentMongoClient(new MongoClient(fallback??env.MONGODB_URI,mongoOptions)); try{return await client.connect();}catch(error){if(!fallback)throw error; const srv=instrumentMongoClient(new MongoClient(env.MONGODB_URI,mongoOptions)); await srv.connect(); return srv;}}
 export async function getDb():Promise<Db>{if(!env.MONGODB_URI)throw new Error("MONGODB_URI is not configured"); if(!globalForMongo.mongoPromise){globalForMongo.mongoPromise=connect().then(client=>{globalForMongo.mongo=client; return client;}).catch(error=>{globalForMongo.mongoPromise=undefined; throw error;});} return (await globalForMongo.mongoPromise).db();}
 export async function closeMongo(){ const client = globalForMongo.mongo; globalForMongo.mongo = undefined; globalForMongo.mongoPromise = undefined; if (client) await client.close(); }
 export async function withMongoTransaction<T>(operation: (db: Db, session: import("mongodb").ClientSession) => Promise<T>) { const db = await getDb(); const client = globalForMongo.mongo; if (!client) throw new Error("Mongo client is not connected"); const session = client.startSession(); try { session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10_000 }); const result = await operation(db, session); await session.commitTransaction({ timeoutMS: 10_000 }); return result; } catch (error) { if (session.inTransaction()) await session.abortTransaction({ timeoutMS: 10_000 }).catch(() => undefined); throw error; } finally { await session.endSession(); } }

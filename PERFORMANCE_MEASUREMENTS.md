@@ -22,6 +22,11 @@ The first pass exposed a homepage 500 caused by MongoDB `ObjectId` values being 
 - `matches`: 1 ms, 317 keys/docs examined, 30 returned; the plan still performs an in-memory sort.
 - `leaderboardStats`: 0 ms, 717 documents examined, 17 returned; it used a collection scan and in-memory sort because the performance indexes have not been applied to this database.
 - `predictionScores`: 9 ms, 1,838 keys/docs examined, 20 returned; the season index was used but kickoff ordering still sorted in memory.
+- `detailedLeaderboard`: 0 ms in the current fixture set, using the season/league compound index before grouping.
+- `clubLeaderboard`: 1 ms, 717 documents examined; the configured database has not received the performance index, so this is currently a collection scan.
+- `currentUserRank`: 0 ms, 717 documents examined; the configured database has not received the performance index, so this is currently a collection scan.
+
+The Mongo client now emits one structured `lowblock.db.query` event for each non-handshake command with operation name, duration, result count (when provided), and failure status. This makes per-query timing available in deployment logs without recording query contents or credentials.
 
 These results prove the diagnostic path works, but they are not production measurements. Run `npm run migrate:foundation` and then rerun the explain script against the deployment database after reviewing the index plan.
 
@@ -36,3 +41,10 @@ The application now emits LCP, INP, CLS, long-task, navigation, and load telemet
 `Server-Timing: db=0.39 ms, leaderboard=1257.15 ms, total=1257.84 ms, serialize=1.71 ms`
 
 The response reported `X-Response-Bytes: 331458` and `Cache-Control: public, s-maxage=30, stale-while-revalidate=60`. This confirms the instrumentation is live and also confirms that the leaderboard query remains the dominant local bottleneck.
+
+## Validation
+
+- `npm test`: 12 files and 33 tests passed.
+- `npm run lint`: passed (`tsc --noEmit`).
+- `npm run build`: passed with valid audit environment values; 55 static pages generated.
+- `npm run explain:performance`: passed against the configured database and recorded the detailed, club, and current-user plans above.

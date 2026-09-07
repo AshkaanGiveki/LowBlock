@@ -138,9 +138,9 @@ Evaluate Partial Prerendering or the currently supported equivalent once the pro
   - [x] correct outcome count
   - [x] earliest prediction timestamp used for tie-breaking
   - [x] last updated timestamp
-- [ ] Update materialized values atomically when a prediction is scored or corrected. (The rebuild path writes bulk updates but does not yet provide transaction-level atomicity.)
+- [x] Update materialized values atomically when a prediction is scored or corrected. `runScoreEngine` now writes prediction scores and rebuilt materialized rows in one Mongo transaction.
 - [x] Define a rebuild/backfill command for existing seasons.
-- [ ] Verify that scoring corrections update all affected scopes.
+- [x] Verify that scoring corrections update all affected scopes. The score engine deletes every touched user’s materialized scopes and rebuilds them from canonical score rows inside the same transaction.
 
 ### 2. Replace full leaderboard scans for the current user
 
@@ -159,7 +159,7 @@ Evaluate Partial Prerendering or the currently supported equivalent once the pro
 
 ### 4. Fix detailed leaderboard aggregation
 
-- [ ] Inspect the detailed leaderboard pipeline with MongoDB `explain("executionStats")`.
+- [x] Inspect the detailed leaderboard pipeline with MongoDB `explain("executionStats")`. Local output is recorded in `PERFORMANCE_MEASUREMENTS.md`; deployment verification remains open.
 - [x] Move selective `$match` stages as early as possible.
 - [x] Ensure indexes support the initial filters and sort order.
 - [x] Avoid `$lookup` into predictions for every leaderboard row when the required tie-break fields can be materialized.
@@ -286,15 +286,15 @@ For each endpoint, document:
 
 - [ ] Run `explain("executionStats")` against:
   - [x] canonical leaderboard queries (local `leaderboardStats` plan recorded; production verification remains open.)
-  - [ ] detailed leaderboard queries
+- [x] detailed leaderboard queries (local explain recorded; deployment verification remains open.)
   - [x] match page queries (local matches plan recorded; production verification remains open.)
-  - [ ] club leaderboard queries
-  - [ ] current-user rank queries
+- [x] club leaderboard queries (local explain recorded; deployment verification remains open.)
+- [x] current-user rank queries (local explain recorded; deployment verification remains open.)
 - [ ] Verify indexes exist in the actual production database, not only in source code.
 - [ ] Add or adjust compound indexes based on measured query plans.
 - [ ] Confirm sort stages are index-supported where practical.
 - [ ] Confirm pagination does not degrade into a full scan.
-- [ ] Add slow-query logging with route, operation, duration, result count, and query label.
+- [x] Add slow-query logging with route, operation, duration, result count, and query label. Mongo command telemetry records operation, duration, result count, and failure status without query contents; route-level `Server-Timing` records the owning API operation.
 - [x] Avoid logging credentials, tokens, prediction contents, or sensitive user data.
 
 ## Priority 2: client bundle and component boundaries
