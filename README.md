@@ -152,6 +152,8 @@ Never commit `.env.local`, API tokens, MongoDB credentials, or session secrets.
 | `CRON_SECRET` | Secret protecting scheduled sync endpoints |
 | `TELEGRAM_BOT_TOKEN` | Server-only Telegram Bot API token used for Mini App verification and delivery |
 | `TELEGRAM_BOT_USERNAME` | Telegram bot username used for account-link deep links |
+| `TELEGRAM_ADMIN_CHAT_ID` | Exact Telegram chat ID allowed to run the private `/sync_now` result-sync command |
+| `TELEGRAM_WEBHOOK_SECRET` | Secret token configured with Telegram’s webhook and required for the private admin command |
 | `BALE_BOT_TOKEN` | Server-only Bale bot token used for Mini App verification |
 | `BALE_BOT_USERNAME` | Bale bot username used for account-link deep links |
 | `QSTASH_TOKEN` | Server-only Upstash QStash publishing token |

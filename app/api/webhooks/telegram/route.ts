@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { consumeLinkToken } from "@/lib/platform/identity";
 import { ObjectId } from "mongodb";
+import { syncFootballApi } from "@/lib/football/api-sports/sync";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,12 @@ export async function POST(req: Request) {
   const providerUserId = message?.from?.id;
   if (chatId == null || providerUserId == null) return NextResponse.json({ ok: true });
   const from = message?.from ?? {};
+
+  if (isCommand(text, "sync_now") && env.TELEGRAM_ADMIN_CHAT_ID === String(chatId)) {
+    if (!process.env.TELEGRAM_WEBHOOK_SECRET || req.headers.get("x-telegram-bot-api-secret-token") !== process.env.TELEGRAM_WEBHOOK_SECRET) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    await handleAdminSync(String(chatId));
+    return NextResponse.json({ ok: true });
+  }
 
   if (text.startsWith("/start ")) {
     const token = text.slice(7).trim();
@@ -48,6 +55,17 @@ export async function POST(req: Request) {
 
 function commandName(text: string) { return text.match(/^\/([a-z0-9_]+)(?:@[a-z0-9_]+)?(?:\s|$)/i)?.[1]?.toLowerCase() ?? ""; }
 function isCommand(text: string, command: string) { return commandName(text) === command; }
+
+async function handleAdminSync(chatId: string) {
+  await send(chatId, "⏳ Sync started. I’ll refresh football results and rebuild the leaderboards when it finishes.");
+  try {
+    const result = await syncFootballApi();
+    await send(chatId, `✅ Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}.`);
+  } catch (error) {
+    console.error("telegram_admin_sync_failed", { chatId, error: error instanceof Error ? error.message : String(error) });
+    await send(chatId, "❌ Sync failed. Check the server logs for details.");
+  }
+}
 
 type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; style?: "danger" | "success" | "primary"; web_app?: { url: string }; url?: string }>> };
 

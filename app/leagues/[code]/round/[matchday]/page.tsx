@@ -9,6 +9,8 @@ import { BackButton } from "@/components/BackButton";
 import { LeagueRoundLeaderboard } from "@/components/LeagueRoundLeaderboard";
 import { RoundMatchGrid } from "@/components/RoundMatchGrid";
 import { LeagueLogo } from "@/components/LeagueLogo";
+import { LeaguePageSwitcher } from "@/components/LeaguePageSwitcher";
+import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +109,7 @@ export default async function RoundPage({
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-3xl">
         <BackButton />
+        <LeaguePageSwitcher currentCode={code} />
         <div className="relative overflow-hidden rounded-3xl border border-white/[.08] bg-[radial-gradient(circle_at_85%_0%,rgba(32,184,121,.2),transparent_38%),linear-gradient(145deg,#14241b,#0b100d)] p-6 md:p-9">
           <div className="flex min-w-0 items-center gap-4">
             <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-white/10 bg-[#0b120e] p-2 shadow-inner">
@@ -128,7 +131,7 @@ export default async function RoundPage({
             </div>
           </div>
         </div>
-        <RoundMatchGrid
+        <Suspense fallback={<div className="mt-6 h-72 animate-pulse rounded-3xl bg-white/[.06]" />}><RoundMatchGrid
           focusMatchId={focusMatchId}
           fixtures={matches.map((match) => ({
             providerMatchId: match.providerMatchId,
@@ -139,8 +142,8 @@ export default async function RoundPage({
             homeTeam: match.homeTeam,
             awayTeam: match.awayTeam,
           }))}
-        />
-        <LeagueRoundLeaderboard players={players} />
+        /></Suspense>
+        <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-3xl bg-white/[.06]" />}><LeagueRoundLeaderboard players={players} /></Suspense>
       </div>
     </main>
   );

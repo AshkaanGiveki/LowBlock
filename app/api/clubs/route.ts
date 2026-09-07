@@ -5,6 +5,7 @@ import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { createClub, currentMembership } from "@/lib/domain/clubs";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getLatestSeasonStartYear } from "@/lib/football/data";
 
 const body = z.object({
   name: z.string().trim().min(2).max(60),
@@ -35,8 +36,8 @@ export async function GET(req: Request) {
   let performance = null;
   let leaderboard: any[] = [];
   if (membership && club) {
-    const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
-    const rows = await getCanonicalLeaderboard(db, { clubId: membership.clubId, seasonStartYear: lifetime || weekly ? null : year, weekly, weeklyOffset }, 100);
+    const year = await getLatestSeasonStartYear();
+    const rows = await getCanonicalLeaderboard(db, { clubId: membership.clubId, seasonStartYear: lifetime || weekly ? null : year, weekly, weeklyOffset }, 20);
     leaderboard = rows.slice(0, 8);
     const mine = rows.find((row) => row.userId === userId);
     const totals = await db.collection<any>("predictionScores").aggregate([

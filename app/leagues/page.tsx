@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Competitions | LowBlock",
   description: "Explore every league and tournament available on LowBlock.",
 };
+export const revalidate = 1800;
 
 export default function LeaguesPage() {
   return (

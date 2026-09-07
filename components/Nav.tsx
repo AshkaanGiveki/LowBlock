@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ChevronDown,
@@ -27,23 +29,12 @@ export function Nav() {
   const pathname = usePathname();
   const { language, setLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [isDefendingChampion, setIsDefendingChampion] = useState(false);
-  const [clubImage, setClubImage] = useState<string | null>(null);
+  const { data: navData } = useQuery({ queryKey: ["navigation-context"], queryFn: async () => { const [meResponse, clubResponse] = await Promise.all([fetch("/api/auth/me"), fetch("/api/clubs")]); return { me: await meResponse.json(), club: await clubResponse.json() }; }, staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const avatar = navData?.me?.user?.avatarUrl ?? null;
+  const isDefendingChampion = Boolean(navData?.me?.user?.isDefendingChampion);
+  const clubImage = navData?.club?.club?.imageUrl ?? null;
   const fa = language === "fa";
   useEffect(() => setLoading(false), [pathname]);
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/auth/me").then((response) => response.json()),
-      fetch("/api/clubs").then((response) => response.json()),
-    ])
-      .then(([me, club]) => {
-        setAvatar(me.user?.avatarUrl ?? null);
-        setIsDefendingChampion(Boolean(me.user?.isDefendingChampion));
-        setClubImage(club.club?.imageUrl ?? null);
-      })
-      .catch(() => undefined);
-  }, [pathname]);
   const active = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const navIcon = (Icon: typeof Home, selected: boolean) => (
@@ -59,9 +50,11 @@ export function Nav() {
     active("/club") && clubImage ? (
       <span className="club-crest-glow relative z-10 grid h-8 w-8 place-items-center rounded-full p-[2px]">
         <span className="grid h-full w-full place-items-center overflow-hidden rounded-full bg-[#101812] p-1">
-          <img
+          <Image
             src={clubImage}
             alt=""
+            width={32}
+            height={32}
             className="h-full w-full rounded-full object-cover"
           />
         </span>
@@ -74,6 +67,7 @@ export function Nav() {
       <header className="fixed inset-x-0 top-0 z-50 h-[70px] border-b border-white/[.07] bg-[#080b0a]/85 backdrop-blur-2xl">
         <div className="relative mx-auto h-full max-w-7xl px-5 md:px-8">
           <LanguageMenu language={language} setLanguage={setLanguage} fa={fa} />
+          <DesktopUtilityBar avatar={avatar} language={language} setLanguage={setLanguage} fa={fa} />
         </div>
         {loading && (
           <motion.span
@@ -84,11 +78,12 @@ export function Nav() {
           />
         )}
       </header>
-      <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around lg:hidden">
+      <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around xl:hidden">
         {routes.map(({ href, icon: Component, label }) => (
           <Link
             key={href}
             href={href}
+            prefetch={href !== "/club"}
             aria-label={
               fa
                 ? (
@@ -128,13 +123,11 @@ export function Nav() {
             />
           )}{" "}
           {avatar ? (
-            <motion.img
+            <motion.div
               animate={{ y: active("/profile") ? 2 : 0 }}
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
-              src={avatar}
-              alt="Profile"
               className="relative z-10 h-7 w-7 rounded-full object-cover"
-            />
+            ><Image src={avatar} alt="Profile" width={28} height={28} className="h-full w-full rounded-full object-cover" /></motion.div>
           ) : (
             navIcon(UserRound, active("/profile"))
           )}
@@ -160,7 +153,7 @@ function LanguageMenu({
   ];
   const current = options.find((option) => option.code === language)!;
   return (
-    <div className="language-menu absolute top-1/2 -translate-y-1/2">
+    <div className="mobile-language-menu language-menu absolute top-1/2 -translate-y-1/2">
       <button
         type="button"
         aria-label="Change language"
@@ -222,4 +215,8 @@ function LanguageMenu({
       </AnimatePresence>
     </div>
   );
+}
+
+function DesktopUtilityBar({ avatar, language, setLanguage, fa }: { avatar: string | null; language: "fa" | "en"; setLanguage: (value: "fa" | "en") => void; fa: boolean }) {
+  return <div className="desktop-utility-only"><Link href="/profile" className="desktop-user-chip"><UserAvatar name={fa ? "پروفایل" : "Profile"} avatarUrl={avatar} className="h-8 w-8 text-[10px]" /><span><small>{fa ? "حساب شما" : "YOUR ACCOUNT"}</small><b>{fa ? "پروفایل من" : "My profile"}</b></span><ChevronDown size={14} /></Link><button type="button" className="desktop-utility-button" onClick={() => setLanguage(fa ? "en" : "fa")} aria-label={fa ? "Switch to English" : "تغییر زبان به فارسی"}>{fa ? "EN" : "فا"}</button><Link href="/help" className="desktop-utility-button" aria-label={fa ? "راهنما" : "Help"}><Globe2 size={17} /></Link></div>;
 }

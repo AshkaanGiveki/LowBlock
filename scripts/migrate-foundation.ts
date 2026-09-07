@@ -1,10 +1,11 @@
-import { ensureIndexes, getDb } from "../lib/db/mongo";
+import { ensureIndexes, ensurePerformanceIndexes, getDb } from "../lib/db/mongo";
 import { env } from "../lib/env";
 
 async function main() {
   if (!env.MONGODB_URI) throw new Error("MONGODB_URI is required");
   const db = await getDb();
   await ensureIndexes();
+  await ensurePerformanceIndexes();
   const matches = db.collection<any>("matches");
   const before = { users: await db.collection("users").countDocuments(), matches: await matches.countDocuments(), predictions: await db.collection("predictions").countDocuments(), scores: await db.collection("predictionScores").countDocuments() };
   const cursor = matches.find({ matchday: { $gt: 0 } }, { projection: { leagueCode: 1, seasonStartYear: 1, matchday: 1, kickoffAt: 1, status: 1 } });
@@ -30,4 +31,3 @@ async function main() {
   console.log(JSON.stringify({ before, after, preserved: Object.keys(before).every(key => before[key as keyof typeof before] === after[key as keyof typeof after]), rounds: roundOps.size }, null, 2));
 }
 main().catch(error => { console.error(error); process.exit(1); });
-

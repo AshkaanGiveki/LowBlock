@@ -19,7 +19,7 @@ import { BackButton } from "@/components/BackButton";
 import { PublicPredictionHistory } from "./PublicPredictionHistory";
 import { PublicAwardsSection } from "@/components/PublicAwardsSection";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
