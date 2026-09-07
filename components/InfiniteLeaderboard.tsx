@@ -15,7 +15,7 @@ export function InfiniteLeaderboard({ initialRows, seasonStartYear, leagueCode, 
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState(initialRows.at(-1)?.cursor ?? null);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(initialRows.length < 100);
+  const [done, setDone] = useState(initialRows.length === 0 || !initialRows.at(-1)?.cursor);
   const sentinel = useRef<HTMLDivElement>(null);
   const params = useMemo(() => { const query = new URLSearchParams({ limit: "40" }); if (weekly) { query.set("weekly", "true"); if (weekOffset) query.set("week", "previous"); } else if (!lifetime) query.set("seasonStartYear", String(seasonStartYear)); if (leagueCode) query.set("leagueCode", leagueCode); return query; }, [seasonStartYear, leagueCode, lifetime, weekly, weekOffset]);
   useEffect(() => { const node = sentinel.current; if (!node) return; const observer = new IntersectionObserver(entries => { if (entries[0]?.isIntersecting && cursor && !loading && !done) loadMore(); }, { rootMargin: "500px" }); observer.observe(node); return () => observer.disconnect(); }, [cursor, loading, done]);

@@ -1,5 +1,5 @@
 import { env } from "@/lib/env";
-import { ensureIndexes, getDb } from "@/lib/db/mongo";
+import { ensureIndexes, ensurePerformanceIndexes, getDb } from "@/lib/db/mongo";
 import { LEAGUES, isQualityInternationalFriendly } from "@/lib/football/leagues";
 import { apiRequest, remainingApiRequests } from "./client";
 import { runScoreEngine } from "@/lib/scoring/scoreEngine";
@@ -38,11 +38,11 @@ async function saveDailyFixtures(dateKey: string, db: Awaited<ReturnType<typeof 
   return { total, listRequests: 1 };
 }
 
-export async function syncFootballApiDate(dateKey: string) { if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) throw new Error("INVALID_UTC_DATE"); const db = await getDb(); await ensureIndexes(); const result = await saveDailyFixtures(dateKey, db); const scoreEngine = await runScoreEngine(); invalidateCompetitionCaches(); return { ...result, scoreEngine }; }
+export async function syncFootballApiDate(dateKey: string) { if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) throw new Error("INVALID_UTC_DATE"); const db = await getDb(); await ensureIndexes(); await ensurePerformanceIndexes(); const result = await saveDailyFixtures(dateKey, db); const scoreEngine = await runScoreEngine(); invalidateCompetitionCaches(); return { ...result, scoreEngine }; }
 
 export async function syncFootballApi() {
   if (!env.MONGODB_URI) throw new Error("MONGODB_URI is required");
-  const db = await getDb(); await ensureIndexes(); const startedAt = new Date(); let listRequests = 0, detailRequests = 0, total = 0;
+  const db = await getDb(); await ensureIndexes(); await ensurePerformanceIndexes(); const startedAt = new Date(); let listRequests = 0, detailRequests = 0, total = 0;
   const byLeague = new Map<string, Map<number, Fixture>>(); for (const league of LEAGUES) byLeague.set(league.code, new Map());
   if (env.FOOTBALL_API_MODE === "season") { for (const league of LEAGUES) { const result = await apiRequest<Fixture>({ league: String(league.apiLeagueId), season: String(env.FOOTBALL_API_SEASON ?? new Date().getUTCFullYear()), timezone: "UTC" }); listRequests++; for (const fixture of result.response) if (league.code !== "FRIENDLY" || isQualityInternationalFriendly(fixture.teams.home.name, fixture.teams.away.name)) byLeague.get(league.code)?.set(fixture.fixture.id, fixture); } }
   else {

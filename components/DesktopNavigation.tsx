@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   CircleHelp,
@@ -29,23 +30,12 @@ const items = [
 export function DesktopNavigation() {
   const pathname = usePathname();
   const { language, setLanguage, t } = useLanguage();
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [isDefendingChampion, setIsDefendingChampion] = useState(false);
-  const [clubImage, setClubImage] = useState<string | null>(null);
+  const { data: navData } = useQuery({ queryKey: ["navigation-context"], queryFn: async () => { const [meResponse, clubResponse] = await Promise.all([fetch("/api/auth/me"), fetch("/api/clubs")]); return { me: await meResponse.json(), club: await clubResponse.json() }; }, staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const avatar = navData?.me?.user?.avatarUrl ?? null;
+  const isDefendingChampion = Boolean(navData?.me?.user?.isDefendingChampion);
+  const clubImage = navData?.club?.club?.imageUrl ?? null;
   const fa = language === "fa";
   const authPage = pathname === "/login" || pathname === "/signup";
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/auth/me").then((response) => response.json()),
-      fetch("/api/clubs").then((response) => response.json()),
-    ])
-      .then(([me, club]) => {
-        setAvatar(me.user?.avatarUrl ?? null);
-        setIsDefendingChampion(Boolean(me.user?.isDefendingChampion));
-        setClubImage(club.club?.imageUrl ?? null);
-      })
-      .catch(() => undefined);
-  }, [pathname]);
   const active = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   if (authPage) return null;
@@ -74,7 +64,7 @@ export function DesktopNavigation() {
             >
               <span className="desktop-rail-link-icon">
                 {href === "/club" && active(href) && clubImage ? (
-                  <img src={clubImage} alt="" />
+                  <Image src={clubImage} alt="" width={24} height={24} />
                 ) : (
                   <Icon size={19} strokeWidth={active(href) ? 2.5 : 1.8} />
                 )}

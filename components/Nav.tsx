@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ChevronDown,
@@ -27,23 +29,12 @@ export function Nav() {
   const pathname = usePathname();
   const { language, setLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [isDefendingChampion, setIsDefendingChampion] = useState(false);
-  const [clubImage, setClubImage] = useState<string | null>(null);
+  const { data: navData } = useQuery({ queryKey: ["navigation-context"], queryFn: async () => { const [meResponse, clubResponse] = await Promise.all([fetch("/api/auth/me"), fetch("/api/clubs")]); return { me: await meResponse.json(), club: await clubResponse.json() }; }, staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const avatar = navData?.me?.user?.avatarUrl ?? null;
+  const isDefendingChampion = Boolean(navData?.me?.user?.isDefendingChampion);
+  const clubImage = navData?.club?.club?.imageUrl ?? null;
   const fa = language === "fa";
   useEffect(() => setLoading(false), [pathname]);
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/auth/me").then((response) => response.json()),
-      fetch("/api/clubs").then((response) => response.json()),
-    ])
-      .then(([me, club]) => {
-        setAvatar(me.user?.avatarUrl ?? null);
-        setIsDefendingChampion(Boolean(me.user?.isDefendingChampion));
-        setClubImage(club.club?.imageUrl ?? null);
-      })
-      .catch(() => undefined);
-  }, [pathname]);
   const active = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const navIcon = (Icon: typeof Home, selected: boolean) => (
@@ -59,9 +50,11 @@ export function Nav() {
     active("/club") && clubImage ? (
       <span className="club-crest-glow relative z-10 grid h-8 w-8 place-items-center rounded-full p-[2px]">
         <span className="grid h-full w-full place-items-center overflow-hidden rounded-full bg-[#101812] p-1">
-          <img
+          <Image
             src={clubImage}
             alt=""
+            width={32}
+            height={32}
             className="h-full w-full rounded-full object-cover"
           />
         </span>
@@ -128,13 +121,11 @@ export function Nav() {
             />
           )}{" "}
           {avatar ? (
-            <motion.img
+            <motion.div
               animate={{ y: active("/profile") ? 2 : 0 }}
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
-              src={avatar}
-              alt="Profile"
               className="relative z-10 h-7 w-7 rounded-full object-cover"
-            />
+            ><Image src={avatar} alt="Profile" width={28} height={28} className="h-full w-full rounded-full object-cover" /></motion.div>
           ) : (
             navIcon(UserRound, active("/profile"))
           )}

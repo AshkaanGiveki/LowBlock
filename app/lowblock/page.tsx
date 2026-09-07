@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { LeaderboardExplorer } from "@/components/LeaderboardExplorer";
 import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
+import { getLatestSeasonStartYear } from "@/lib/football/data";
 import { BarChart3, Sparkles, Trophy, Users } from "lucide-react";
 
 export const metadata = { title: "Global Football Prediction Leaderboard", description: "Compare football prediction points with LowBlock players around the world and across major leagues.", alternates: { canonical: "/lowblock" } };
@@ -17,9 +19,8 @@ export default async function LowBlockPage({ searchParams }: { searchParams: Pro
   const lifetime = query.scope === "lifetime";
   const league = LEAGUES.find((item) => item.code === query.league);
   const db = await getDb();
-  const year = Number((await db.collection("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
-  const rows = await getCanonicalLeaderboard(db, { seasonStartYear: lifetime || weekly ? null : year, leagueCode: league?.code ?? null, weekly, weeklyOffset: weekOffset }, 100);
-  const [usersCount, picksCount, roundsCount, me] = await Promise.all([
+  const year = await getLatestSeasonStartYear();
+  const [rows, usersCount, picksCount, roundsCount, me] = await Promise.all([getCanonicalLeaderboard(db, { seasonStartYear: lifetime || weekly ? null : year, leagueCode: league?.code ?? null, weekly, weeklyOffset: weekOffset }, 20),
     db.collection("users").countDocuments(),
     db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
     db.collection("rounds").countDocuments({ status: "FINAL" }),
@@ -32,7 +33,7 @@ export default async function LowBlockPage({ searchParams }: { searchParams: Pro
       <div className="lowblock-command-orbit" aria-hidden="true"><Trophy size={42} /></div>
       <div className="lowblock-metric-grid mt-8 grid grid-cols-3 gap-3"><Metric icon={<Users size={17} />} value={usersCount} fa="کاربر" en="Users" /><Metric icon={<BarChart3 size={17} />} value={picksCount} fa="پیش‌بینی" en="Predictions" /><Metric icon={<Trophy size={17} />} value={roundsCount} fa="راند نهایی" en="Final rounds" /></div>
     </section>
-    <LeaderboardExplorer initialRows={rows} seasonStartYear={year} leagueCode={league?.code} lifetime={lifetime} weekly={weekly} weekOffset={weekOffset} me={me} />
+    <Suspense fallback={<div className="mt-5 h-96 animate-pulse rounded-3xl bg-white/[.06]" />}><LeaderboardExplorer initialRows={rows} seasonStartYear={year} leagueCode={league?.code} lifetime={lifetime} weekly={weekly} weekOffset={weekOffset} me={me} /></Suspense>
   </div></main>;
 }
 

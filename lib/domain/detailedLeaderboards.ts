@@ -1,12 +1,14 @@
 import { ObjectId, type Db } from "mongodb";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { DEFAULT_CLUB_LEAGUE_CODES, GLOBAL_LEAGUE_CODES } from "@/lib/football/leagues";
+import { getSnapshotRanks, snapshotScope } from "@/lib/domain/rankSnapshots";
 
 export type DetailedSort = "rank" | "username" | "predictions" | "exact" | "correct" | "wrongResults" | "misses" | "points" | "average" | "awards";
 export type DetailedScope = { clubId?: string | null; seasonStartYear?: number | null; weekly?: boolean; weeklyOffset?: number; page?: number; pageSize?: number; sort?: DetailedSort; direction?: "asc" | "desc"; viewerUserId?: string | null };
 export type DetailedRow = { userId: string; username: string; avatarUrl: string | null; clubId: string | null; clubName: string | null; predictions: number; exact: number; correct: number; wrongResults: number; misses: number; points: number; average: number; awards: number; rank: number; previousRank: number | null; placeChange: number };
 
 const sortFields: DetailedSort[] = ["rank", "username", "predictions", "exact", "correct", "wrongResults", "misses", "points", "average", "awards"];
+const detailedCache = new Map<string, { expiresAt: number; value: any }>();
 export function normalizeDetailedSort(value: string | null): DetailedSort { return sortFields.includes(value as DetailedSort) ? value as DetailedSort : "rank"; }
 
 function iranDayStart(date: Date) { return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())); }
@@ -40,7 +42,12 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
     matchFilter.leagueCode = { $in: GLOBAL_LEAGUE_CODES };
   }
   const totalMatches = await db.collection<any>("matches").countDocuments(matchFilter);
-  const rows = await db.collection<any>("predictionScores").aggregate([
+  const directScoreMatch: Record<string, unknown> = { kickoffAt: match["fixture.kickoffAt"], ...(scope.seasonStartYear != null ? { seasonStartYear: scope.seasonStartYear } : {}), ...(scope.clubId ? { clubIdAtLock: scope.clubId } : {}), ...(scope.clubId ? { leagueCode: matchFilter.leagueCode } : { leagueCode: GLOBAL_LEAGUE_CODES }) };
+  let rows = await db.collection<any>("predictionScores").aggregate([
+    { $match: directScoreMatch },
+    { $group: { _id: "$userId", points: { $sum: "$points" }, predictions: { $sum: 1 }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, correct: { $sum: { $cond: ["$correctOutcome", 1, 0] } } } },
+  ]).toArray();
+  if (!rows.length) rows = await db.collection<any>("predictionScores").aggregate([
     { $lookup: { from: "matches", localField: "matchId", foreignField: "providerMatchId", as: "fixture" } },
     { $unwind: "$fixture" },
     { $match: match },
@@ -62,9 +69,11 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
 }
 
 export async function getDetailedLeaderboard(db: Db, scope: DetailedScope) {
-  const now = new Date(); const sort = scope.sort ?? "rank"; const direction = scope.direction ?? "desc"; const pageSize = Math.min(Math.max(scope.pageSize ?? 25, 10), 50); const page = Math.max(scope.page ?? 1, 1);
-  const current = await aggregateRows(db, scope, now); const yesterday = await aggregateRows(db, scope, iranDayStart(now));
-  const currentSorted = [...current].sort((a, b) => comparison(a, b, sort, direction)); const previousSorted = [...yesterday].sort((a, b) => comparison(a, b, sort, direction)); const previousRanks = new Map(previousSorted.map((row, index) => [row.userId, index + 1]));
+  const now = new Date(); const sort = scope.sort ?? "rank"; const direction = scope.direction ?? "desc"; const pageSize = Math.min(Math.max(scope.pageSize ?? 25, 10), 50); const page = Math.max(scope.page ?? 1, 1); const cacheKey = JSON.stringify({ clubId: scope.clubId ?? null, seasonStartYear: scope.seasonStartYear ?? null, weekly: Boolean(scope.weekly), weeklyOffset: scope.weeklyOffset ?? 0, sort, direction }); const cached = detailedCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) { const cachedRows = cached.value.rows as DetailedRow[]; const start = (page - 1) * pageSize; return { ...cached.value, rows: cachedRows.slice(start, start + pageSize), page, pageSize, pages: Math.max(1, Math.ceil(cachedRows.length / pageSize)), viewerRow: scope.viewerUserId ? cachedRows.find(row => row.userId === scope.viewerUserId) ?? null : null }; }
+  const current = await aggregateRows(db, scope, now); const snapshotRanks = await getSnapshotRanks(db, snapshotScope(scope), iranDayStart(now)); const yesterday = snapshotRanks.size ? [] : await aggregateRows(db, scope, iranDayStart(now));
+  const currentSorted = [...current].sort((a, b) => comparison(a, b, sort, direction)); const previousSorted = [...yesterday].sort((a, b) => comparison(a, b, sort, direction)); const previousRanks = snapshotRanks.size ? snapshotRanks : new Map(previousSorted.map((row, index) => [row.userId, index + 1]));
   const ranked = currentSorted.map((row, index) => { const rank = index + 1; const previousRank = previousRanks.get(row.userId) ?? null; return { ...row, rank, previousRank, placeChange: previousRank == null ? 0 : previousRank - rank }; });
+  const result = { rows: ranked, viewerRow: null, total: ranked.length, page: 1, pageSize: ranked.length || 1, pages: 1, sort, direction };
+  detailedCache.set(cacheKey, { expiresAt: Date.now() + 15_000, value: result });
   const start = (page - 1) * pageSize; return { rows: ranked.slice(start, start + pageSize), viewerRow: scope.viewerUserId ? ranked.find(row => row.userId === scope.viewerUserId) ?? null : null, total: ranked.length, page, pageSize, pages: Math.max(1, Math.ceil(ranked.length / pageSize)), sort, direction };
 }

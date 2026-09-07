@@ -35,6 +35,12 @@ const getCachedMatches = unstable_cache(async (leagueCode: string, matchday: num
   return db.collection<MatchRecord>("matches").find(query).sort({ kickoffAt: 1 }).limit(limit).toArray();
 }, ["lowblock-matches"], { revalidate: 60, tags: ["matches"] });
 
+export const getLatestSeasonStartYear = unstable_cache(async () => {
+  const db = await getDb();
+  const latest = await db.collection<{ seasonStartYear?: number }>("matches").findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } });
+  return Number(latest?.seasonStartYear ?? new Date().getUTCFullYear());
+}, ["lowblock-latest-season"], { revalidate: 900, tags: ["matches", "seasons"] });
+
 export async function getMatches(filters: { leagueCode?: string; matchday?: number; limit?: number } = {}) {
   const now = Date.now();
   return getCachedMatches(filters.leagueCode ?? "", filters.matchday ?? null, filters.limit ?? 50, now - 24 * 60 * 60 * 1000, now + 14 * 864e5);
