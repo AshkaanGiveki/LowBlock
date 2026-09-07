@@ -16,7 +16,8 @@
     "migrate:foundation": "tsx scripts/migrate-foundation.ts",
     "rebuild:leaderboards": "tsx scripts/rebuild-leaderboards.ts",
     "validate:env": "tsx scripts/validate-env.ts",
-    "explain:performance": "tsx scripts/explain-performance.ts"
+    "explain:performance": "tsx scripts/explain-performance.ts",
+    "measure:performance": "tsx scripts/measure-performance.ts"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.5.0",

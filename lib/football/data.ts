@@ -8,7 +8,7 @@ export type MatchRecord = {
   providerMatchId: string;
   leagueCode: string;
   matchday: number;
-  kickoffAt: Date;
+  kickoffAt: Date | string;
   status: string;
   elapsed?: number | null;
   homeGoals: number | null;
@@ -85,8 +85,9 @@ export async function getMatchesPage(limit = 30, cursor?: MatchPageCursor | null
   const matches = await db.collection<MatchRecord>("matches").aggregate<MatchRecord>(pipeline).toArray();
   const hasMore = matches.length > pageSize;
   const page = hasMore ? matches.slice(0, -1) : matches;
-  const last = page.at(-1);
-  return { matches: page, hasMore, nextCursor: last ? { globalPriority: (GLOBAL_LEAGUE_CODES.includes(last.leagueCode as never) ? 0 : 1) as 0 | 1, kickoffAt: new Date(last.kickoffAt).toISOString(), providerMatchId: last.providerMatchId } : null };
+  const publicPage = page.map((match) => ({ provider: match.provider, providerMatchId: match.providerMatchId, leagueCode: match.leagueCode, matchday: match.matchday, kickoffAt: new Date(match.kickoffAt).toISOString(), status: match.status, elapsed: match.elapsed ?? null, homeGoals: match.homeGoals, awayGoals: match.awayGoals, homeTeam: match.homeTeam, awayTeam: match.awayTeam, seasonStartYear: match.seasonStartYear }));
+  const last = publicPage.at(-1);
+  return { matches: publicPage, hasMore, nextCursor: last ? { globalPriority: (GLOBAL_LEAGUE_CODES.includes(last.leagueCode as never) ? 0 : 1) as 0 | 1, kickoffAt: new Date(last.kickoffAt).toISOString(), providerMatchId: last.providerMatchId } : null };
 }
 
 export async function getMatch(providerMatchId: string) {

@@ -82,6 +82,7 @@ export function Nav() {
           <Link
             key={href}
             href={href}
+            prefetch={href !== "/club"}
             aria-label={
               fa
                 ? (

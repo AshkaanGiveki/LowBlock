@@ -14,6 +14,17 @@ export function timingHeaders(timings: TimingEntry[], extra: HeadersInit = {}) {
   return headers;
 }
 
+export function addSerializationTiming<T>(payload: T, timings: TimingEntry[]) {
+  const started = performance.now();
+  const body = JSON.stringify(payload);
+  timings.push({ name: "serialize", durationMs: Math.round((performance.now() - started) * 100) / 100 });
+  return { body, bytes: new TextEncoder().encode(body).byteLength };
+}
+
 export function jsonWithTiming<T>(payload: T, timings: TimingEntry[], init?: ResponseInit) {
-  return NextResponse.json(payload, { ...init, headers: timingHeaders(timings, init?.headers) });
+  const serialized = addSerializationTiming(payload, timings);
+  const headers = timingHeaders(timings, init?.headers);
+  headers.set("X-Response-Bytes", String(serialized.bytes));
+  headers.set("X-Cache-Metrics", "instrumented");
+  return new NextResponse(serialized.body, { ...init, headers: new Headers({ ...Object.fromEntries(headers.entries()), "content-type": "application/json" }) });
 }

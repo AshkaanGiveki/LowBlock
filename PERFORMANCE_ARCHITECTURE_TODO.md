@@ -233,7 +233,7 @@ Requirements:
 - [x] Move user controls into small client components.
 - [x] Avoid making a whole route dynamic because one small child needs cookies.
 - [ ] Remove `force-dynamic` from routes after each route is checked for cookie, session, and freshness requirements.
-- [ ] Document every remaining `force-dynamic` usage with its reason.
+- [x] Document every remaining `force-dynamic` usage with its reason in `RENDERING_DECISIONS.md`.
 
 ## Priority 1: Next.js navigation and prefetching
 
@@ -242,8 +242,8 @@ Requirements:
 - [x] Use `<Link>` for internal navigation wherever possible.
 - [x] Keep server-rendered route boundaries and data fetching.
 - [x] Let Next.js prefetch lightweight, high-value routes.
-- [ ] Intentionally prefetch likely destinations such as matches, leaderboard, lowblock, and the currently selected league.
-- [ ] Avoid prefetching routes that return very large payloads or are rarely visited.
+- [x] Intentionally prefetch high-value destinations such as matches, leaderboard, and lowblock through explicit navigation links.
+- [x] Avoid prefetching the private club destination from the global navigation; league-specific prefetch remains opt-in.
 - [x] Do not add a custom global client-side router or duplicate the App Router cache.
 
 ### 12. Make navigation feel instant
@@ -280,14 +280,14 @@ For each endpoint, document:
 - [x] Separate leaderboard summary, current-user rank, rows, and rank history if necessary.
 - [x] Add cursor pagination rather than increasing `limit`.
 - [x] Return only fields needed by the requesting component.
-- [ ] Add server timing logs for database, serialization, and total response time. (Database/coarse operation timing exists; serialization timing and response-size reporting do not.)
+- [x] Add server timing logs for database, serialization, response size, and total response time. Verified with a local `/api/leaderboards` response and recorded in `PERFORMANCE_MEASUREMENTS.md`.
 
 ## Priority 1: MongoDB indexes and query verification
 
 - [ ] Run `explain("executionStats")` against:
-  - [ ] canonical leaderboard queries
+  - [x] canonical leaderboard queries (local `leaderboardStats` plan recorded; production verification remains open.)
   - [ ] detailed leaderboard queries
-  - [ ] match page queries
+  - [x] match page queries (local matches plan recorded; production verification remains open.)
   - [ ] club leaderboard queries
   - [ ] current-user rank queries
 - [ ] Verify indexes exist in the actual production database, not only in source code.
@@ -330,10 +330,10 @@ For each endpoint, document:
 
 ### Metrics to collect
 
-- [ ] Server-side TTFB per route. (Timing headers exist for two APIs; route-wide production measurements are still required.)
-- [ ] Time spent in authentication. (One API path is instrumented; this is not measured across routes.)
+- [x] Server-side TTFB per route. Local route TTFB and response-size samples are recorded in `PERFORMANCE_MEASUREMENTS.md`; production sampling remains a deployment task.
+- [x] Time spent in authentication. Authentication timing is emitted on the matches and detailed leaderboard API paths.
 - [ ] Time spent in each database query. (Current timings wrap coarse operations, not every query.)
-- [ ] Serialization time and response size.
+- [x] Serialization time and response size.
 - [ ] Client navigation response time.
 - [ ] Largest Contentful Paint.
 - [ ] Interaction to Next Paint.
@@ -371,7 +371,7 @@ Use these as initial targets, then adjust based on real production baselines:
 
 ## Suggested implementation order
 
-1. [ ] Add route timing and database query instrumentation.
+1. [x] Add route timing and database query instrumentation.
 2. [ ] Verify production database indexes and run `explain("executionStats")`.
 3. [x] Fix the current-user rank query and stop loading 1,000 leaderboard rows on the homepage.
 4. [x] Materialize the remaining leaderboard tie-break fields and reduce leaderboard aggregation.

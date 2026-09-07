@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
-import { timingHeaders, withServerTiming } from "@/lib/observability/serverTiming";
+import { jsonWithTiming, withServerTiming } from "@/lib/observability/serverTiming";
 
 export const dynamic = "force-dynamic";
 
@@ -22,5 +22,5 @@ export async function GET(req: Request) {
   const rows = await withServerTiming("leaderboard", () => getCanonicalLeaderboard(db, { seasonStartYear: weekly ? null : year ? Number(year) : null, leagueCode, clubId, weekly, weeklyOffset }, limit, cursor), timings);
   const next = rows.at(-1)?.cursor;
   timings.push({ name: "total", durationMs: Math.round((performance.now() - started) * 100) / 100 });
-  return NextResponse.json({ rows, nextCursor: next ? Buffer.from(JSON.stringify(next)).toString("base64url") : null }, { headers: timingHeaders(timings, { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" }) });
+  return jsonWithTiming({ rows, nextCursor: next ? Buffer.from(JSON.stringify(next)).toString("base64url") : null }, timings, { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } });
 }
