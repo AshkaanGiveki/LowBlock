@@ -49,7 +49,12 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                 className="flex w-full items-center gap-3 p-4 text-start"
               >
                 <b className="w-6 text-[var(--muted)]">{n(index + 1)}</b>
-                <UserAvatar name={player.username} avatarUrl={player.avatarUrl} isDefendingChampion={player.isDefendingChampion} className="h-11 w-11" />
+                <UserAvatar
+                  name={player.username}
+                  avatarUrl={player.avatarUrl}
+                  isDefendingChampion={player.isDefendingChampion}
+                  className="h-11 w-11"
+                />
                 <span className="flex-1">
                   <b className="block">{player.username}</b>
                   <small className="text-[var(--muted)]">

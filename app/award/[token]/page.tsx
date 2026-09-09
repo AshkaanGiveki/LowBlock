@@ -12,37 +12,168 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 async function load(token: string) {
-  if (!/^[A-Za-z0-9_-]{6}$/.test(token) && !/^[A-Za-z0-9_-]{40,60}$/.test(token)) return null;
+  if (
+    !/^[A-Za-z0-9_-]{6}$/.test(token) &&
+    !/^[A-Za-z0-9_-]{40,60}$/.test(token)
+  )
+    return null;
   const db = await getDb();
-  const award = await db.collection<any>("awards").findOne({ shareTokenHash: hashAwardShareToken(token), scope: { $in: ["LOWBLOCK", "CLUB"] } });
+  const award = await db
+    .collection<any>("awards")
+    .findOne({
+      shareTokenHash: hashAwardShareToken(token),
+      scope: { $in: ["LOWBLOCK", "CLUB"] },
+    });
   if (!award) return null;
   const asset = getAwardAsset(award);
   if (!asset) return null;
   const viewerId = await currentUserId();
 
   const [winner, membership, scores, championId] = await Promise.all([
-    db.collection<any>("users").findOne({ _id: ObjectId.isValid(String(award.userId)) ? new ObjectId(String(award.userId)) : award.userId }, { projection: { username: 1, avatarUrl: 1 } }),
-    db.collection<any>("clubMemberships").findOne({ userId: award.userId, leftAt: null }, { sort: { joinedAt: -1 }, projection: { clubId: 1 } }),
-    db.collection<any>("predictionScores").aggregate([{ $match: { userId: award.userId, leagueCode: award.competitionId, seasonStartYear: award.seasonStartYear, matchday: award.roundNumber } }, { $group: { _id: null, points: { $sum: "$points" } } }]).toArray(),
+    db
+      .collection<any>("users")
+      .findOne(
+        {
+          _id: ObjectId.isValid(String(award.userId))
+            ? new ObjectId(String(award.userId))
+            : award.userId,
+        },
+        { projection: { username: 1, avatarUrl: 1 } },
+      ),
+    db
+      .collection<any>("clubMemberships")
+      .findOne(
+        { userId: award.userId, leftAt: null },
+        { sort: { joinedAt: -1 }, projection: { clubId: 1 } },
+      ),
+    db
+      .collection<any>("predictionScores")
+      .aggregate([
+        {
+          $match: {
+            userId: award.userId,
+            leagueCode: award.competitionId,
+            seasonStartYear: award.seasonStartYear,
+            matchday: award.roundNumber,
+          },
+        },
+        { $group: { _id: null, points: { $sum: "$points" } } },
+      ])
+      .toArray(),
     getDefendingChampionUserId(db),
   ]);
-  const club = membership?.clubId && ObjectId.isValid(String(membership.clubId)) ? await db.collection<any>("clubs").findOne({ _id: new ObjectId(String(membership.clubId)) }, { projection: { name: 1, imageUrl: 1 } }) : null;
+  const club =
+    membership?.clubId && ObjectId.isValid(String(membership.clubId))
+      ? await db
+          .collection<any>("clubs")
+          .findOne(
+            { _id: new ObjectId(String(membership.clubId)) },
+            { projection: { name: 1, imageUrl: 1 } },
+          )
+      : null;
   const now = new Date();
-  const predictedIds = viewerId ? (await db.collection<any>("predictions").find({ userId: viewerId }, { projection: { matchId: 1 } }).toArray()).map((row) => row.matchId) : [];
-  const query = { provider: "football-api", rawApiResponse: { $exists: true }, status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] }, kickoffAt: { $gt: now }, ...(viewerId ? { providerMatchId: { $nin: predictedIds } } : {}) };
-  const same = await db.collection<any>("matches").find({ ...query, leagueCode: award.competitionId }).sort({ kickoffAt: 1 }).limit(1).toArray();
-  const fallback = same.length ? same : await db.collection<any>("matches").find(query).sort({ kickoffAt: 1 }).limit(1).toArray();
+  const predictedIds = viewerId
+    ? (
+        await db
+          .collection<any>("predictions")
+          .find({ userId: viewerId }, { projection: { matchId: 1 } })
+          .toArray()
+      ).map((row) => row.matchId)
+    : [];
+  const query = {
+    provider: "football-api",
+    rawApiResponse: { $exists: true },
+    status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
+    kickoffAt: { $gt: now },
+    ...(viewerId ? { providerMatchId: { $nin: predictedIds } } : {}),
+  };
+  const same = await db
+    .collection<any>("matches")
+    .find({ ...query, leagueCode: award.competitionId })
+    .sort({ kickoffAt: 1 })
+    .limit(1)
+    .toArray();
+  const fallback = same.length
+    ? same
+    : await db
+        .collection<any>("matches")
+        .find(query)
+        .sort({ kickoffAt: 1 })
+        .limit(1)
+        .toArray();
   const match = fallback[0] ?? null;
-  const prediction = viewerId && match ? await db.collection<any>("predictions").findOne({ userId: viewerId, matchId: match.providerMatchId }) : null;
+  const prediction =
+    viewerId && match
+      ? await db
+          .collection<any>("predictions")
+          .findOne({ userId: viewerId, matchId: match.providerMatchId })
+      : null;
   return {
-    award: { competitionName: award.competitionName, competitionId: award.competitionId ?? "WEEKLY", seasonStartYear: award.seasonStartYear ?? new Date().getUTCFullYear(), roundNumber: award.roundNumber ?? 0 },
-    winner: { name: winner?.username ?? "LowBlock Player", avatarUrl: winner?.avatarUrl ?? null, isDefendingChampion: String(award.userId) === championId, clubName: club?.name ?? null, clubImageUrl: club?.imageUrl ?? null, points: Number(scores[0]?.points ?? 0) },
-    match: match ? { providerMatchId: match.providerMatchId, kickoffAt: new Date(match.kickoffAt).toISOString(), status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null,
-    initial: prediction ? { homeGoals: prediction.homeGoals, awayGoals: prediction.awayGoals } : null,
+    award: {
+      competitionName: award.competitionName,
+      competitionId: award.competitionId ?? "WEEKLY",
+      seasonStartYear: award.seasonStartYear ?? new Date().getUTCFullYear(),
+      roundNumber: award.roundNumber ?? 0,
+    },
+    winner: {
+      name: winner?.username ?? "LowBlock Player",
+      avatarUrl: winner?.avatarUrl ?? null,
+      isDefendingChampion: String(award.userId) === championId,
+      clubName: club?.name ?? null,
+      clubImageUrl: club?.imageUrl ?? null,
+      points: Number(scores[0]?.points ?? 0),
+    },
+    match: match
+      ? {
+          providerMatchId: match.providerMatchId,
+          kickoffAt: new Date(match.kickoffAt).toISOString(),
+          status: match.status,
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+        }
+      : null,
+    initial: prediction
+      ? { homeGoals: prediction.homeGoals, awayGoals: prediction.awayGoals }
+      : null,
     authenticated: Boolean(viewerId),
     imageUrl: `/api/awards/share/${token}/image`,
   };
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> { const { token } = await params; const data = await load(token); const image = `https://lowblock.ir/api/awards/share/${encodeURIComponent(token)}/image`; return { metadataBase: new URL("https://lowblock.ir"), title: data ? `${data.award.competitionName} Round Winner | LowBlock` : "LowBlock Award", description: "Think you can take the next crown? Make your prediction.", openGraph: { title: data ? `${data.award.competitionName} Round Winner | LowBlock` : "LowBlock Award", description: "Think you can take the next crown? Make your prediction.", type: "website", images: [{ url: image, width: 1200, height: 630, alt: "LowBlock award card" }] }, twitter: { card: "summary_large_image", images: [image] } }; }
-export default async function AwardSharePage({ params }: { params: Promise<{ token: string }> }) { const { token } = await params; const data = await load(token); if (!data) notFound(); return <SharedPredictionExperience token={token} {...data} />; }
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  const data = await load(token);
+  const image = `https://lowblock.ir/api/awards/share/${encodeURIComponent(token)}/image`;
+  return {
+    metadataBase: new URL("https://lowblock.ir"),
+    title: data
+      ? `${data.award.competitionName} Round Winner | LowBlock`
+      : "LowBlock Award",
+    description: "Think you can take the next crown? Make your prediction.",
+    openGraph: {
+      title: data
+        ? `${data.award.competitionName} Round Winner | LowBlock`
+        : "LowBlock Award",
+      description: "Think you can take the next crown? Make your prediction.",
+      type: "website",
+      images: [
+        { url: image, width: 1200, height: 630, alt: "LowBlock award card" },
+      ],
+    },
+    twitter: { card: "summary_large_image", images: [image] },
+  };
+}
+export default async function AwardSharePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+  const data = await load(token);
+  if (!data) notFound();
+  return <SharedPredictionExperience token={token} {...data} />;
+}

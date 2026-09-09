@@ -279,7 +279,12 @@ function RequestCard({
         href={`/u/${encodeURIComponent(username)}`}
         className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-brand/30 bg-brand/10 text-sm font-black text-brand transition hover:border-brand"
       >
-        <UserAvatar name={username} avatarUrl={request.user?.avatarUrl} isDefendingChampion={request.isDefendingChampion} className="h-full w-full text-sm" />
+        <UserAvatar
+          name={username}
+          avatarUrl={request.user?.avatarUrl}
+          isDefendingChampion={request.isDefendingChampion}
+          className="h-full w-full text-sm"
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <Link

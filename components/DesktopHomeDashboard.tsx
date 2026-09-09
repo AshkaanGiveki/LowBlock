@@ -1,23 +1,355 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, BarChart3, ChevronLeft, Flame, Target, Trophy, UsersRound } from "lucide-react";
+import {
+  ArrowLeft,
+  BarChart3,
+  ChevronLeft,
+  Flame,
+  Target,
+  Trophy,
+  UsersRound,
+} from "lucide-react";
 import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
 import { T } from "@/components/LanguageProvider";
 import { FEATURED_COMPETITION_CODES, LEAGUES } from "@/lib/football/leagues";
 import type { MatchRecord } from "@/lib/football/data";
 
-type Row = { userId: string; username: string; points: number; exact: number; predictions: number; avatarUrl: string | null; rank?: number };
+type Row = {
+  userId: string;
+  username: string;
+  points: number;
+  exact: number;
+  predictions: number;
+  avatarUrl: string | null;
+  rank?: number;
+};
 
-export function DesktopHomeDashboard({ matches, predictions, allPredicted, rows, username, rank, points, exact, clubName }: { matches: MatchRecord[]; predictions: Record<string, { homeGoals: number; awayGoals: number }>; allPredicted: boolean; rows: Row[]; username: string; rank: number | string; points: number; exact: number; clubName: string | null }) {
-  const featured = FEATURED_COMPETITION_CODES.map((code) => LEAGUES.find((league) => league.code === code)).filter(Boolean);
-  return <section className="desktop-home-only desktop-home-dashboard" aria-label="LowBlock dashboard">
-    <div className="desktop-home-heading"><div><span className="desktop-kicker"><T fa="اتاق رقابت" en="COMPETITION ROOM" /></span><h1><T fa={username ? `خوش آمدی، ${username}` : "آماده‌ای برای پیش‌بینی؟"} en={username ? `Welcome back, ${username}` : "Ready to make your pick?"} /></h1><p><T fa="بازی‌های مهم، رتبه شما و فرصت بعدی برای امتیاز گرفتن؛ همه در یک نگاه." en="Your next fixtures, rank and scoring opportunities — all in one view." /></p></div><Link href="/matches" className="desktop-outline-action"><T fa="مشاهده همه مسابقه‌ها" en="All matches" /><ArrowLeft size={15} /></Link></div>
-    <div className="desktop-home-layout">
-      <aside className="desktop-context-column"><DesktopPanel title="رده‌بندی جهانی" enTitle="Global ranking" icon={<Trophy size={16} />} action="/lowblock">{rows.length ? <><div className="desktop-podium">{rows.slice(0, 3).map((row, index) => <div className={`desktop-podium-player podium-${index + 1}`} key={row.userId}><span className="desktop-podium-medal">{index + 1}</span><div className="desktop-avatar"><span>{row.username.slice(0, 1).toUpperCase()}</span></div><b>{row.username}</b><small>{row.points.toLocaleString()} <T fa="امتیاز" en="pts" /></small></div>)}</div><div className="desktop-ranking-list">{rows.slice(3, 7).map((row, index) => <Link href="/lowblock" className={row.username === username ? "is-current" : ""} key={row.userId}><span>{index + 4}</span><b>{row.username}</b><strong>{row.points.toLocaleString()}</strong><ChevronLeft size={13} /></Link>)}</div></> : <div className="desktop-context-empty"><T fa="برای دیدن رتبه‌بندی وارد شوید." en="Sign in to see the ranking." /></div>}</DesktopPanel><DesktopPanel title="باشگاه من" enTitle="My club" icon={<UsersRound size={16} />} action="/club">{clubName ? <Link href="/club" className="desktop-club-card"><span className="desktop-club-mark"><UsersRound size={22} /></span><span><b>{clubName}</b><small><T fa="مشاهده فضای باشگاه" en="Open club space" /></small></span><ChevronLeft size={15} /></Link> : <Link href="/club/create" className="desktop-empty-action"><UsersRound size={18} /><span><b><T fa="باشگاهت را بساز" en="Build your club" /></b><small><T fa="رقابت گروهی را شروع کن" en="Start competing together" /></small></span></Link>}</DesktopPanel></aside>
-      <div className="desktop-main-column"><section className="desktop-next-match panel-surface"><div className="desktop-next-match-copy"><span className="desktop-kicker"><Target size={14} /><T fa="فرصت بعدی شما" en="YOUR NEXT OPPORTUNITY" /></span><h2><T fa="پیش‌بینی کن، امتیاز بگیر." en="Predict. Score. Climb." /></h2><p><T fa="نتیجه بازی‌های پیش‌رو را قبل از شروع ثبت کن." en="Lock in your score before the next whistle." /></p></div><div className="desktop-fixture-stage"><HomeFixtureSlider matches={matches.slice(0, 3)} predictions={predictions} allPredicted={allPredicted} /></div></section><div className="desktop-league-strip"><div className="desktop-section-heading"><div><span className="desktop-kicker"><T fa="رقابت‌ها" en="COMPETITIONS" /></span><h2><T fa="لیگ مورد علاقه‌ات را انتخاب کن" en="Choose your competition" /></h2></div><Link href="/leagues"><T fa="همه لیگ‌ها" en="View all" /><ChevronLeft size={14} /></Link></div><div className="desktop-league-cards">{featured.map((league, index) => league && <Link href={`/leagues/${league.code}`} key={league.code} className={`desktop-league-card ${index === 0 ? "is-selected" : ""}`}><Image src={league.logo} alt="" width={48} height={48} className="league-logo" /><b>{league.enName}</b><small><T fa={league.faName} en={league.enName} /></small></Link>)}</div></div><div className="desktop-bottom-grid"><DesktopStats rank={rank} points={points} exact={exact} upcoming={matches.length} /><DesktopPanel title="فرصت‌های پیش‌رو" enTitle="Upcoming fixtures" icon={<Flame size={16} />} action="/matches"><div className="desktop-fixture-list">{matches.slice(0, 4).map((match) => <Link href={`/matches?match=${match.providerMatchId}`} key={match.providerMatchId}><span className="desktop-fixture-dot" /><span className="truncate">{match.homeTeam.name}</span><time>{new Date(match.kickoffAt).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}</time><span className="truncate">{match.awayTeam.name}</span><ChevronLeft size={13} /></Link>)}</div></DesktopPanel></div></div>
-    </div>
-  </section>;
+export function DesktopHomeDashboard({
+  matches,
+  predictions,
+  allPredicted,
+  rows,
+  username,
+  rank,
+  points,
+  exact,
+  clubName,
+}: {
+  matches: MatchRecord[];
+  predictions: Record<string, { homeGoals: number; awayGoals: number }>;
+  allPredicted: boolean;
+  rows: Row[];
+  username: string;
+  rank: number | string;
+  points: number;
+  exact: number;
+  clubName: string | null;
+}) {
+  const featured = FEATURED_COMPETITION_CODES.map((code) =>
+    LEAGUES.find((league) => league.code === code),
+  ).filter(Boolean);
+  return (
+    <section
+      className="desktop-home-only desktop-home-dashboard"
+      aria-label="LowBlock dashboard"
+    >
+      <div className="desktop-home-heading">
+        <div>
+          <span className="desktop-kicker">
+            <T fa="اتاق رقابت" en="COMPETITION ROOM" />
+          </span>
+          <h1>
+            <T
+              fa={
+                username ? `خوش آمدی، ${username}` : "آماده‌ای برای پیش‌بینی؟"
+              }
+              en={
+                username
+                  ? `Welcome back, ${username}`
+                  : "Ready to make your pick?"
+              }
+            />
+          </h1>
+          <p>
+            <T
+              fa="بازی‌های مهم، رتبه شما و فرصت بعدی برای امتیاز گرفتن؛ همه در یک نگاه."
+              en="Your next fixtures, rank and scoring opportunities — all in one view."
+            />
+          </p>
+        </div>
+        <Link href="/matches" className="desktop-outline-action">
+          <T fa="مشاهده همه مسابقه‌ها" en="All matches" />
+          <ArrowLeft size={15} />
+        </Link>
+      </div>
+      <div className="desktop-home-layout">
+        <aside className="desktop-context-column">
+          <DesktopPanel
+            title="رده‌بندی جهانی"
+            enTitle="Global ranking"
+            icon={<Trophy size={16} />}
+            action="/lowblock"
+          >
+            {rows.length ? (
+              <>
+                <div className="desktop-podium">
+                  {rows.slice(0, 3).map((row, index) => (
+                    <div
+                      className={`desktop-podium-player podium-${index + 1}`}
+                      key={row.userId}
+                    >
+                      <span className="desktop-podium-medal">{index + 1}</span>
+                      <div className="desktop-avatar">
+                        <span>{row.username.slice(0, 1).toUpperCase()}</span>
+                      </div>
+                      <b>{row.username}</b>
+                      <small>
+                        {row.points.toLocaleString()} <T fa="امتیاز" en="pts" />
+                      </small>
+                    </div>
+                  ))}
+                </div>
+                <div className="desktop-ranking-list">
+                  {rows.slice(3, 7).map((row, index) => (
+                    <Link
+                      href="/lowblock"
+                      className={row.username === username ? "is-current" : ""}
+                      key={row.userId}
+                    >
+                      <span>{index + 4}</span>
+                      <b>{row.username}</b>
+                      <strong>{row.points.toLocaleString()}</strong>
+                      <ChevronLeft size={13} />
+                    </Link>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="desktop-context-empty">
+                <T
+                  fa="برای دیدن رتبه‌بندی وارد شوید."
+                  en="Sign in to see the ranking."
+                />
+              </div>
+            )}
+          </DesktopPanel>
+          <DesktopPanel
+            title="باشگاه من"
+            enTitle="My club"
+            icon={<UsersRound size={16} />}
+            action="/club"
+          >
+            {clubName ? (
+              <Link href="/club" className="desktop-club-card">
+                <span className="desktop-club-mark">
+                  <UsersRound size={22} />
+                </span>
+                <span>
+                  <b>{clubName}</b>
+                  <small>
+                    <T fa="مشاهده فضای باشگاه" en="Open club space" />
+                  </small>
+                </span>
+                <ChevronLeft size={15} />
+              </Link>
+            ) : (
+              <Link href="/club/create" className="desktop-empty-action">
+                <UsersRound size={18} />
+                <span>
+                  <b>
+                    <T fa="باشگاهت را بساز" en="Build your club" />
+                  </b>
+                  <small>
+                    <T
+                      fa="رقابت گروهی را شروع کن"
+                      en="Start competing together"
+                    />
+                  </small>
+                </span>
+              </Link>
+            )}
+          </DesktopPanel>
+        </aside>
+        <div className="desktop-main-column">
+          <section className="desktop-next-match panel-surface">
+            <div className="desktop-next-match-copy">
+              <span className="desktop-kicker">
+                <Target size={14} />
+                <T fa="فرصت بعدی شما" en="YOUR NEXT OPPORTUNITY" />
+              </span>
+              <h2>
+                <T fa="پیش‌بینی کن، امتیاز بگیر." en="Predict. Score. Climb." />
+              </h2>
+              <p>
+                <T
+                  fa="نتیجه بازی‌های پیش‌رو را قبل از شروع ثبت کن."
+                  en="Lock in your score before the next whistle."
+                />
+              </p>
+            </div>
+            <div className="desktop-fixture-stage">
+              <HomeFixtureSlider
+                matches={matches.slice(0, 3)}
+                predictions={predictions}
+                allPredicted={allPredicted}
+              />
+            </div>
+          </section>
+          <div className="desktop-league-strip">
+            <div className="desktop-section-heading">
+              <div>
+                <span className="desktop-kicker">
+                  <T fa="رقابت‌ها" en="COMPETITIONS" />
+                </span>
+                <h2>
+                  <T
+                    fa="لیگ مورد علاقه‌ات را انتخاب کن"
+                    en="Choose your competition"
+                  />
+                </h2>
+              </div>
+              <Link href="/leagues">
+                <T fa="همه لیگ‌ها" en="View all" />
+                <ChevronLeft size={14} />
+              </Link>
+            </div>
+            <div className="desktop-league-cards">
+              {featured.map(
+                (league, index) =>
+                  league && (
+                    <Link
+                      href={`/leagues/${league.code}`}
+                      key={league.code}
+                      className={`desktop-league-card ${index === 0 ? "is-selected" : ""}`}
+                    >
+                      <Image
+                        src={league.logo}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="league-logo"
+                      />
+                      <b>{league.enName}</b>
+                      <small>
+                        <T fa={league.faName} en={league.enName} />
+                      </small>
+                    </Link>
+                  ),
+              )}
+            </div>
+          </div>
+          <div className="desktop-bottom-grid">
+            <DesktopStats
+              rank={rank}
+              points={points}
+              exact={exact}
+              upcoming={matches.length}
+            />
+            <DesktopPanel
+              title="فرصت‌های پیش‌رو"
+              enTitle="Upcoming fixtures"
+              icon={<Flame size={16} />}
+              action="/matches"
+            >
+              <div className="desktop-fixture-list">
+                {matches.slice(0, 4).map((match) => (
+                  <Link
+                    href={`/matches?match=${match.providerMatchId}`}
+                    key={match.providerMatchId}
+                  >
+                    <span className="desktop-fixture-dot" />
+                    <span className="truncate">{match.homeTeam.name}</span>
+                    <time>
+                      {new Date(match.kickoffAt).toLocaleTimeString("fa-IR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                    <span className="truncate">{match.awayTeam.name}</span>
+                    <ChevronLeft size={13} />
+                  </Link>
+                ))}
+              </div>
+            </DesktopPanel>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
-function DesktopStats({ rank, points, exact, upcoming }: { rank: number | string; points: number; exact: number; upcoming: number }) { const stats = [["رتبه جهانی", String(rank), "GLOBAL RANK", BarChart3], ["امتیاز فصل", points.toLocaleString(), "SEASON POINTS", Trophy], ["پیش‌بینی دقیق", String(exact), "EXACT PICKS", Target], ["بازی پیش‌رو", String(upcoming), "UP NEXT", Flame]] as const; return <section className="desktop-stats-panel panel-surface"><div className="desktop-section-heading"><div><span className="desktop-kicker"><BarChart3 size={14} /><T fa="آمار فصل شما" en="YOUR SEASON" /></span><h2><T fa="پیشرفت شما" en="Your progress" /></h2></div></div><div className="desktop-stat-grid">{stats.map(([fa, value, en, Icon]) => <div className="desktop-stat" key={en}><Icon size={18} /><b>{value}</b><small><T fa={fa} en={en} /></small></div>)}</div></section>; }
-function DesktopPanel({ title, enTitle, icon, action, children }: { title: string; enTitle: string; icon: React.ReactNode; action: string; children: React.ReactNode }) { return <section className="desktop-panel panel-surface"><div className="desktop-panel-heading"><span><i>{icon}</i><span><small>{enTitle}</small><b>{title}</b></span></span><Link href={action} aria-label={enTitle}><ChevronLeft size={15} /></Link></div>{children}</section>; }
+function DesktopStats({
+  rank,
+  points,
+  exact,
+  upcoming,
+}: {
+  rank: number | string;
+  points: number;
+  exact: number;
+  upcoming: number;
+}) {
+  const stats = [
+    ["رتبه جهانی", String(rank), "GLOBAL RANK", BarChart3],
+    ["امتیاز فصل", points.toLocaleString(), "SEASON POINTS", Trophy],
+    ["پیش‌بینی دقیق", String(exact), "EXACT PICKS", Target],
+    ["بازی پیش‌رو", String(upcoming), "UP NEXT", Flame],
+  ] as const;
+  return (
+    <section className="desktop-stats-panel panel-surface">
+      <div className="desktop-section-heading">
+        <div>
+          <span className="desktop-kicker">
+            <BarChart3 size={14} />
+            <T fa="آمار فصل شما" en="YOUR SEASON" />
+          </span>
+          <h2>
+            <T fa="پیشرفت شما" en="Your progress" />
+          </h2>
+        </div>
+      </div>
+      <div className="desktop-stat-grid">
+        {stats.map(([fa, value, en, Icon]) => (
+          <div className="desktop-stat" key={en}>
+            <Icon size={18} />
+            <b>{value}</b>
+            <small>
+              <T fa={fa} en={en} />
+            </small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+function DesktopPanel({
+  title,
+  enTitle,
+  icon,
+  action,
+  children,
+}: {
+  title: string;
+  enTitle: string;
+  icon: React.ReactNode;
+  action: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="desktop-panel panel-surface">
+      <div className="desktop-panel-heading">
+        <span>
+          <i>{icon}</i>
+          <span>
+            <small>{enTitle}</small>
+            <b>{title}</b>
+          </span>
+        </span>
+        <Link href={action} aria-label={enTitle}>
+          <ChevronLeft size={15} />
+        </Link>
+      </div>
+      {children}
+    </section>
+  );
+}

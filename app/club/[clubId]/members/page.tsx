@@ -268,7 +268,14 @@ function Avatar({ member }: { member: Member }) {
   }, [member.role, member.user?.avatarUrl]);
   const username = member.user?.username ?? viewer?.username ?? "Player";
   const avatarUrl = member.user?.avatarUrl ?? viewer?.avatarUrl;
-  return <UserAvatar name={username} avatarUrl={avatarUrl} isDefendingChampion={member.isDefendingChampion} className="h-11 w-11 border border-brand/20 text-xs" />;
+  return (
+    <UserAvatar
+      name={username}
+      avatarUrl={avatarUrl}
+      isDefendingChampion={member.isDefendingChampion}
+      className="h-11 w-11 border border-brand/20 text-xs"
+    />
+  );
 }
 function MemberSkeleton({ count }: { count: number }) {
   return (

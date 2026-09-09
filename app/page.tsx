@@ -3,30 +3,330 @@ import { ObjectId } from "mongodb";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { getLeaderboardSummary } from "@/lib/domain/leaderboards";
-import { getLatestSeasonStartYear, getMatchesPage, getPredictions } from "@/lib/football/data";
+import {
+  getLatestSeasonStartYear,
+  getMatchesPage,
+  getPredictions,
+} from "@/lib/football/data";
 import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
 import { HomeHeroSlang } from "@/components/HomeHeroSlang";
-import { FEATURED_COMPETITION_CODES, LEAGUES as ALL_LEAGUES } from "@/lib/football/leagues";
+import {
+  FEATURED_COMPETITION_CODES,
+  LEAGUES as ALL_LEAGUES,
+} from "@/lib/football/leagues";
 import { T } from "@/components/LanguageProvider";
 import { DesktopHomeDashboard } from "@/components/DesktopHomeDashboard";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 
 export const dynamic = "force-dynamic";
-const featuredLeagues = FEATURED_COMPETITION_CODES.map((code) => ALL_LEAGUES.find((league) => league.code === code)!).filter(Boolean);
+const featuredLeagues = FEATURED_COMPETITION_CODES.map((code) =>
+  ALL_LEAGUES.find((league) => league.code === code)!,
+).filter(Boolean);
 const LEAGUES = featuredLeagues;
 
 export default async function Home() {
-  const [{ matches: fetchedMatches }, userId] = await Promise.all([getMatchesPage(50), currentUserId()]); const eligibleMatches = fetchedMatches.filter((match) => match.status === "SCHEDULED" && new Date(match.kickoffAt).getTime() > Date.now()); const allPredictions = await getPredictions(eligibleMatches.map((match) => match.providerMatchId), userId ?? "guest"); const matches = eligibleMatches.filter((match) => !allPredictions.has(match.providerMatchId)).slice(0, 5); const predictions = new Map([...allPredictions].filter(([matchId]) => matches.some((match) => match.providerMatchId === matchId))); const allPredicted = userId !== null && eligibleMatches.length > 0 && matches.length === 0;
-  let username = ""; let rank: number | string = "—"; let points = 0; let exact = 0; let club: any = null;
-  if (userId) { const db = await getDb(); const [user, year, membership] = await Promise.all([db.collection<any>("users").findOne({ _id: new ObjectId(userId) }, { projection: { username: 1 } }), getLatestSeasonStartYear(), db.collection<any>("clubMemberships").findOne({ userId, leftAt: null }, { projection: { clubId: 1 } })]); username = user?.username ?? ""; const mine = await getLeaderboardSummary(db, userId, { seasonStartYear: year }); rank = mine?.rank ?? "—"; points = mine?.points ?? 0; exact = mine?.exact ?? 0; club = membership && ObjectId.isValid(String(membership.clubId)) ? await db.collection<any>("clubs").findOne({ _id: new ObjectId(String(membership.clubId)) }, { projection: { name: 1 } }) : null; }
+  const [{ matches: fetchedMatches }, userId] = await Promise.all([
+    getMatchesPage(50),
+    currentUserId(),
+  ]);
+  const eligibleMatches = fetchedMatches.filter(
+    (match) =>
+      match.status === "SCHEDULED" &&
+      new Date(match.kickoffAt).getTime() > Date.now(),
+  );
+  const allPredictions = await getPredictions(
+    eligibleMatches.map((match) => match.providerMatchId),
+    userId ?? "guest",
+  );
+  const matches = eligibleMatches
+    .filter((match) => !allPredictions.has(match.providerMatchId))
+    .slice(0, 5);
+  const predictions = new Map(
+    [...allPredictions].filter(([matchId]) =>
+      matches.some((match) => match.providerMatchId === matchId),
+    ),
+  );
+  const allPredicted =
+    userId !== null && eligibleMatches.length > 0 && matches.length === 0;
+  let username = "";
+  let rank: number | string = "—";
+  let points = 0;
+  let exact = 0;
+  let club: any = null;
+  if (userId) {
+    const db = await getDb();
+    const [user, year, membership] = await Promise.all([
+      db
+        .collection<any>("users")
+        .findOne(
+          { _id: new ObjectId(userId) },
+          { projection: { username: 1 } },
+        ),
+      getLatestSeasonStartYear(),
+      db
+        .collection<any>("clubMemberships")
+        .findOne({ userId, leftAt: null }, { projection: { clubId: 1 } }),
+    ]);
+    username = user?.username ?? "";
+    const mine = await getLeaderboardSummary(db, userId, {
+      seasonStartYear: year,
+    });
+    rank = mine?.rank ?? "—";
+    points = mine?.points ?? 0;
+    exact = mine?.exact ?? 0;
+    club =
+      membership && ObjectId.isValid(String(membership.clubId))
+        ? await db
+            .collection<any>("clubs")
+            .findOne(
+              { _id: new ObjectId(String(membership.clubId)) },
+              { projection: { name: 1 } },
+            )
+        : null;
+  }
   let leaderboardRows: any[] = [];
-  if (userId) { const db = await getDb(); const year = await getLatestSeasonStartYear(); leaderboardRows = await getCanonicalLeaderboard(db, { seasonStartYear: year }, 7); }
-  return <main className="min-h-screen pb-24 pt-20"><div className="mx-auto max-w-7xl px-4 md:px-8"><DesktopHomeDashboard matches={matches} predictions={Object.fromEntries(predictions)} allPredicted={allPredicted} rows={leaderboardRows} username={username} rank={rank} points={points} exact={exact} clubName={club?.name ?? null}/>
-    <section className="home-hero relative mt-5 overflow-hidden rounded-[2rem] border border-white/[.08] p-6 md:p-10"><div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" /><div className="relative"><p className="text-xs font-black tracking-[.2em] text-brand">{username ? <T fa={`ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ ${username}`} en={`Hello, ${username}`} /> : <T fa="ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¡ LowBlock ÃƒËœÃ‚Â®Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â´ ÃƒËœÃ‚Â¢Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â¯" en="Welcome to LowBlock" />}</p><h1 className="mt-3 max-w-2xl text-4xl font-black leading-tight md:text-6xl"><HomeHeroSlang /></h1><p className="mt-4 max-w-xl text-sm leading-7 text-white/60"><T fa="Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â± Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â´Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ LowBlockÃƒËœÃ…â€™ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ€ºÃ…â€™ÃƒÅ¡Ã‚Â¯ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒÅ¡Ã‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ€ºÃ…â€™ÃƒËœÃ‚Â§ÃƒËœÃ‚Â² ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¯." en="Every prediction contributes to LowBlock, leagues and your Club." /></p><div className="mt-7 flex flex-wrap gap-3"><Link href="/matches" className="rounded-xl bg-brand px-5 py-3 text-sm font-black"><T fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Â¡" en="Predict matches" /></Link><Link href="/lowblock" className="rounded-xl border border-white/10 bg-white/[.04] px-5 py-3 text-sm font-black"><T fa="ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒÅ¡Ã‚Â©Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ€ºÃ…â€™" en="Global standings" /></Link></div></div></section>
-    {userId && <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4"><Metric label={<T fa="ÃƒËœÃ‚Â±ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¡ ÃƒÅ¡Ã‚Â©Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ€ºÃ…â€™" en="Global rank" />} value={`#${rank}`} /><Metric label={<T fa="ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ€ºÃ…â€™ÃƒËœÃ‚Â§ÃƒËœÃ‚Â² Ãƒâ„¢Ã‚ÂÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Å¾" en="Season points" />} value={String(points)} /><Metric label={<T fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Å¡" en="Exact picks" />} value={String(exact)} /><Link href={club ? "/club" : "/club/create"} className="rounded-2xl border border-brand/20 bg-brand/10 p-4"><small className="text-brand">{club ? <T fa="ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒÅ¡Ã‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ ÃƒËœÃ‚Â´Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§" en="Your Club" /> : <T fa="ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â®ÃƒËœÃ‚Âª ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒÅ¡Ã‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡" en="Create a Club" />}</small><b className="mt-1 block truncate text-lg">{club?.name ?? <T fa="Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã‹â€ Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Âª ÃƒËœÃ‚ÂªÃƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â®Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â²Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â¯" en="Build your team identity" />}</b></Link></section>}
-    <section className="mt-8"><div className="flex items-end justify-between"><div><p className="text-xs font-black tracking-[.16em] text-brand"><T fa="ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§" en="Competitions" /></p><h2 className="mt-2 text-2xl font-black"><T fa="ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾" en="Find your competition" /></h2></div><Link href="/leagues" className="text-xs font-bold text-brand"><T fa="Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¡ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¡" en="View all" /></Link></div><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{LEAGUES.map((league, index) => <Link key={league.code} href={`/leagues/${league.code}`} className="group relative isolate min-h-32 overflow-hidden rounded-[1.35rem] border border-white/10 bg-[linear-gradient(135deg,#17251b,#0d130f)] p-5 transition duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_18px_45px_rgba(32,184,121,.14)]"><span className="absolute -right-7 -top-8 h-28 w-28 rounded-full bg-brand/10 blur-2xl transition group-hover:bg-brand/20" /><span className="absolute bottom-0 left-0 h-1 w-0 bg-brand transition-all duration-300 group-hover:w-full" /><span className="relative flex items-start justify-between gap-3"><span className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[.06] p-2 shadow-inner shadow-black/20"><img src={league.logo} alt="" className="league-logo h-full w-full object-contain" /></span><span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black tracking-[.14em] text-white/35">{index === 0 ? "01" : index === 1 ? "02" : index === 2 ? "03" : index === 3 ? "04" : index === 4 ? "05" : "UCL"}</span></span><span className="relative mt-5 block text-sm font-black"><T fa={league.faName} en={league.enName} /></span><span className="relative mt-1 block text-[10px] font-bold tracking-wide text-white/35"><T fa="Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¡ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Â¡ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§" en="Explore fixtures" /></span></Link>)}</div></section>
-    <section className="mt-8 pb-8"><div className="flex items-end justify-between"><div><p className="text-xs font-black tracking-[.16em] text-brand"><T fa="ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â²Ãƒâ€ºÃ…â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ ÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ " en="UPCOMING MATCHES" /></p><h2 className="mt-2 text-2xl font-black"><T fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ€ºÃ…â€™" en="Upcoming predictions" /></h2></div><Link href="/matches" className="text-xs font-bold text-brand"><T fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ ÃƒÅ¡Ã‚Â©Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â¯" en="Predict" /></Link></div><HomeFixtureSlider matches={matches} predictions={Object.fromEntries(predictions)} allPredicted={allPredicted} /></section>
-  </div></main>;
+  if (userId) {
+    const db = await getDb();
+    const year = await getLatestSeasonStartYear();
+    leaderboardRows = await getCanonicalLeaderboard(
+      db,
+      { seasonStartYear: year },
+      7,
+    );
+  }
+  return (
+    <main className="min-h-screen pb-24 pt-20">
+      <div className="mx-auto max-w-7xl px-4 md:px-8">
+        <DesktopHomeDashboard
+          matches={matches}
+          predictions={Object.fromEntries(predictions)}
+          allPredicted={allPredicted}
+          rows={leaderboardRows}
+          username={username}
+          rank={rank}
+          points={points}
+          exact={exact}
+          clubName={club?.name ?? null}
+        />
+        <section className="home-hero relative mt-5 overflow-hidden rounded-[2rem] border border-white/[.08] p-6 md:p-10">
+          <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
+          <div className="relative">
+            <p className="text-xs font-black tracking-[.2em] text-brand">
+              {username ? (
+                <T
+                  fa={`ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ ${username}`}
+                  en={`Hello, ${username}`}
+                />
+              ) : (
+                <T
+                  fa="ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¡ LowBlock ÃƒËœÃ‚Â®Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â´ ÃƒËœÃ‚Â¢Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â¯"
+                  en="Welcome to LowBlock"
+                />
+              )}
+            </p>
+            <h1 className="mt-3 max-w-2xl text-4xl font-black leading-tight md:text-6xl">
+              <HomeHeroSlang />
+            </h1>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-white/60">
+              <T
+                fa="Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â± Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â´Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ LowBlockÃƒËœÃ…â€™ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ€ºÃ…â€™ÃƒÅ¡Ã‚Â¯ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒÅ¡Ã‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ€ºÃ…â€™ÃƒËœÃ‚Â§ÃƒËœÃ‚Â² ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¯."
+                en="Every prediction contributes to LowBlock, leagues and your Club."
+              />
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link
+                href="/matches"
+                className="rounded-xl bg-brand px-5 py-3 text-sm font-black"
+              >
+                <T
+                  fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Â¡"
+                  en="Predict matches"
+                />
+              </Link>
+              <Link
+                href="/lowblock"
+                className="rounded-xl border border-white/10 bg-white/[.04] px-5 py-3 text-sm font-black"
+              >
+                <T
+                  fa="ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒÅ¡Ã‚Â©Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ€ºÃ…â€™"
+                  en="Global standings"
+                />
+              </Link>
+            </div>
+          </div>
+        </section>
+        {userId && (
+          <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Metric
+              label={
+                <T
+                  fa="ÃƒËœÃ‚Â±ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¡ ÃƒÅ¡Ã‚Â©Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ€ºÃ…â€™"
+                  en="Global rank"
+                />
+              }
+              value={`#${rank}`}
+            />
+            <Metric
+              label={
+                <T
+                  fa="ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ€ºÃ…â€™ÃƒËœÃ‚Â§ÃƒËœÃ‚Â² Ãƒâ„¢Ã‚ÂÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Å¾"
+                  en="Season points"
+                />
+              }
+              value={String(points)}
+            />
+            <Metric
+              label={
+                <T
+                  fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Å¡"
+                  en="Exact picks"
+                />
+              }
+              value={String(exact)}
+            />
+            <Link
+              href={club ? "/club" : "/club/create"}
+              className="rounded-2xl border border-brand/20 bg-brand/10 p-4"
+            >
+              <small className="text-brand">
+                {club ? (
+                  <T
+                    fa="ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒÅ¡Ã‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ ÃƒËœÃ‚Â´Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§"
+                    en="Your Club"
+                  />
+                ) : (
+                  <T
+                    fa="ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â®ÃƒËœÃ‚Âª ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒÅ¡Ã‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡"
+                    en="Create a Club"
+                  />
+                )}
+              </small>
+              <b className="mt-1 block truncate text-lg">
+                {club?.name ?? (
+                  <T
+                    fa="Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã‹â€ Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Âª ÃƒËœÃ‚ÂªÃƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â®Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â²Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â¯"
+                    en="Build your team identity"
+                  />
+                )}
+              </b>
+            </Link>
+          </section>
+        )}
+        <section className="mt-8">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs font-black tracking-[.16em] text-brand">
+                <T
+                  fa="ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§"
+                  en="Competitions"
+                />
+              </p>
+              <h2 className="mt-2 text-2xl font-black">
+                <T
+                  fa="ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾"
+                  en="Find your competition"
+                />
+              </h2>
+            </div>
+            <Link href="/leagues" className="text-xs font-bold text-brand">
+              <T
+                fa="Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¡ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¡"
+                en="View all"
+              />
+            </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {LEAGUES.map((league, index) => (
+              <Link
+                key={league.code}
+                href={`/leagues/${league.code}`}
+                className="group relative isolate min-h-32 overflow-hidden rounded-[1.35rem] border border-white/10 bg-[linear-gradient(135deg,#17251b,#0d130f)] p-5 transition duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_18px_45px_rgba(32,184,121,.14)]"
+              >
+                <span className="absolute -right-7 -top-8 h-28 w-28 rounded-full bg-brand/10 blur-2xl transition group-hover:bg-brand/20" />
+                <span className="absolute bottom-0 left-0 h-1 w-0 bg-brand transition-all duration-300 group-hover:w-full" />
+                <span className="relative flex items-start justify-between gap-3">
+                  <span className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[.06] p-2 shadow-inner shadow-black/20">
+                    <img
+                      src={league.logo}
+                      alt=""
+                      className="league-logo h-full w-full object-contain"
+                    />
+                  </span>
+                  <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black tracking-[.14em] text-white/35">
+                    {index === 0
+                      ? "01"
+                      : index === 1
+                        ? "02"
+                        : index === 2
+                          ? "03"
+                          : index === 3
+                            ? "04"
+                            : index === 4
+                              ? "05"
+                              : "UCL"}
+                  </span>
+                </span>
+                <span className="relative mt-5 block text-sm font-black">
+                  <T fa={league.faName} en={league.enName} />
+                </span>
+                <span className="relative mt-1 block text-[10px] font-bold tracking-wide text-white/35">
+                  <T
+                    fa="Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¡ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Â¡ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§"
+                    en="Explore fixtures"
+                  />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+        <section className="mt-8 pb-8">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs font-black tracking-[.16em] text-brand">
+                <T
+                  fa="ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â²Ãƒâ€ºÃ…â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ ÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ "
+                  en="UPCOMING MATCHES"
+                />
+              </p>
+              <h2 className="mt-2 text-2xl font-black">
+                <T
+                  fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ€ºÃ…â€™ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ€ºÃ…â€™"
+                  en="Upcoming predictions"
+                />
+              </h2>
+            </div>
+            <Link href="/matches" className="text-xs font-bold text-brand">
+              <T
+                fa="Ãƒâ„¢Ã‚Â¾Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â´ÃƒÂ¢Ã¢â€šÂ¬Ã…â€™ÃƒËœÃ‚Â¨Ãƒâ€ºÃ…â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ ÃƒÅ¡Ã‚Â©Ãƒâ„¢Ã¢â‚¬Â Ãƒâ€ºÃ…â€™ÃƒËœÃ‚Â¯"
+                en="Predict"
+              />
+            </Link>
+          </div>
+          <HomeFixtureSlider
+            matches={matches}
+            predictions={Object.fromEntries(predictions)}
+            allPredicted={allPredicted}
+          />
+        </section>
+      </div>
+    </main>
+  );
 }
 
-function Metric({ label, value }: { label: React.ReactNode; value: string }) { return <div className="metric-tile group relative overflow-hidden rounded-[1.35rem] border border-white/[.1] bg-[linear-gradient(145deg,rgba(25,52,38,.82),rgba(10,17,13,.9))] p-4 shadow-[0_14px_40px_rgba(0,0,0,.18)] transition duration-300 hover:-translate-y-1 hover:border-brand/45"><span className="metric-tile-glow"/><span className="relative block h-1 w-10 rounded-full bg-brand/70 transition-all duration-300 group-hover:w-16"/><small className="relative mt-3 block truncate text-[10px] font-black tracking-wide text-white/50">{label}</small><b className="relative mt-1 block text-2xl font-black tracking-tight text-white">{value}</b><span className="relative mt-3 block h-1 overflow-hidden rounded-full bg-white/10"><span className="block h-full w-2/3 rounded-full bg-gradient-to-r from-brand/30 to-brand"/></span></div>; }
+function Metric({ label, value }: { label: React.ReactNode; value: string }) {
+  return (
+    <div className="metric-tile group relative overflow-hidden rounded-[1.35rem] border border-white/[.1] bg-[linear-gradient(145deg,rgba(25,52,38,.82),rgba(10,17,13,.9))] p-4 shadow-[0_14px_40px_rgba(0,0,0,.18)] transition duration-300 hover:-translate-y-1 hover:border-brand/45">
+      <span className="metric-tile-glow" />
+      <span className="relative block h-1 w-10 rounded-full bg-brand/70 transition-all duration-300 group-hover:w-16" />
+      <small className="relative mt-3 block truncate text-[10px] font-black tracking-wide text-white/50">
+        {label}
+      </small>
+      <b className="relative mt-1 block text-2xl font-black tracking-tight text-white">
+        {value}
+      </b>
+      <span className="relative mt-3 block h-1 overflow-hidden rounded-full bg-white/10">
+        <span className="block h-full w-2/3 rounded-full bg-gradient-to-r from-brand/30 to-brand" />
+      </span>
+    </div>
+  );
+}

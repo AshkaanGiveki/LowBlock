@@ -65,7 +65,12 @@ export function LeagueStandings({
                 className={`group relative overflow-hidden rounded-2xl border p-4 transition hover:-translate-y-1 ${index === 0 ? "border-[#e8c66a]/35 bg-[#e8c66a]/10 md:-translate-y-2" : "border-white/[.08] bg-white/[.03]"}`}
               >
                 <div className="flex items-center gap-3">
-                  <UserAvatar name={row.username} avatarUrl={row.avatarUrl} isDefendingChampion={row.isDefendingChampion} className={`h-11 w-11 border-2 ${index === 0 ? "border-[#e8c66a]/60" : "border-white/10"} text-xs`} />
+                  <UserAvatar
+                    name={row.username}
+                    avatarUrl={row.avatarUrl}
+                    isDefendingChampion={row.isDefendingChampion}
+                    className={`h-11 w-11 border-2 ${index === 0 ? "border-[#e8c66a]/60" : "border-white/10"} text-xs`}
+                  />
                   <span className="min-w-0 flex-1">
                     <b className="block truncate">{row.username}</b>
                     <small className="text-[10px] text-[var(--muted)]">
@@ -122,7 +127,12 @@ export function LeagueStandings({
                     href={`/u/${encodeURIComponent(row.username)}`}
                     className="flex min-w-0 items-center gap-3"
                   >
-                    <UserAvatar name={row.username} avatarUrl={row.avatarUrl} isDefendingChampion={row.isDefendingChampion} className="h-9 w-9 text-[10px]" />
+                    <UserAvatar
+                      name={row.username}
+                      avatarUrl={row.avatarUrl}
+                      isDefendingChampion={row.isDefendingChampion}
+                      className="h-9 w-9 text-[10px]"
+                    />
                     <span className="min-w-0">
                       <b className="block truncate text-sm">
                         {row.username}

@@ -1,0 +1,118 @@
+{
+  "date": "2026-09-05",
+  "warning": "Review only; no database records were changed.",
+  "matches": [
+    {
+      "providerMatchId": "1507052",
+      "leagueCode": "IR_SC",
+      "providerLeagueId": 292,
+      "providerLeagueName": "K League 1",
+      "kickoffAt": "2026-09-05T10:00:00.000Z",
+      "homeTeam": {
+        "id": 2745,
+        "name": "Bucheon FC 1995",
+        "logoUrl": "https://media.api-sports.io/football/teams/2745.png"
+      },
+      "awayTeam": {
+        "id": 2750,
+        "name": "Daejeon Citizen",
+        "logoUrl": "https://media.api-sports.io/football/teams/2750.png"
+      },
+      "status": "SCHEDULED",
+      "predictions": [
+        {
+          "userId": "6a8226077ee22d780851eca9",
+          "matchId": "1507052",
+          "awayGoals": 0,
+          "createdAt": "2026-09-05T08:23:11.567Z",
+          "homeGoals": 1,
+          "updatedAt": "2026-09-05T08:23:11.567Z"
+        }
+      ]
+    },
+    {
+      "providerMatchId": "1507053",
+      "leagueCode": "IR_SC",
+      "providerLeagueId": 292,
+      "providerLeagueName": "K League 1",
+      "kickoffAt": "2026-09-05T10:00:00.000Z",
+      "homeTeam": {
+        "id": 2761,
+        "name": "Jeju United FC",
+        "logoUrl": "https://media.api-sports.io/football/teams/2761.png"
+      },
+      "awayTeam": {
+        "id": 2767,
+        "name": "Ulsan Hyundai FC",
+        "logoUrl": "https://media.api-sports.io/football/teams/2767.png"
+      },
+      "status": "SCHEDULED",
+      "predictions": [
+        {
+          "matchId": "1507053",
+          "userId": "6a8226077ee22d780851eca9",
+          "awayGoals": 1,
+          "createdAt": "2026-09-05T08:22:43.423Z",
+          "homeGoals": 0,
+          "updatedAt": "2026-09-05T08:22:43.423Z"
+        }
+      ]
+    },
+    {
+      "providerMatchId": "1507054",
+      "leagueCode": "IR_SC",
+      "providerLeagueId": 292,
+      "providerLeagueName": "K League 1",
+      "kickoffAt": "2026-09-05T10:00:00.000Z",
+      "homeTeam": {
+        "id": 2762,
+        "name": "Jeonbuk Motors",
+        "logoUrl": "https://media.api-sports.io/football/teams/2762.png"
+      },
+      "awayTeam": {
+        "id": 2764,
+        "name": "Pohang Steelers",
+        "logoUrl": "https://media.api-sports.io/football/teams/2764.png"
+      },
+      "status": "SCHEDULED",
+      "predictions": [
+        {
+          "matchId": "1507054",
+          "userId": "6a8226077ee22d780851eca9",
+          "awayGoals": 1,
+          "createdAt": "2026-09-05T08:23:20.919Z",
+          "homeGoals": 2,
+          "updatedAt": "2026-09-05T08:23:20.919Z"
+        }
+      ]
+    },
+    {
+      "providerMatchId": "1507055",
+      "leagueCode": "IR_SC",
+      "providerLeagueId": 292,
+      "providerLeagueName": "K League 1",
+      "kickoffAt": "2026-09-05T10:00:00.000Z",
+      "homeTeam": {
+        "id": 2766,
+        "name": "FC Seoul",
+        "logoUrl": "https://media.api-sports.io/football/teams/2766.png"
+      },
+      "awayTeam": {
+        "id": 2763,
+        "name": "Incheon United",
+        "logoUrl": "https://media.api-sports.io/football/teams/2763.png"
+      },
+      "status": "SCHEDULED",
+      "predictions": [
+        {
+          "userId": "6a8226077ee22d780851eca9",
+          "matchId": "1507055",
+          "awayGoals": 1,
+          "createdAt": "2026-09-05T08:22:58.487Z",
+          "homeGoals": 2,
+          "updatedAt": "2026-09-05T08:22:58.487Z"
+        }
+      ]
+    }
+  ]
+}

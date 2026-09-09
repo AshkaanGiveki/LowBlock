@@ -14,38 +14,154 @@ import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}): Promise<Metadata> {
   const { code } = await params;
   const league = getLeague(code);
-  if (!league) return { title: "League not found", robots: { index: false, follow: false } };
-  return { title: `${league.enName} Football Predictions`, description: `Predict ${league.enName} matches, follow the league leaderboard, and compete on LowBlock.`, alternates: { canonical: `/leagues/${league.code}` } };
+  if (!league)
+    return {
+      title: "League not found",
+      robots: { index: false, follow: false },
+    };
+  return {
+    title: `${league.enName} Football Predictions`,
+    description: `Predict ${league.enName} matches, follow the league leaderboard, and compete on LowBlock.`,
+    alternates: { canonical: `/leagues/${league.code}` },
+  };
 }
 
-export default async function LeaguePage({ params }: { params: Promise<{ code: string }> }) {
+export default async function LeaguePage({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
   const { code } = await params;
   const league = getLeague(code);
   if (!league) notFound();
   const db = await getDb();
-  const year = Number((await db.collection("matches").findOne({ leagueCode: code }, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
-  const rows = await getCanonicalLeaderboard(db, { leagueCode: code, seasonStartYear: year }, 100);
-  const docs = await db.collection<any>("matches").find({ leagueCode: code, seasonStartYear: year, matchday: { $gt: 0 }, status: { $nin: ["VOID", "CANCELLED"] } }, { projection: { matchday: 1, status: 1, kickoffAt: 1 } }).toArray();
-  const grouped = new Map<number, { number: number; count: number; active: boolean; completed: boolean; live: boolean }>();
+  const year = Number(
+    (
+      await db
+        .collection("matches")
+        .findOne(
+          { leagueCode: code },
+          { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } },
+        )
+    )?.seasonStartYear ?? new Date().getUTCFullYear(),
+  );
+  const rows = await getCanonicalLeaderboard(
+    db,
+    { leagueCode: code, seasonStartYear: year },
+    100,
+  );
+  const docs = await db
+    .collection<any>("matches")
+    .find(
+      {
+        leagueCode: code,
+        seasonStartYear: year,
+        matchday: { $gt: 0 },
+        status: { $nin: ["VOID", "CANCELLED"] },
+      },
+      { projection: { matchday: 1, status: 1, kickoffAt: 1 } },
+    )
+    .toArray();
+  const grouped = new Map<
+    number,
+    {
+      number: number;
+      count: number;
+      active: boolean;
+      completed: boolean;
+      live: boolean;
+    }
+  >();
   for (const match of docs) {
-    const item = grouped.get(match.matchday) ?? { number: match.matchday, count: 0, active: false, completed: true, live: false };
+    const item = grouped.get(match.matchday) ?? {
+      number: match.matchday,
+      count: 0,
+      active: false,
+      completed: true,
+      live: false,
+    };
     item.count++;
     item.completed = item.completed && match.status === "FINISHED";
     item.live = item.live || match.status === "LIVE";
-    item.active = item.active || item.live || (match.status === "SCHEDULED" && new Date(match.kickoffAt).getTime() > Date.now());
+    item.active =
+      item.active ||
+      item.live ||
+      (match.status === "SCHEDULED" &&
+        new Date(match.kickoffAt).getTime() > Date.now());
     grouped.set(match.matchday, item);
   }
-  const storedRounds = await db.collection<any>("rounds").find({ leagueCode: code, seasonId: String(year) }).sort({ number: 1 }).toArray();
-  const rounds = (storedRounds.length ? storedRounds.map((round) => ({ number: Number(round.number), count: Number(round.eligibleFixtures ?? grouped.get(Number(round.number))?.count ?? 0), active: round.status === "LIVE" || round.status === "UPCOMING", live: round.status === "LIVE", completed: round.status === "FINAL" })) : [...grouped.values()]).filter((round) => round.count > 0).sort((a, b) => a.number - b.number);
-  const activeNumber = rounds.filter((round) => round.active).at(-1)?.number ?? rounds.find((round) => !round.completed)?.number ?? rounds.at(-1)?.number;
-  return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-6xl">
-    <BackButton />
-    <LeaguePageSwitcher currentCode={code} />
-    <section className="rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-6 md:p-9"><div className="flex min-w-0 items-center gap-4"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/[.03] p-2"><LeagueLogo src={league.logo} className="h-full w-full" /></span><div className="min-w-0"><p className="text-xs font-black tracking-[.2em] text-brand"><T fa={`لیگ · ${year}`} en={`LEAGUE · ${year}`} /></p><h1 className="mt-1 truncate text-3xl font-black"><T fa={league.faName} en={league.enName} /></h1></div></div></section>
-    <LeagueRoundRail code={code} rounds={rounds.map((round) => ({ ...round, active: round.number === activeNumber }))} />
-    <Suspense fallback={<div className="mt-8 h-[620px] animate-pulse rounded-[2rem] bg-white/[.06]" />}><LeagueStandings rows={rows} me={await currentUserId()} leagueCode={code} /></Suspense>
-  </div></main>;
+  const storedRounds = await db
+    .collection<any>("rounds")
+    .find({ leagueCode: code, seasonId: String(year) })
+    .sort({ number: 1 })
+    .toArray();
+  const rounds = (
+    storedRounds.length
+      ? storedRounds.map((round) => ({
+          number: Number(round.number),
+          count: Number(
+            round.eligibleFixtures ??
+              grouped.get(Number(round.number))?.count ??
+              0,
+          ),
+          active: round.status === "LIVE" || round.status === "UPCOMING",
+          live: round.status === "LIVE",
+          completed: round.status === "FINAL",
+        }))
+      : [...grouped.values()]
+  )
+    .filter((round) => round.count > 0)
+    .sort((a, b) => a.number - b.number);
+  const activeNumber =
+    rounds.filter((round) => round.active).at(-1)?.number ??
+    rounds.find((round) => !round.completed)?.number ??
+    rounds.at(-1)?.number;
+  return (
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
+      <div className="mx-auto max-w-6xl">
+        <BackButton />
+        <LeaguePageSwitcher currentCode={code} />
+        <section className="rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.24),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-6 md:p-9">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/[.03] p-2">
+              <LeagueLogo src={league.logo} className="h-full w-full" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black tracking-[.2em] text-brand">
+                <T fa={`لیگ · ${year}`} en={`LEAGUE · ${year}`} />
+              </p>
+              <h1 className="mt-1 truncate text-3xl font-black">
+                <T fa={league.faName} en={league.enName} />
+              </h1>
+            </div>
+          </div>
+        </section>
+        <LeagueRoundRail
+          code={code}
+          rounds={rounds.map((round) => ({
+            ...round,
+            active: round.number === activeNumber,
+          }))}
+        />
+        <Suspense
+          fallback={
+            <div className="mt-8 h-[620px] animate-pulse rounded-[2rem] bg-white/[.06]" />
+          }
+        >
+          <LeagueStandings
+            rows={rows}
+            me={await currentUserId()}
+            leagueCode={code}
+          />
+        </Suspense>
+      </div>
+    </main>
+  );
 }

@@ -277,7 +277,12 @@ function AwardPanel({
       <div className="relative mt-3 w-full overflow-hidden rounded-2xl border border-[#e8c66a]/30 bg-[linear-gradient(120deg,rgba(232,198,106,.12),rgba(32,184,121,.08)_45%,rgba(0,0,0,.22))] p-3">
         <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(135deg,transparent_0%,rgba(255,255,255,.2)_45%,transparent_46%),linear-gradient(45deg,transparent_0%,rgba(32,184,121,.18)_50%,transparent_51%)]" />
         <div className="relative flex items-center gap-3">
-          <UserAvatar name={winner.name} avatarUrl={winner.avatarUrl} isDefendingChampion={winner.isDefendingChampion} className="h-11 w-11 rounded-xl border border-[#e8c66a]/45 bg-[#e8c66a]/15 text-sm text-[#f4d982]" />
+          <UserAvatar
+            name={winner.name}
+            avatarUrl={winner.avatarUrl}
+            isDefendingChampion={winner.isDefendingChampion}
+            className="h-11 w-11 rounded-xl border border-[#e8c66a]/45 bg-[#e8c66a]/15 text-sm text-[#f4d982]"
+          />
           <div className="min-w-0 flex-1">
             <p className="text-[9px] font-black tracking-[.16em] text-[#e8c66a]">
               {t("قهرمان این کارت", "CARD WINNER")}

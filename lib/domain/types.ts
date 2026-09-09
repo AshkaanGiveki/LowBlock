@@ -4,8 +4,19 @@ export type ClubVisibility = "PUBLIC" | "PRIVATE";
 export type ClubDiscoveryMode = "INVITE_ONLY" | "RECRUITING";
 export type RoundStatus = "UPCOMING" | "LIVE" | "PENDING" | "FINAL";
 
-export type SeasonRecord = { id: string; label: string; startsAt: Date; endsAt: Date };
-export type LeagueSeasonRecord = { id: string; leagueCode: string; seasonId: string; teamCount?: number; expectedFixturesPerRound?: number };
+export type SeasonRecord = {
+  id: string;
+  label: string;
+  startsAt: Date;
+  endsAt: Date;
+};
+export type LeagueSeasonRecord = {
+  id: string;
+  leagueCode: string;
+  seasonId: string;
+  teamCount?: number;
+  expectedFixturesPerRound?: number;
+};
 export type RoundRecord = {
   id: string;
   leagueSeasonId: string;

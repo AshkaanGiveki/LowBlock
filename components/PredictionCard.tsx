@@ -1,8 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react"; import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, Check, ChevronDown, Clock3, Crown, Minus, Plus, Radio, Sparkles, UserRound, X } from "lucide-react";
+import {
+  BarChart3,
+  Check,
+  ChevronDown,
+  Clock3,
+  Crown,
+  Minus,
+  Plus,
+  Radio,
+  Sparkles,
+  UserRound,
+  X,
+} from "lucide-react";
 import { formatIranDate, formatIranTime } from "@/lib/football/time";
 import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
@@ -12,78 +25,952 @@ import { MatchAnalytics } from "./MatchAnalytics";
 import { MatchInsightsPanel } from "./MatchInsights";
 import { useToast } from "@/components/ToastProvider";
 import { friendlyError } from "@/lib/userErrors";
-import { closeMatchRoute, matchRoute, openMatchRoute } from "@/components/matchNavigation";
+import {
+  closeMatchRoute,
+  matchRoute,
+  openMatchRoute,
+} from "@/components/matchNavigation";
 import { getLeague } from "@/lib/football/leagues";
 import { BadgeMinus } from "lucide-react";
 import { DrawerCompetitionMeta } from "./DrawerCompetitionMeta";
 import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
 
 type Team = { id: number; name: string; logoUrl: string | null };
-type Match = { providerMatchId: string; leagueCode?: string; kickoffAt: Date | string; status: string; elapsed?: number | null; homeGoals?: number | null; awayGoals?: number | null; homeTeam: Team; awayTeam: Team };
-type Props = { match: Match; initial?: { homeGoals: number; awayGoals: number }; index?: number; onDrawerChange?: (open: boolean) => void; onPredictionSaved?: (prediction: { homeGoals: number; awayGoals: number }) => void; openOnMount?: boolean; submitPrediction?: (prediction: { matchId: string; homeGoals: number; awayGoals: number }) => Promise<void> };
+type Match = {
+  providerMatchId: string;
+  leagueCode?: string;
+  kickoffAt: Date | string;
+  status: string;
+  elapsed?: number | null;
+  homeGoals?: number | null;
+  awayGoals?: number | null;
+  homeTeam: Team;
+  awayTeam: Team;
+};
+type Props = {
+  match: Match;
+  initial?: { homeGoals: number; awayGoals: number };
+  index?: number;
+  onDrawerChange?: (open: boolean) => void;
+  onPredictionSaved?: (prediction: {
+    homeGoals: number;
+    awayGoals: number;
+  }) => void;
+  openOnMount?: boolean;
+  submitPrediction?: (prediction: {
+    matchId: string;
+    homeGoals: number;
+    awayGoals: number;
+  }) => Promise<void>;
+};
 type DrawerTeam = { id?: number; name: string; logo: string | null };
 
-export function PredictionCard({ match, initial, index = 0, onDrawerChange, onPredictionSaved, openOnMount = false, submitPrediction }: Props) {
-  const { language, t } = useLanguage(); const { showToast } = useToast(); const router = useRouter(); const pathname = usePathname(); const [activePath, setActivePath] = useState(pathname);
+export function PredictionCard({
+  match,
+  initial,
+  index = 0,
+  onDrawerChange,
+  onPredictionSaved,
+  openOnMount = false,
+  submitPrediction,
+}: Props) {
+  const { language, t } = useLanguage();
+  const { showToast } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [activePath, setActivePath] = useState(pathname);
   const [now, setNow] = useState(Date.now());
   const [home, setHome] = useState(initial?.homeGoals?.toString() ?? "");
   const [away, setAway] = useState(initial?.awayGoals?.toString() ?? "");
-  const [savedPrediction, setSavedPrediction] = useState(initial ?? null); const saved = savedPrediction !== null && home !== "" && away !== "" && Number(home) === savedPrediction.homeGoals && Number(away) === savedPrediction.awayGoals;
+  const [savedPrediction, setSavedPrediction] = useState(initial ?? null);
+  const saved =
+    savedPrediction !== null &&
+    home !== "" &&
+    away !== "" &&
+    Number(home) === savedPrediction.homeGoals &&
+    Number(away) === savedPrediction.awayGoals;
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(""); const [authToast, setAuthToast] = useState(false);
+  const [error, setError] = useState("");
+  const [authToast, setAuthToast] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, []); useEffect(() => { if (!authToast) return; const timer = window.setTimeout(() => router.push("/login"), 4200); return () => window.clearTimeout(timer); }, [authToast, router]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!authToast) return;
+    const timer = window.setTimeout(() => router.push("/login"), 4200);
+    return () => window.clearTimeout(timer);
+  }, [authToast, router]);
   const kickoff = new Date(match.kickoffAt).getTime();
   const hasResult = match.homeGoals != null && match.awayGoals != null;
   const finished = match.status === "FINISHED" || match.status === "FT";
-  const started = !finished && (match.status === "LIVE" || match.status === "SUSPENDED" || now >= kickoff);
+  const started =
+    !finished &&
+    (match.status === "LIVE" || match.status === "SUSPENDED" || now >= kickoff);
   const live = LIVE_SCORE_UI_ENABLED && started;
   const locked = started || finished;
-  useEffect(() => { const syncPath = () => setActivePath(window.location.pathname); window.addEventListener("popstate", syncPath); return () => window.removeEventListener("popstate", syncPath); }, []);
-  useEffect(() => { if (!openOnMount) return; if (activePath !== matchRoute(match.providerMatchId)) openMatchRoute(match.providerMatchId, pathname); if (locked) { setAnalyticsOpen(true); return; } setDrawerOpen(true); onDrawerChange?.(true); }, [openOnMount, locked, onDrawerChange, activePath, match.providerMatchId, pathname]);
+  useEffect(() => {
+    const syncPath = () => setActivePath(window.location.pathname);
+    window.addEventListener("popstate", syncPath);
+    return () => window.removeEventListener("popstate", syncPath);
+  }, []);
+  useEffect(() => {
+    if (!openOnMount) return;
+    if (activePath !== matchRoute(match.providerMatchId))
+      openMatchRoute(match.providerMatchId, pathname);
+    if (locked) {
+      setAnalyticsOpen(true);
+      return;
+    }
+    setDrawerOpen(true);
+    onDrawerChange?.(true);
+  }, [
+    openOnMount,
+    locked,
+    onDrawerChange,
+    activePath,
+    match.providerMatchId,
+    pathname,
+  ]);
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
-  const competition = match.leagueCode ? getLeague(match.leagueCode) : undefined;
+  const competition = match.leagueCode
+    ? getLeague(match.leagueCode)
+    : undefined;
   const countsInLeaderboard = Boolean(competition?.globalLeaderboard);
   const isMatchRoute = activePath === matchRoute(match.providerMatchId);
-  const leaveMatchRoute = () => { if (!isMatchRoute) return; if (typeof window.history.state?.lowblockMatchOrigin === "string") closeMatchRoute(); else router.replace("/matches"); };
-  const closeDrawer = () => { setDrawerOpen(false); setInsightsOpen(false); onDrawerChange?.(false); leaveMatchRoute(); };
-  const closeAnalytics = () => { setAnalyticsOpen(false); leaveMatchRoute(); };
-  const open = () => { if (!isMatchRoute) openMatchRoute(match.providerMatchId, pathname); if (locked) setAnalyticsOpen(true); else { setDrawerOpen(true); onDrawerChange?.(true); } };
-  const update = (setter: (value: string) => void) => (value: string) => { setter(value); };
-  async function submit() { if (home === "" || away === "" || locked) return; setBusy(true); setError(""); try { const response = await fetch("/api/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ matchId: match.providerMatchId, homeGoals: Number(home), awayGoals: Number(away) }) }); const data = await response.json().catch(() => ({})); if (!response.ok) { if (response.status === 401 || data.error === "AUTH_REQUIRED") { setError(""); setAuthToast(true); return; } throw new Error(getPredictionError(data.error, t)); } setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) }); onPredictionSaved?.({ homeGoals: Number(home), awayGoals: Number(away) }); closeDrawer(); } catch (reason) { setError(reason instanceof Error ? reason.message : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.")); } finally { setBusy(false); } }
+  const leaveMatchRoute = () => {
+    if (!isMatchRoute) return;
+    if (typeof window.history.state?.lowblockMatchOrigin === "string")
+      closeMatchRoute();
+    else router.replace("/matches");
+  };
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setInsightsOpen(false);
+    onDrawerChange?.(false);
+    leaveMatchRoute();
+  };
+  const closeAnalytics = () => {
+    setAnalyticsOpen(false);
+    leaveMatchRoute();
+  };
+  const open = () => {
+    if (!isMatchRoute) openMatchRoute(match.providerMatchId, pathname);
+    if (locked) setAnalyticsOpen(true);
+    else {
+      setDrawerOpen(true);
+      onDrawerChange?.(true);
+    }
+  };
+  const update = (setter: (value: string) => void) => (value: string) => {
+    setter(value);
+  };
+  async function submit() {
+    if (home === "" || away === "" || locked) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/predictions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          matchId: match.providerMatchId,
+          homeGoals: Number(home),
+          awayGoals: Number(away),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 401 || data.error === "AUTH_REQUIRED") {
+          setError("");
+          setAuthToast(true);
+          return;
+        }
+        throw new Error(getPredictionError(data.error, t));
+      }
+      setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) });
+      onPredictionSaved?.({ homeGoals: Number(home), awayGoals: Number(away) });
+      closeDrawer();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   const hasPrediction = savedPrediction !== null;
-  const statusText = <MatchStatusBadge live={live} finished={finished} homeGoals={match.homeGoals} awayGoals={match.awayGoals} elapsed={match.elapsed} kickoff={kickoff} now={now} language={language} />;
-  const validateAndSubmit = () => { if (home === "" || away === "") { const message = t("برای ثبت پیش‌بینی باید نتیجه‌ی هر دو تیم را مشخص کنید.", "You should specify both team scores before saving your prediction."); setError(message); showToast(message); return; } submit(); };
-  useEffect(() => { const notifyMissingScore = (event: PointerEvent) => { const target = event.target as HTMLElement; if (!target.closest("button[disabled]")) return; const container = target.closest(".glow-card, .prediction-drawer-submit-shell"); if (!container || home !== "" && away !== "") return; const message = t("برای ثبت پیش‌بینی باید نتیجه‌ی هر دو تیم را مشخص کنید.", "You should specify both team scores before saving your prediction."); setError(message); showToast(message); }; document.addEventListener("pointerdown", notifyMissingScore, true); return () => document.removeEventListener("pointerdown", notifyMissingScore, true); }, [away, home, showToast, t]);
-  const handleCardClick = (event: React.MouseEvent<HTMLElement>) => { const target = event.target as HTMLElement; if (window.innerWidth < 768 && !target.closest("button, input")) open(); };
- return <>{authToast && <AuthRedirectToast language={language} />}{!drawerOpen && <CompetitionMeta competition={competition} included={countsInLeaderboard} language={language}/>}
-    <motion.article initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: index * .05 }} whileHover={{ y: -4 }} onClick={handleCardClick} className="glow-card relative mb-5 overflow-hidden rounded-2xl border border-brand/55 bg-transparent shadow-[0_18px_55px_rgba(0,0,0,.24)] transition-colors hover:border-brand">
-      <div className="relative rounded-[15px] border border-brand/20 bg-transparent px-5 pb-14 pt-5 backdrop-blur-sm"><div className="mb-4 flex items-center justify-between text-[10px] font-bold text-white/80"><span className="inline-flex items-center gap-1.5 text-brand"><Crown size={13}/>{t("مسابقه رسمی", "Official match")}</span><span className={`rounded-full border px-2.5 py-1 ${live ? "border-red-400/50 bg-red-500/15 text-red-200" : "border-brand/30 bg-brand/10 text-brand"}`}>{live || finished ? statusText : <CountdownDisplay milliseconds={Math.max(0, kickoff - now)} language={language} />}</span></div><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3"><TeamBlock name={homeName} sourceName={match.homeTeam.name} logo={match.homeTeam.logoUrl}/><div className="text-center"><p className="mb-2 text-[9px] font-black tracking-wide text-brand">{t("پیش‌بینی شما", "YOUR PICK")}</p><div className="hidden items-center gap-1.5 rounded-lg border border-brand/25 bg-transparent p-1.5 md:flex"><ScoreInput value={home} setValue={update(setHome)} disabled={locked}/><b className="text-brand">:</b><ScoreInput value={away} setValue={update(setAway)} disabled={locked}/></div><button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); open(); }} className="flex min-w-28 flex-col items-center rounded-lg border border-brand/35 bg-transparent px-3 py-2 text-[10px] font-bold text-white md:hidden"><PickSummary hasPrediction={hasPrediction} home={home} away={away} language={language} locked={locked} /></button></div><TeamBlock name={awayName} sourceName={match.awayTeam.name} logo={match.awayTeam.logoUrl}/></div><div className="mt-4 text-center text-[10px] font-bold text-white/65">{formatIranDate(match.kickoffAt, language === "fa" ? "fa-IR" : "en-GB")} · {formatIranTime(match.kickoffAt, language === "fa" ? "fa-IR" : "en-GB")}</div>{error && <p role="alert" className="prediction-error-inline mt-3 rounded-lg border border-red-400/30 bg-red-950/25 p-2 text-center text-[10px] text-red-100">{error}</p>}</div><button type="button" disabled={busy || home === "" || away === "" || locked} onClick={submit} className="absolute bottom-2 left-1/2 hidden min-w-40 -translate-x-1/2 items-center justify-center gap-2 rounded-full border border-brand bg-brand px-5 py-2.5 text-xs font-black text-[#07100b] shadow-lg transition hover:-translate-y-0.5 hover:bg-brand/10 disabled:opacity-60 md:flex">{saved ? <><Check size={14}/>{t("ذخیره شد", "Saved")}</> : <><Sparkles size={14}/>{busy ? t("در حال ثبت…", "Saving…") : t("ثبت پیش‌بینی", "Save prediction")}</>}</button>
-    </motion.article>
-    <AnimatePresence initial={false}>{drawerOpen && <PredictionDrawer competition={competition} included={countsInLeaderboard} home={{ id: match.homeTeam.id, name: homeName, logo: match.homeTeam.logoUrl }} away={{ id: match.awayTeam.id, name: awayName, logo: match.awayTeam.logoUrl }} homeValue={home} awayValue={away} setHome={update(setHome)} setAway={update(setAway)} onClose={closeDrawer} onSubmit={submit} matchId={match.providerMatchId} insightsOpen={insightsOpen} onToggleInsights={() => setInsightsOpen((value) => !value)} busy={busy} saved={saved} error={error} language={language}/>}</AnimatePresence>
-    <AnimatePresence initial={false}>{analyticsOpen && <MatchAnalytics matchId={match.providerMatchId} onClose={closeAnalytics}/>}</AnimatePresence>
-  </>;
+  const statusText = (
+    <MatchStatusBadge
+      live={live}
+      finished={finished}
+      homeGoals={match.homeGoals}
+      awayGoals={match.awayGoals}
+      elapsed={match.elapsed}
+      kickoff={kickoff}
+      now={now}
+      language={language}
+    />
+  );
+  const validateAndSubmit = () => {
+    if (home === "" || away === "") {
+      const message = t(
+        "برای ثبت پیش‌بینی باید نتیجه‌ی هر دو تیم را مشخص کنید.",
+        "You should specify both team scores before saving your prediction.",
+      );
+      setError(message);
+      showToast(message);
+      return;
+    }
+    submit();
+  };
+  useEffect(() => {
+    const notifyMissingScore = (event: PointerEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("button[disabled]")) return;
+      const container = target.closest(
+        ".glow-card, .prediction-drawer-submit-shell",
+      );
+      if (!container || (home !== "" && away !== "")) return;
+      const message = t(
+        "برای ثبت پیش‌بینی باید نتیجه‌ی هر دو تیم را مشخص کنید.",
+        "You should specify both team scores before saving your prediction.",
+      );
+      setError(message);
+      showToast(message);
+    };
+    document.addEventListener("pointerdown", notifyMissingScore, true);
+    return () =>
+      document.removeEventListener("pointerdown", notifyMissingScore, true);
+  }, [away, home, showToast, t]);
+  const handleCardClick = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (window.innerWidth < 768 && !target.closest("button, input")) open();
+  };
+  return (
+    <>
+      {authToast && <AuthRedirectToast language={language} />}
+      {!drawerOpen && (
+        <CompetitionMeta
+          competition={competition}
+          included={countsInLeaderboard}
+          language={language}
+        />
+      )}
+      <motion.article
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: index * 0.05 }}
+        whileHover={{ y: -4 }}
+        onClick={handleCardClick}
+        className="glow-card relative mb-5 overflow-hidden rounded-2xl border border-brand/55 bg-transparent shadow-[0_18px_55px_rgba(0,0,0,.24)] transition-colors hover:border-brand"
+      >
+        <div className="relative rounded-[15px] border border-brand/20 bg-transparent px-5 pb-14 pt-5 backdrop-blur-sm">
+          <div className="mb-4 flex items-center justify-between text-[10px] font-bold text-white/80">
+            <span className="inline-flex items-center gap-1.5 text-brand">
+              <Crown size={13} />
+              {t("مسابقه رسمی", "Official match")}
+            </span>
+            <span
+              className={`rounded-full border px-2.5 py-1 ${live ? "border-red-400/50 bg-red-500/15 text-red-200" : "border-brand/30 bg-brand/10 text-brand"}`}
+            >
+              {live || finished ? (
+                statusText
+              ) : (
+                <CountdownDisplay
+                  milliseconds={Math.max(0, kickoff - now)}
+                  language={language}
+                />
+              )}
+            </span>
+          </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <TeamBlock
+              name={homeName}
+              sourceName={match.homeTeam.name}
+              logo={match.homeTeam.logoUrl}
+            />
+            <div className="text-center">
+              <p className="mb-2 text-[9px] font-black tracking-wide text-brand">
+                {t("پیش‌بینی شما", "YOUR PICK")}
+              </p>
+              <div className="hidden items-center gap-1.5 rounded-lg border border-brand/25 bg-transparent p-1.5 md:flex">
+                <ScoreInput
+                  value={home}
+                  setValue={update(setHome)}
+                  disabled={locked}
+                />
+                <b className="text-brand">:</b>
+                <ScoreInput
+                  value={away}
+                  setValue={update(setAway)}
+                  disabled={locked}
+                />
+              </div>
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  open();
+                }}
+                className="flex min-w-28 flex-col items-center rounded-lg border border-brand/35 bg-transparent px-3 py-2 text-[10px] font-bold text-white md:hidden"
+              >
+                <PickSummary
+                  hasPrediction={hasPrediction}
+                  home={home}
+                  away={away}
+                  language={language}
+                  locked={locked}
+                />
+              </button>
+            </div>
+            <TeamBlock
+              name={awayName}
+              sourceName={match.awayTeam.name}
+              logo={match.awayTeam.logoUrl}
+            />
+          </div>
+          <div className="mt-4 text-center text-[10px] font-bold text-white/65">
+            {formatIranDate(
+              match.kickoffAt,
+              language === "fa" ? "fa-IR" : "en-GB",
+            )}{" "}
+            ·{" "}
+            {formatIranTime(
+              match.kickoffAt,
+              language === "fa" ? "fa-IR" : "en-GB",
+            )}
+          </div>
+          {error && (
+            <p
+              role="alert"
+              className="prediction-error-inline mt-3 rounded-lg border border-red-400/30 bg-red-950/25 p-2 text-center text-[10px] text-red-100"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          disabled={busy || home === "" || away === "" || locked}
+          onClick={submit}
+          className="absolute bottom-2 left-1/2 hidden min-w-40 -translate-x-1/2 items-center justify-center gap-2 rounded-full border border-brand bg-brand px-5 py-2.5 text-xs font-black text-[#07100b] shadow-lg transition hover:-translate-y-0.5 hover:bg-brand/10 disabled:opacity-60 md:flex"
+        >
+          {saved ? (
+            <>
+              <Check size={14} />
+              {t("ذخیره شد", "Saved")}
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} />
+              {busy
+                ? t("در حال ثبت…", "Saving…")
+                : t("ثبت پیش‌بینی", "Save prediction")}
+            </>
+          )}
+        </button>
+      </motion.article>
+      <AnimatePresence initial={false}>
+        {drawerOpen && (
+          <PredictionDrawer
+            competition={competition}
+            included={countsInLeaderboard}
+            home={{
+              id: match.homeTeam.id,
+              name: homeName,
+              logo: match.homeTeam.logoUrl,
+            }}
+            away={{
+              id: match.awayTeam.id,
+              name: awayName,
+              logo: match.awayTeam.logoUrl,
+            }}
+            homeValue={home}
+            awayValue={away}
+            setHome={update(setHome)}
+            setAway={update(setAway)}
+            onClose={closeDrawer}
+            onSubmit={submit}
+            matchId={match.providerMatchId}
+            insightsOpen={insightsOpen}
+            onToggleInsights={() => setInsightsOpen((value) => !value)}
+            busy={busy}
+            saved={saved}
+            error={error}
+            language={language}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence initial={false}>
+        {analyticsOpen && (
+          <MatchAnalytics
+            matchId={match.providerMatchId}
+            onClose={closeAnalytics}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
 }
 
-function MatchStatusBadge({ live, finished, homeGoals, awayGoals, elapsed, kickoff, now, language }: { live: boolean; finished: boolean; homeGoals?: number | null; awayGoals?: number | null; elapsed?: number | null; kickoff: number; now: number; language: "fa" | "en" }) { const result = homeGoals != null && awayGoals != null ? `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}` : "—"; if (live) { const minute = elapsed ?? Math.max(1, Math.floor((now - kickoff) / 60_000)); return <span className="inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/12 px-3 py-1.5 text-red-100 shadow-[0_0_22px_rgba(248,113,113,.12)]"><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-300 opacity-75"/><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-400"/></span><b className="tracking-[.12em]">LIVE</b><strong className="text-sm text-white">{result}</strong><small className="rounded-md bg-white/10 px-1.5 py-0.5 font-black">{formatNumber(minute, language)}′</small></span>; } if (finished) return <span className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-brand shadow-[0_0_22px_rgba(32,184,121,.1)]"><span className="grid h-4 w-4 place-items-center rounded-full bg-brand/20"><Check size={10}/></span><b>FT</b><strong className="text-sm text-white">{result}</strong></span>; return <span className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-brand"><CountdownDisplay milliseconds={Math.max(0, kickoff - now)} language={language}/></span>; }
-function PickSummary({ hasPrediction, home, away, language, locked = true }: { hasPrediction: boolean; home: string; away: string; language: "fa" | "en"; locked?: boolean }) { if (hasPrediction && home !== "" && away !== "") return <><span className="text-lg font-black text-white">{formatNumber(Number(home), language)} - {formatNumber(Number(away), language)}</span><span className="mt-0.5 text-[10px] text-brand">{language === "fa" ? "پیش‌بینی شما" : "Your pick"}</span></>; return <><span className={`text-sm font-black ${locked ? "text-white/55" : "text-brand"}`}>{locked ? (language === "fa" ? "پیش‌بینی نشده" : "Unpredicted") : (language === "fa" ? "پیش‌بینی" : "Predict")}</span><span className="mt-0.5 text-[10px] text-white/45">{locked ? (language === "fa" ? "ثبت نشده" : "No pick") : (language === "fa" ? "نتیجه را انتخاب کنید" : "Choose a score")}</span></>; }
-function TeamBlock({ name, sourceName, logo }: { name: string; sourceName: string; logo: string | null }) { return <div className="flex min-w-0 flex-col items-center gap-2 text-center"><div className="grid h-16 w-16 place-items-center"><TeamCrest name={sourceName} logo={logo}/></div><span className="line-clamp-2 max-w-28 text-xs font-black text-white">{name}</span></div>; }
-function CompetitionMeta({ competition, included, language }: { competition?: ReturnType<typeof getLeague>; included: boolean; language: "fa" | "en" }) { if (!competition) return null; const label = language === "fa" ? (included ? "در جدول جهانی" : "خارج از جدول جهانی") : (included ? "Global leaderboard" : "Outside global leaderboard"); return <div className="pointer-events-none relative z-10 -mb-12 flex items-center justify-between px-5 pt-3"><img src={competition.logo} alt={language === "fa" ? competition.faName : competition.enName} className="h-7 w-7 object-contain" />{!included && <span aria-label={label} title={label} className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/[.06] text-white/60"><BadgeMinus size={14} /></span>}</div>; }
-function ScoreInput({ value, setValue, disabled }: { value: string; setValue: (value: string) => void; disabled: boolean }) { return <input disabled={disabled} value={value} onChange={(event) => setValue(event.target.value.replace(/\D/g, "").slice(0, 2))} className="h-10 w-10 rounded-md border border-brand/40 bg-transparent text-center text-xl font-black text-white outline-none focus:ring-2 focus:ring-brand"/>; }
-function CountdownDisplay({ milliseconds, language }: { milliseconds: number; language: "fa" | "en" }) { const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000)); const values = [Math.floor(totalSeconds / 86400), Math.floor((totalSeconds % 86400) / 3600), Math.floor((totalSeconds % 3600) / 60), totalSeconds % 60]; const labels = language === "fa" ? ["روز", "ساعت", "دقیقه", "ثانیه"] : ["DAYS", "HOURS", "MIN", "SEC"]; return <span className="countdown-display" dir="ltr" aria-label={language === "fa" ? "زمان باقی‌مانده تا شروع مسابقه" : "Time remaining until kick-off"}>{values.map((value, index) => <span className="countdown-unit" key={labels[index]}><b>{formatNumber(value, language, { minimumIntegerDigits: 2, useGrouping: false })}</b><small>{labels[index]}</small></span>)}</span>; }
-function formatCountdown(milliseconds: number, language: "fa" | "en") { const totalMinutes = Math.max(0, Math.floor(milliseconds / 60_000)); const days = Math.floor(totalMinutes / 1440); const hours = Math.floor((totalMinutes % 1440) / 60); const minutes = totalMinutes % 60; if (days) return `${formatNumber(days, language)}${language === "fa" ? "روز" : "d"} ${formatNumber(hours, language)}${language === "fa" ? "ساعت" : "h"}`; if (hours) return `${formatNumber(hours, language)}${language === "fa" ? "ساعت" : "h"} ${formatNumber(minutes, language)}${language === "fa" ? "دقیقه" : "m"}`; return `${formatNumber(minutes, language)}${language === "fa" ? "دقیقه" : "m"}`; }
-
-export function PredictionDrawer({ competition, included = false, home, away, homeValue, awayValue, setHome, setAway, onClose, onSubmit, matchId, insightsOpen, onToggleInsights, busy, saved, error, language }: { competition?: ReturnType<typeof getLeague>; included?: boolean; home: DrawerTeam; away: DrawerTeam; homeValue: string; awayValue: string; setHome: (value: string) => void; setAway: (value: string) => void; onClose: () => void; onSubmit: () => void; matchId: string; insightsOpen: boolean; onToggleInsights: () => void; busy: boolean; saved: boolean; error: string; language: "fa" | "en" }) {
-  const t = (fa: string, en: string) => language === "fa" ? fa : en;
-  const display = (value: string) => value === "" ? "—" : formatNumber(Number(value), language);
-  return <motion.div initial={{ opacity: 0, height: "100dvh" }} animate={{ opacity: 1, height: "100dvh" }} exit={{ opacity: 0, height: 0, transition: { duration: .3, ease: "easeInOut" } }} className="fixed inset-x-0 bottom-0 z-[80] h-[100dvh] overflow-hidden md:hidden"><button type="button" aria-label={t("بستن", "Close")} onClick={onClose} className="absolute inset-0 bg-black/75 backdrop-blur-md"/><motion.div initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0, transition: { duration: .3, ease: "easeInOut" } }} transition={{ type: "spring", stiffness: 300, damping: 30 }} className="absolute inset-x-0 bottom-0 max-h-[94vh] overflow-y-auto rounded-t-[2.25rem] border border-b-0 border-brand/40 bg-[#0d1712]/95 px-5 pb-8 pt-14 shadow-[0_-30px_100px_rgba(0,0,0,.72)]"><div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-brand/50"/><button type="button" onClick={onClose} aria-label={t("بستن", "Close")} className="absolute left-5 top-5 grid h-10 w-10 place-items-center rounded-2xl border border-brand/30 bg-transparent text-brand"><X size={18}/></button><div className="mb-7 text-center"><div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-brand/35 bg-brand/10 px-3 py-1.5 text-[10px] font-black tracking-[.18em] text-brand"><BarChart3 size={13}/>{t("پیش‌بینی مسابقه", "MATCH PREDICTION")}</div><h2 className="text-2xl font-black text-white">{t("پیش‌بینیت را ثبت کن", "Lock in your score")}</h2><p className="mt-2 text-xs text-white/50">{t("گل‌های هر دو تیم را قبل از شروع بازی انتخاب کن.", "Choose both teams’ goals before kick-off.")}</p></div><DrawerCompetitionMeta competition={competition} included={included} language={language}/><div className="relative grid grid-cols-2 gap-3"><DrawerTeamCard team={home} value={homeValue} setValue={setHome} language={language}/><DrawerTeamCard team={away} value={awayValue} setValue={setAway} language={language}/><div className="pointer-events-none absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl border border-brand/40 bg-[#10231a] text-xs font-black text-brand shadow-xl">{display(homeValue)}<span className="mx-0.5 text-white/40">–</span>{display(awayValue)}</div></div><InsightsToggle open={insightsOpen} onToggle={onToggleInsights} language={language}/><AnimatePresence initial={false}>{insightsOpen && <motion.div key="match-insights" initial={{ height: 0, opacity: 0, y: -8 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={{ height: 0, opacity: 0, y: -8 }} transition={{ duration: .3, ease: "easeInOut" }} className="overflow-hidden"><div className="pb-5 pt-1"><MatchInsightsPanel matchId={matchId}/></div></motion.div>}</AnimatePresence>{error && <p className="prediction-error-inline mt-4 rounded-xl border border-red-400/30 bg-red-950/30 p-3 text-center text-xs text-red-200">{error}</p>}<div className="prediction-drawer-submit-shell"><button type="button" disabled={busy || homeValue === "" || awayValue === ""} onClick={onSubmit} className="prediction-drawer-submit flex w-full items-center justify-center gap-2 rounded-2xl border border-brand/60 bg-brand py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(32,184,121,.22)] disabled:opacity-100 disabled:brightness-75">{saved ? <><Check size={16}/>{t("ذخیره شد", "Saved")}</> : busy ? t("در حال ثبت…", "Saving…") : t("ثبت پیش‌بینی", "Save prediction")}</button></div></motion.div></motion.div>;
+function MatchStatusBadge({
+  live,
+  finished,
+  homeGoals,
+  awayGoals,
+  elapsed,
+  kickoff,
+  now,
+  language,
+}: {
+  live: boolean;
+  finished: boolean;
+  homeGoals?: number | null;
+  awayGoals?: number | null;
+  elapsed?: number | null;
+  kickoff: number;
+  now: number;
+  language: "fa" | "en";
+}) {
+  const result =
+    homeGoals != null && awayGoals != null
+      ? `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}`
+      : "—";
+  if (live) {
+    const minute = elapsed ?? Math.max(1, Math.floor((now - kickoff) / 60_000));
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/12 px-3 py-1.5 text-red-100 shadow-[0_0_22px_rgba(248,113,113,.12)]">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-300 opacity-75" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-400" />
+        </span>
+        <b className="tracking-[.12em]">LIVE</b>
+        <strong className="text-sm text-white">{result}</strong>
+        <small className="rounded-md bg-white/10 px-1.5 py-0.5 font-black">
+          {formatNumber(minute, language)}′
+        </small>
+      </span>
+    );
+  }
+  if (finished)
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-brand shadow-[0_0_22px_rgba(32,184,121,.1)]">
+        <span className="grid h-4 w-4 place-items-center rounded-full bg-brand/20">
+          <Check size={10} />
+        </span>
+        <b>FT</b>
+        <strong className="text-sm text-white">{result}</strong>
+      </span>
+    );
+  return (
+    <span className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-brand">
+      <CountdownDisplay
+        milliseconds={Math.max(0, kickoff - now)}
+        language={language}
+      />
+    </span>
+  );
+}
+function PickSummary({
+  hasPrediction,
+  home,
+  away,
+  language,
+  locked = true,
+}: {
+  hasPrediction: boolean;
+  home: string;
+  away: string;
+  language: "fa" | "en";
+  locked?: boolean;
+}) {
+  if (hasPrediction && home !== "" && away !== "")
+    return (
+      <>
+        <span className="text-lg font-black text-white">
+          {formatNumber(Number(home), language)} -{" "}
+          {formatNumber(Number(away), language)}
+        </span>
+        <span className="mt-0.5 text-[10px] text-brand">
+          {language === "fa" ? "پیش‌بینی شما" : "Your pick"}
+        </span>
+      </>
+    );
+  return (
+    <>
+      <span
+        className={`text-sm font-black ${locked ? "text-white/55" : "text-brand"}`}
+      >
+        {locked
+          ? language === "fa"
+            ? "پیش‌بینی نشده"
+            : "Unpredicted"
+          : language === "fa"
+            ? "پیش‌بینی"
+            : "Predict"}
+      </span>
+      <span className="mt-0.5 text-[10px] text-white/45">
+        {locked
+          ? language === "fa"
+            ? "ثبت نشده"
+            : "No pick"
+          : language === "fa"
+            ? "نتیجه را انتخاب کنید"
+            : "Choose a score"}
+      </span>
+    </>
+  );
+}
+function TeamBlock({
+  name,
+  sourceName,
+  logo,
+}: {
+  name: string;
+  sourceName: string;
+  logo: string | null;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+      <div className="grid h-16 w-16 place-items-center">
+        <TeamCrest name={sourceName} logo={logo} />
+      </div>
+      <span className="line-clamp-2 max-w-28 text-xs font-black text-white">
+        {name}
+      </span>
+    </div>
+  );
+}
+function CompetitionMeta({
+  competition,
+  included,
+  language,
+}: {
+  competition?: ReturnType<typeof getLeague>;
+  included: boolean;
+  language: "fa" | "en";
+}) {
+  if (!competition) return null;
+  const label =
+    language === "fa"
+      ? included
+        ? "در جدول جهانی"
+        : "خارج از جدول جهانی"
+      : included
+        ? "Global leaderboard"
+        : "Outside global leaderboard";
+  return (
+    <div className="pointer-events-none relative z-10 -mb-12 flex items-center justify-between px-5 pt-3">
+      <img
+        src={competition.logo}
+        alt={language === "fa" ? competition.faName : competition.enName}
+        className="h-7 w-7 object-contain"
+      />
+      {!included && (
+        <span
+          aria-label={label}
+          title={label}
+          className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/[.06] text-white/60"
+        >
+          <BadgeMinus size={14} />
+        </span>
+      )}
+    </div>
+  );
+}
+function ScoreInput({
+  value,
+  setValue,
+  disabled,
+}: {
+  value: string;
+  setValue: (value: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <input
+      disabled={disabled}
+      value={value}
+      onChange={(event) =>
+        setValue(event.target.value.replace(/\D/g, "").slice(0, 2))
+      }
+      className="h-10 w-10 rounded-md border border-brand/40 bg-transparent text-center text-xl font-black text-white outline-none focus:ring-2 focus:ring-brand"
+    />
+  );
+}
+function CountdownDisplay({
+  milliseconds,
+  language,
+}: {
+  milliseconds: number;
+  language: "fa" | "en";
+}) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const values = [
+    Math.floor(totalSeconds / 86400),
+    Math.floor((totalSeconds % 86400) / 3600),
+    Math.floor((totalSeconds % 3600) / 60),
+    totalSeconds % 60,
+  ];
+  const labels =
+    language === "fa"
+      ? ["روز", "ساعت", "دقیقه", "ثانیه"]
+      : ["DAYS", "HOURS", "MIN", "SEC"];
+  return (
+    <span
+      className="countdown-display"
+      dir="ltr"
+      aria-label={
+        language === "fa"
+          ? "زمان باقی‌مانده تا شروع مسابقه"
+          : "Time remaining until kick-off"
+      }
+    >
+      {values.map((value, index) => (
+        <span className="countdown-unit" key={labels[index]}>
+          <b>
+            {formatNumber(value, language, {
+              minimumIntegerDigits: 2,
+              useGrouping: false,
+            })}
+          </b>
+          <small>{labels[index]}</small>
+        </span>
+      ))}
+    </span>
+  );
+}
+function formatCountdown(milliseconds: number, language: "fa" | "en") {
+  const totalMinutes = Math.max(0, Math.floor(milliseconds / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days)
+    return `${formatNumber(days, language)}${language === "fa" ? "روز" : "d"} ${formatNumber(hours, language)}${language === "fa" ? "ساعت" : "h"}`;
+  if (hours)
+    return `${formatNumber(hours, language)}${language === "fa" ? "ساعت" : "h"} ${formatNumber(minutes, language)}${language === "fa" ? "دقیقه" : "m"}`;
+  return `${formatNumber(minutes, language)}${language === "fa" ? "دقیقه" : "m"}`;
 }
 
-function InsightsToggle({ open, onToggle, language }: { open: boolean; onToggle: () => void; language: "fa" | "en" }) { const t = (fa: string, en: string) => language === "fa" ? fa : en; return <div className="my-6 flex items-center gap-3"><span className="flex-1 border-t border-dashed border-brand/35"/><button type="button" onClick={onToggle} aria-expanded={open} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-[#0d1712] px-3 py-1.5 text-[10px] font-black text-brand shadow-[0_0_0_5px_#0d1712] transition hover:bg-brand/10"><span>{t("سابقه رودررو", "H2H history")}</span><ChevronDown size={14} className={open ? "rotate-180 transition-transform" : "transition-transform"}/></button><span className="flex-1 border-t border-dashed border-brand/35"/></div>; }
-function DrawerTeamCard({ team, value, setValue, language }: { team: DrawerTeam; value: string; setValue: (value: string) => void; language: "fa" | "en" }) { const n = (amount: number) => formatNumber(amount, language); const isolate = (event: React.SyntheticEvent<HTMLButtonElement>) => event.stopPropagation(); return <div className="drawer-team-card text-center"><div className="drawer-team-logo-slot"><TeamCrest name={team.name} logo={team.logo}/></div><p className="mt-3 line-clamp-2 min-h-8 text-xs font-bold text-white/80">{team.id ? teamName(language, team.id, team.name) : team.name}</p><div className="prediction-score-controls mt-5 flex items-center justify-center gap-2"><button type="button" aria-label="Decrease score" disabled={Number(value || 0) <= 0} onPointerDown={isolate} onClick={(event) => { isolate(event); setValue(String(Math.max(0, Number(value || 0) - 1))); }} className="grid h-9 w-9 place-items-center rounded-xl border border-brand/35 bg-transparent text-brand transition hover:bg-brand/10 disabled:opacity-25"><Minus size={15}/></button><span className="grid h-12 w-12 place-items-center rounded-xl border border-brand/40 bg-brand/10 text-2xl font-black text-brand">{value === "" ? "—" : n(Number(value))}</span><button type="button" aria-label="Increase score" onPointerDown={isolate} onClick={(event) => { isolate(event); setValue(String(Math.min(20, Number(value === "" ? -1 : value) + 1))); }} className="grid h-9 w-9 place-items-center rounded-xl border border-brand/50 bg-transparent text-brand shadow-[0_6px_18px_rgba(32,184,121,.18)] transition hover:bg-brand/10"><Plus size={15}/></button></div></div>; }
+export function PredictionDrawer({
+  competition,
+  included = false,
+  home,
+  away,
+  homeValue,
+  awayValue,
+  setHome,
+  setAway,
+  onClose,
+  onSubmit,
+  matchId,
+  insightsOpen,
+  onToggleInsights,
+  busy,
+  saved,
+  error,
+  language,
+}: {
+  competition?: ReturnType<typeof getLeague>;
+  included?: boolean;
+  home: DrawerTeam;
+  away: DrawerTeam;
+  homeValue: string;
+  awayValue: string;
+  setHome: (value: string) => void;
+  setAway: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  matchId: string;
+  insightsOpen: boolean;
+  onToggleInsights: () => void;
+  busy: boolean;
+  saved: boolean;
+  error: string;
+  language: "fa" | "en";
+}) {
+  const t = (fa: string, en: string) => (language === "fa" ? fa : en);
+  const display = (value: string) =>
+    value === "" ? "—" : formatNumber(Number(value), language);
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: "100dvh" }}
+      animate={{ opacity: 1, height: "100dvh" }}
+      exit={{
+        opacity: 0,
+        height: 0,
+        transition: { duration: 0.3, ease: "easeInOut" },
+      }}
+      className="fixed inset-x-0 bottom-0 z-[80] h-[100dvh] overflow-hidden md:hidden"
+    >
+      <button
+        type="button"
+        aria-label={t("بستن", "Close")}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/75 backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ y: "100%", opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{
+          y: "100%",
+          opacity: 0,
+          transition: { duration: 0.3, ease: "easeInOut" },
+        }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="absolute inset-x-0 bottom-0 max-h-[94vh] overflow-y-auto rounded-t-[2.25rem] border border-b-0 border-brand/40 bg-[#0d1712]/95 px-5 pb-8 pt-14 shadow-[0_-30px_100px_rgba(0,0,0,.72)]"
+      >
+        <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-brand/50" />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("بستن", "Close")}
+          className="absolute left-5 top-5 grid h-10 w-10 place-items-center rounded-2xl border border-brand/30 bg-transparent text-brand"
+        >
+          <X size={18} />
+        </button>
+        <div className="mb-7 text-center">
+          <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-brand/35 bg-brand/10 px-3 py-1.5 text-[10px] font-black tracking-[.18em] text-brand">
+            <BarChart3 size={13} />
+            {t("پیش‌بینی مسابقه", "MATCH PREDICTION")}
+          </div>
+          <h2 className="text-2xl font-black text-white">
+            {t("پیش‌بینیت را ثبت کن", "Lock in your score")}
+          </h2>
+          <p className="mt-2 text-xs text-white/50">
+            {t(
+              "گل‌های هر دو تیم را قبل از شروع بازی انتخاب کن.",
+              "Choose both teams’ goals before kick-off.",
+            )}
+          </p>
+        </div>
+        <DrawerCompetitionMeta
+          competition={competition}
+          included={included}
+          language={language}
+        />
+        <div className="relative grid grid-cols-2 gap-3">
+          <DrawerTeamCard
+            team={home}
+            value={homeValue}
+            setValue={setHome}
+            language={language}
+          />
+          <DrawerTeamCard
+            team={away}
+            value={awayValue}
+            setValue={setAway}
+            language={language}
+          />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl border border-brand/40 bg-[#10231a] text-xs font-black text-brand shadow-xl">
+            {display(homeValue)}
+            <span className="mx-0.5 text-white/40">–</span>
+            {display(awayValue)}
+          </div>
+        </div>
+        <InsightsToggle
+          open={insightsOpen}
+          onToggle={onToggleInsights}
+          language={language}
+        />
+        <AnimatePresence initial={false}>
+          {insightsOpen && (
+            <motion.div
+              key="match-insights"
+              initial={{ height: 0, opacity: 0, y: -8 }}
+              animate={{ height: "auto", opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -8 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <div className="pb-5 pt-1">
+                <MatchInsightsPanel matchId={matchId} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {error && (
+          <p className="prediction-error-inline mt-4 rounded-xl border border-red-400/30 bg-red-950/30 p-3 text-center text-xs text-red-200">
+            {error}
+          </p>
+        )}
+        <div className="prediction-drawer-submit-shell">
+          <button
+            type="button"
+            disabled={busy || homeValue === "" || awayValue === ""}
+            onClick={onSubmit}
+            className="prediction-drawer-submit flex w-full items-center justify-center gap-2 rounded-2xl border border-brand/60 bg-brand py-4 text-sm font-black text-white shadow-[0_12px_30px_rgba(32,184,121,.22)] disabled:opacity-100 disabled:brightness-75"
+          >
+            {saved ? (
+              <>
+                <Check size={16} />
+                {t("ذخیره شد", "Saved")}
+              </>
+            ) : busy ? (
+              t("در حال ثبت…", "Saving…")
+            ) : (
+              t("ثبت پیش‌بینی", "Save prediction")
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
-function getPredictionError(code: unknown, t: (fa: string, en: string) => string) { switch (code) { case "INVALID_PREDICTION": return t("نتیجه پیش‌بینی معتبر نیست.", "Enter a valid prediction."); case "MATCH_NOT_FOUND": return t("این مسابقه پیدا نشد.", "This match could not be found."); case "PREDICTION_LOCKED": return t("مهلت پیش‌بینی این مسابقه تمام شده است.", "Predictions for this match are closed."); default: return t("ثبت پیش‌بینی انجام نشد. دوباره تلاش کنید.", "Your prediction could not be saved. Try again."); } }
-function AuthRedirectToast({ language }: { language: "fa" | "en" }) { const fa = language === "fa"; return <motion.div initial={{ opacity: 0, y: -18, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 420, damping: 28 }} role="alert" className="prediction-auth-toast fixed inset-x-4 top-20 z-[100] mx-auto max-w-md overflow-hidden rounded-2xl border border-brand/35 bg-[#102319]/95 p-4 text-start shadow-[0_20px_70px_rgba(0,0,0,.45)] backdrop-blur-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand/30 bg-brand/15 text-brand"><UserRound size={18}/></span><div className="min-w-0"><b className="block text-sm text-white">{fa ? "برای ثبت پیش‌بینی وارد شوید" : "Sign in to save your prediction"}</b><p className="mt-1 text-xs leading-5 text-white/55">{fa ? "برای ادامه به صفحه ورود منتقل می‌شوید." : "You’ll be taken to the sign-in page to continue."}</p></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10"><motion.span initial={{ scaleX: 1 }} animate={{ scaleX: 0 }} transition={{ duration: 4.2, ease: "linear" }} className="block h-full origin-left rounded-full bg-brand shadow-[0_0_14px_rgba(32,184,121,.85)]"/></div></motion.div>; }
+function InsightsToggle({
+  open,
+  onToggle,
+  language,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  language: "fa" | "en";
+}) {
+  const t = (fa: string, en: string) => (language === "fa" ? fa : en);
+  return (
+    <div className="my-6 flex items-center gap-3">
+      <span className="flex-1 border-t border-dashed border-brand/35" />
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-[#0d1712] px-3 py-1.5 text-[10px] font-black text-brand shadow-[0_0_0_5px_#0d1712] transition hover:bg-brand/10"
+      >
+        <span>{t("سابقه رودررو", "H2H history")}</span>
+        <ChevronDown
+          size={14}
+          className={
+            open ? "rotate-180 transition-transform" : "transition-transform"
+          }
+        />
+      </button>
+      <span className="flex-1 border-t border-dashed border-brand/35" />
+    </div>
+  );
+}
+function DrawerTeamCard({
+  team,
+  value,
+  setValue,
+  language,
+}: {
+  team: DrawerTeam;
+  value: string;
+  setValue: (value: string) => void;
+  language: "fa" | "en";
+}) {
+  const n = (amount: number) => formatNumber(amount, language);
+  const isolate = (event: React.SyntheticEvent<HTMLButtonElement>) =>
+    event.stopPropagation();
+  return (
+    <div className="drawer-team-card text-center">
+      <div className="drawer-team-logo-slot">
+        <TeamCrest name={team.name} logo={team.logo} />
+      </div>
+      <p className="mt-3 line-clamp-2 min-h-8 text-xs font-bold text-white/80">
+        {team.id ? teamName(language, team.id, team.name) : team.name}
+      </p>
+      <div className="prediction-score-controls mt-5 flex items-center justify-center gap-2">
+        <button
+          type="button"
+          aria-label="Decrease score"
+          disabled={Number(value || 0) <= 0}
+          onPointerDown={isolate}
+          onClick={(event) => {
+            isolate(event);
+            setValue(String(Math.max(0, Number(value || 0) - 1)));
+          }}
+          className="grid h-9 w-9 place-items-center rounded-xl border border-brand/35 bg-transparent text-brand transition hover:bg-brand/10 disabled:opacity-25"
+        >
+          <Minus size={15} />
+        </button>
+        <span className="grid h-12 w-12 place-items-center rounded-xl border border-brand/40 bg-brand/10 text-2xl font-black text-brand">
+          {value === "" ? "—" : n(Number(value))}
+        </span>
+        <button
+          type="button"
+          aria-label="Increase score"
+          onPointerDown={isolate}
+          onClick={(event) => {
+            isolate(event);
+            setValue(
+              String(Math.min(20, Number(value === "" ? -1 : value) + 1)),
+            );
+          }}
+          className="grid h-9 w-9 place-items-center rounded-xl border border-brand/50 bg-transparent text-brand shadow-[0_6px_18px_rgba(32,184,121,.18)] transition hover:bg-brand/10"
+        >
+          <Plus size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function getPredictionError(
+  code: unknown,
+  t: (fa: string, en: string) => string,
+) {
+  switch (code) {
+    case "INVALID_PREDICTION":
+      return t("نتیجه پیش‌بینی معتبر نیست.", "Enter a valid prediction.");
+    case "MATCH_NOT_FOUND":
+      return t("این مسابقه پیدا نشد.", "This match could not be found.");
+    case "PREDICTION_LOCKED":
+      return t(
+        "مهلت پیش‌بینی این مسابقه تمام شده است.",
+        "Predictions for this match are closed.",
+      );
+    default:
+      return t(
+        "ثبت پیش‌بینی انجام نشد. دوباره تلاش کنید.",
+        "Your prediction could not be saved. Try again.",
+      );
+  }
+}
+function AuthRedirectToast({ language }: { language: "fa" | "en" }) {
+  const fa = language === "fa";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -18, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 420, damping: 28 }}
+      role="alert"
+      className="prediction-auth-toast fixed inset-x-4 top-20 z-[100] mx-auto max-w-md overflow-hidden rounded-2xl border border-brand/35 bg-[#102319]/95 p-4 text-start shadow-[0_20px_70px_rgba(0,0,0,.45)] backdrop-blur-2xl"
+    >
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand/30 bg-brand/15 text-brand">
+          <UserRound size={18} />
+        </span>
+        <div className="min-w-0">
+          <b className="block text-sm text-white">
+            {fa
+              ? "برای ثبت پیش‌بینی وارد شوید"
+              : "Sign in to save your prediction"}
+          </b>
+          <p className="mt-1 text-xs leading-5 text-white/55">
+            {fa
+              ? "برای ادامه به صفحه ورود منتقل می‌شوید."
+              : "You’ll be taken to the sign-in page to continue."}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+        <motion.span
+          initial={{ scaleX: 1 }}
+          animate={{ scaleX: 0 }}
+          transition={{ duration: 4.2, ease: "linear" }}
+          className="block h-full origin-left rounded-full bg-brand shadow-[0_0_14px_rgba(32,184,121,.85)]"
+        />
+      </div>
+    </motion.div>
+  );
+}

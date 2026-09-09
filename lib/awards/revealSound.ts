@@ -15,7 +15,10 @@ export function playAwardRevealSound() {
     const audio = getAwardAudio();
     audio.currentTime = 0;
     audio.muted = false;
-    return audio.play().then(() => true).catch(() => false);
+    return audio
+      .play()
+      .then(() => true)
+      .catch(() => false);
   } catch {
     return Promise.resolve(false);
   }

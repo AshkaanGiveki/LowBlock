@@ -1,23 +1,89 @@
 import { ObjectId } from "mongodb";
 import { getDb, withMongoTransaction } from "@/lib/db/mongo";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
-import { createLockSnapshot, isPredictionLocked, SCORING_VERSION } from "@/lib/domain/predictionLock";
+import {
+  createLockSnapshot,
+  isPredictionLocked,
+  SCORING_VERSION,
+} from "@/lib/domain/predictionLock";
 import { grantAutomaticAwards } from "@/lib/awards/service";
-import { DEFAULT_CLUB_LEAGUE_CODES, isGlobalCompetition } from "@/lib/football/leagues";
+import {
+  DEFAULT_CLUB_LEAGUE_CODES,
+  isGlobalCompetition,
+} from "@/lib/football/leagues";
 import { writeRankSnapshots } from "@/lib/domain/rankSnapshots";
 
-type Match = { _id?: unknown; providerMatchId: string; leagueCode: string; seasonStartYear: number; matchday: number; roundId?: string | null; status: string; kickoffAt: Date; homeGoals: number | null; awayGoals: number | null };
-type Prediction = { _id?: unknown; userId: string; matchId: string; homeGoals: number; awayGoals: number; createdAt?: Date };
+type Match = {
+  _id?: unknown;
+  providerMatchId: string;
+  leagueCode: string;
+  seasonStartYear: number;
+  matchday: number;
+  roundId?: string | null;
+  status: string;
+  kickoffAt: Date;
+  homeGoals: number | null;
+  awayGoals: number | null;
+};
+type Prediction = {
+  _id?: unknown;
+  userId: string;
+  matchId: string;
+  homeGoals: number;
+  awayGoals: number;
+  createdAt?: Date;
+};
 
 // Kept for the existing Club views. Low Block awards use the canonical leaderboard below.
 async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
-  const rounds = await db.collection<any>("rounds").find({ status: "FINAL" }).toArray();
+  const rounds = await db
+    .collection<any>("rounds")
+    .find({ status: "FINAL" })
+    .toArray();
   for (const round of rounds) {
-    const rows = await db.collection<any>("predictionScores").aggregate([{ $match: { leagueCode: round.leagueCode, seasonStartYear: Number(round.seasonId), matchday: round.number } }, { $group: { _id: { userId: "$userId", clubId: "$clubIdAtLock" }, points: { $sum: "$points" }, exact: { $sum: { $cond: ["$exactScore", 1, 0] } }, predictions: { $sum: 1 } } }, { $sort: { points: -1, exact: -1, predictions: -1, "_id.userId": 1 } }]).toArray();
+    const rows = await db
+      .collection<any>("predictionScores")
+      .aggregate([
+        {
+          $match: {
+            leagueCode: round.leagueCode,
+            seasonStartYear: Number(round.seasonId),
+            matchday: round.number,
+          },
+        },
+        {
+          $group: {
+            _id: { userId: "$userId", clubId: "$clubIdAtLock" },
+            points: { $sum: "$points" },
+            exact: { $sum: { $cond: ["$exactScore", 1, 0] } },
+            predictions: { $sum: 1 },
+          },
+        },
+        { $sort: { points: -1, exact: -1, predictions: -1, "_id.userId": 1 } },
+      ])
+      .toArray();
     await db.collection("roundWinners").deleteMany({ roundId: round.id });
     const scopes = new Map<string, any>();
-    for (const row of rows) { const clubId = row._id.clubId ?? null; if (!clubId && !isGlobalCompetition(round.leagueCode)) continue; const key = clubId ?? "GLOBAL"; if (!scopes.has(key)) scopes.set(key, row); }
-    if (scopes.size) await db.collection("roundWinners").insertMany([...scopes.values()].map((row) => ({ roundId: round.id, userId: String(row._id.userId), clubId: row._id.clubId ?? null, points: Number(row.points ?? 0), exact: Number(row.exact ?? 0), predictions: Number(row.predictions ?? 0), createdAt: new Date() })));
+    for (const row of rows) {
+      const clubId = row._id.clubId ?? null;
+      if (!clubId && !isGlobalCompetition(round.leagueCode)) continue;
+      const key = clubId ?? "GLOBAL";
+      if (!scopes.has(key)) scopes.set(key, row);
+    }
+    if (scopes.size)
+      await db
+        .collection("roundWinners")
+        .insertMany(
+          [...scopes.values()].map((row) => ({
+            roundId: round.id,
+            userId: String(row._id.userId),
+            clubId: row._id.clubId ?? null,
+            points: Number(row.points ?? 0),
+            exact: Number(row.exact ?? 0),
+            predictions: Number(row.predictions ?? 0),
+            createdAt: new Date(),
+          })),
+        );
   }
   return rounds.length;
 }
@@ -29,48 +95,259 @@ async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
  */
 export async function runScoreEngine() {
   const db = await getDb();
-  const matches = await db.collection<Match>("matches").find({ provider: "football-api", status: "FINISHED", homeGoals: { $ne: null }, awayGoals: { $ne: null } }).toArray();
-  if (!matches.length) return { matches: 0, scores: 0, leaderboards: 0, awards: await grantAutomaticAwards(db) };
-  const byMatch = new Map(matches.map(match => [match.providerMatchId, match]));
-  const predictions = await db.collection<Prediction>("predictions").find({ matchId: { $in: matches.map(match => match.providerMatchId) }, userId: { $ne: "guest" } }).toArray();
+  const matches = await db
+    .collection<Match>("matches")
+    .find({
+      provider: "football-api",
+      status: "FINISHED",
+      homeGoals: { $ne: null },
+      awayGoals: { $ne: null },
+    })
+    .toArray();
+  if (!matches.length)
+    return {
+      matches: 0,
+      scores: 0,
+      leaderboards: 0,
+      awards: await grantAutomaticAwards(db),
+    };
+  const byMatch = new Map(
+    matches.map((match) => [match.providerMatchId, match]),
+  );
+  const predictions = await db
+    .collection<Prediction>("predictions")
+    .find({
+      matchId: { $in: matches.map((match) => match.providerMatchId) },
+      userId: { $ne: "guest" },
+    })
+    .toArray();
   const now = new Date();
-  const snapshots = new Map<string, Awaited<ReturnType<typeof createLockSnapshot>>>();
+  const snapshots = new Map<
+    string,
+    Awaited<ReturnType<typeof createLockSnapshot>>
+  >();
   for (const prediction of predictions) {
     if (!isPredictionLocked(byMatch.get(prediction.matchId)!)) continue;
-    snapshots.set(`${prediction.userId}:${prediction.matchId}`, await createLockSnapshot(db, prediction, new Date(byMatch.get(prediction.matchId)!.kickoffAt)));
+    snapshots.set(
+      `${prediction.userId}:${prediction.matchId}`,
+      await createLockSnapshot(
+        db,
+        prediction,
+        new Date(byMatch.get(prediction.matchId)!.kickoffAt),
+      ),
+    );
   }
-  const clubIds = [...new Set([...snapshots.values()].map((snapshot) => snapshot.clubIdAtLock).filter(Boolean) as string[])];
-  const clubs = clubIds.length ? await db.collection<any>("clubs").find({ _id: { $in: clubIds.filter(ObjectId.isValid).map((id) => new ObjectId(id)) } }, { projection: { leaderboardCompetitionCodes: 1 } }).toArray() : [];
-  const clubCompetitionCodes = new Map(clubs.map((club) => [String(club._id), Array.isArray(club.leaderboardCompetitionCodes) ? club.leaderboardCompetitionCodes : DEFAULT_CLUB_LEAGUE_CODES]));
-  const scoreOps = predictions.map(prediction => {
+  const clubIds = [
+    ...new Set(
+      [...snapshots.values()]
+        .map((snapshot) => snapshot.clubIdAtLock)
+        .filter(Boolean) as string[],
+    ),
+  ];
+  const clubs = clubIds.length
+    ? await db
+        .collection<any>("clubs")
+        .find(
+          {
+            _id: {
+              $in: clubIds
+                .filter(ObjectId.isValid)
+                .map((id) => new ObjectId(id)),
+            },
+          },
+          { projection: { leaderboardCompetitionCodes: 1 } },
+        )
+        .toArray()
+    : [];
+  const clubCompetitionCodes = new Map(
+    clubs.map((club) => [
+      String(club._id),
+      Array.isArray(club.leaderboardCompetitionCodes)
+        ? club.leaderboardCompetitionCodes
+        : DEFAULT_CLUB_LEAGUE_CODES,
+    ]),
+  );
+  const scoreOps = predictions.map((prediction) => {
     const match = byMatch.get(prediction.matchId)!;
-    const score = calculatePredictionScore(prediction.homeGoals, prediction.awayGoals, match.homeGoals, match.awayGoals);
-    const snapshot = snapshots.get(`${prediction.userId}:${prediction.matchId}`);
-    return { updateOne: { filter: { userId: prediction.userId, matchId: prediction.matchId }, update: { $set: { predictionId: String(prediction._id ?? `${prediction.userId}:${prediction.matchId}`), fixtureId: match.providerMatchId, matchId: match.providerMatchId, userId: prediction.userId, leagueCode: match.leagueCode, seasonId: String(match.seasonStartYear), seasonStartYear: match.seasonStartYear, roundId: match.roundId ?? null, matchday: match.matchday, kickoffAt: match.kickoffAt, points: score.points, category: score.category, exactScore: score.category === "EXACT_SCORE", correctOutcome: ["EXACT_SCORE", "CORRECT_GOAL_DIFFERENCE", "CORRECT_OUTCOME"].includes(score.category), predictedHomeGoals: prediction.homeGoals, predictedAwayGoals: prediction.awayGoals, actualHomeGoals: match.homeGoals, actualAwayGoals: match.awayGoals, clubIdAtLock: snapshot?.clubIdAtLock ?? null, scoringVersion: SCORING_VERSION, calculatedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } }, upsert: true } };
+    const score = calculatePredictionScore(
+      prediction.homeGoals,
+      prediction.awayGoals,
+      match.homeGoals,
+      match.awayGoals,
+    );
+    const snapshot = snapshots.get(
+      `${prediction.userId}:${prediction.matchId}`,
+    );
+    return {
+      updateOne: {
+        filter: { userId: prediction.userId, matchId: prediction.matchId },
+        update: {
+          $set: {
+            predictionId: String(
+              prediction._id ?? `${prediction.userId}:${prediction.matchId}`,
+            ),
+            fixtureId: match.providerMatchId,
+            matchId: match.providerMatchId,
+            userId: prediction.userId,
+            leagueCode: match.leagueCode,
+            seasonId: String(match.seasonStartYear),
+            seasonStartYear: match.seasonStartYear,
+            roundId: match.roundId ?? null,
+            matchday: match.matchday,
+            kickoffAt: match.kickoffAt,
+            points: score.points,
+            category: score.category,
+            exactScore: score.category === "EXACT_SCORE",
+            correctOutcome: [
+              "EXACT_SCORE",
+              "CORRECT_GOAL_DIFFERENCE",
+              "CORRECT_OUTCOME",
+            ].includes(score.category),
+            predictedHomeGoals: prediction.homeGoals,
+            predictedAwayGoals: prediction.awayGoals,
+            actualHomeGoals: match.homeGoals,
+            actualAwayGoals: match.awayGoals,
+            clubIdAtLock: snapshot?.clubIdAtLock ?? null,
+            scoringVersion: SCORING_VERSION,
+            calculatedAt: now,
+            updatedAt: now,
+          },
+          $setOnInsert: { createdAt: now },
+        },
+        upsert: true,
+      },
+    };
   });
-  const aggregates = new Map<string, { userId: string; scope: string; points: number; predictions: number; exact: number; correctOutcome: number; earliestPredictionAt?: Date }>();
+  const aggregates = new Map<
+    string,
+    {
+      userId: string;
+      scope: string;
+      points: number;
+      predictions: number;
+      exact: number;
+      correctOutcome: number;
+      earliestPredictionAt?: Date;
+    }
+  >();
   for (const prediction of predictions) {
     const match = byMatch.get(prediction.matchId)!;
-    const score = calculatePredictionScore(prediction.homeGoals, prediction.awayGoals, match.homeGoals, match.awayGoals);
-    const snapshot = snapshots.get(`${prediction.userId}:${prediction.matchId}`);
-    const scopes = [`LEAGUE:${match.leagueCode}:${match.seasonStartYear}`, `ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`, `SEASON:${match.seasonStartYear}`];
+    const score = calculatePredictionScore(
+      prediction.homeGoals,
+      prediction.awayGoals,
+      match.homeGoals,
+      match.awayGoals,
+    );
+    const snapshot = snapshots.get(
+      `${prediction.userId}:${prediction.matchId}`,
+    );
+    const scopes = [
+      `LEAGUE:${match.leagueCode}:${match.seasonStartYear}`,
+      `ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`,
+      `SEASON:${match.seasonStartYear}`,
+    ];
     if (isGlobalCompetition(match.leagueCode)) scopes.push("GLOBAL");
-    if (snapshot?.clubIdAtLock && (clubCompetitionCodes.get(snapshot.clubIdAtLock) ?? DEFAULT_CLUB_LEAGUE_CODES).includes(match.leagueCode)) scopes.push(`CLUB:${snapshot.clubIdAtLock}:OVERALL:${match.seasonStartYear}`, `CLUB:${snapshot.clubIdAtLock}:LEAGUE:${match.leagueCode}:${match.seasonStartYear}`, `CLUB:${snapshot.clubIdAtLock}:ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`);
-    for (const scope of scopes) { const key = `${prediction.userId}:${scope}`; const row = aggregates.get(key) ?? { userId: prediction.userId, scope, points: 0, predictions: 0, exact: 0, correctOutcome: 0 }; row.points += score.points; row.predictions++; row.exact += score.category === "EXACT_SCORE" ? 1 : 0; row.correctOutcome += ["EXACT_SCORE", "CORRECT_GOAL_DIFFERENCE", "CORRECT_OUTCOME"].includes(score.category) ? 1 : 0; if (prediction.createdAt && (!row.earliestPredictionAt || prediction.createdAt < row.earliestPredictionAt)) row.earliestPredictionAt = prediction.createdAt; aggregates.set(key, row); }
+    if (
+      snapshot?.clubIdAtLock &&
+      (
+        clubCompetitionCodes.get(snapshot.clubIdAtLock) ??
+        DEFAULT_CLUB_LEAGUE_CODES
+      ).includes(match.leagueCode)
+    )
+      scopes.push(
+        `CLUB:${snapshot.clubIdAtLock}:OVERALL:${match.seasonStartYear}`,
+        `CLUB:${snapshot.clubIdAtLock}:LEAGUE:${match.leagueCode}:${match.seasonStartYear}`,
+        `CLUB:${snapshot.clubIdAtLock}:ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`,
+      );
+    for (const scope of scopes) {
+      const key = `${prediction.userId}:${scope}`;
+      const row = aggregates.get(key) ?? {
+        userId: prediction.userId,
+        scope,
+        points: 0,
+        predictions: 0,
+        exact: 0,
+        correctOutcome: 0,
+      };
+      row.points += score.points;
+      row.predictions++;
+      row.exact += score.category === "EXACT_SCORE" ? 1 : 0;
+      row.correctOutcome += [
+        "EXACT_SCORE",
+        "CORRECT_GOAL_DIFFERENCE",
+        "CORRECT_OUTCOME",
+      ].includes(score.category)
+        ? 1
+        : 0;
+      if (
+        prediction.createdAt &&
+        (!row.earliestPredictionAt ||
+          prediction.createdAt < row.earliestPredictionAt)
+      )
+        row.earliestPredictionAt = prediction.createdAt;
+      aggregates.set(key, row);
+    }
   }
-  const touchedUsers = [...new Set([...aggregates.values()].map(row => row.userId))];
-  const globalPoints = new Map([...aggregates.values()].filter(row => row.scope === "GLOBAL").map(row => [row.userId, row.points]));
-  const statOps = [...aggregates.values()].map(row => ({ updateOne: { filter: { userId: row.userId, scope: row.scope }, update: { $set: { ...row, globalPoints: globalPoints.get(row.userId) ?? 0, totalPoints: row.points, predictionCount: row.predictions, exactScores: row.exact, updatedAt: now } }, upsert: true } }));
+  const touchedUsers = [
+    ...new Set([...aggregates.values()].map((row) => row.userId)),
+  ];
+  const globalPoints = new Map(
+    [...aggregates.values()]
+      .filter((row) => row.scope === "GLOBAL")
+      .map((row) => [row.userId, row.points]),
+  );
+  const statOps = [...aggregates.values()].map((row) => ({
+    updateOne: {
+      filter: { userId: row.userId, scope: row.scope },
+      update: {
+        $set: {
+          ...row,
+          globalPoints: globalPoints.get(row.userId) ?? 0,
+          totalPoints: row.points,
+          predictionCount: row.predictions,
+          exactScores: row.exact,
+          updatedAt: now,
+        },
+      },
+      upsert: true,
+    },
+  }));
   // Scores and the materialized rows are one consistency unit. This prevents a
   // correction from exposing new scores with old leaderboard totals (or vice
   // versa) during a sync or concurrent request.
   await withMongoTransaction(async (transactionDb, session) => {
-    if (scoreOps.length) await transactionDb.collection("predictionScores").bulkWrite(scoreOps, { ordered: false, session });
-    if (touchedUsers.length) await transactionDb.collection("leaderboardStats").deleteMany({ userId: { $in: touchedUsers } }, { session });
-    if (statOps.length) await transactionDb.collection("leaderboardStats").bulkWrite(statOps, { ordered: false, session });
+    if (scoreOps.length)
+      await transactionDb
+        .collection("predictionScores")
+        .bulkWrite(scoreOps, { ordered: false, session });
+    if (touchedUsers.length)
+      await transactionDb
+        .collection("leaderboardStats")
+        .deleteMany({ userId: { $in: touchedUsers } }, { session });
+    if (statOps.length)
+      await transactionDb
+        .collection("leaderboardStats")
+        .bulkWrite(statOps, { ordered: false, session });
   });
-  await writeRankSnapshots(db, [...aggregates.values()].map(row => ({ userId: row.userId, scope: row.scope, points: row.points, exact: row.exact, correctOutcome: row.correctOutcome, predictions: row.predictions })), now);
+  await writeRankSnapshots(
+    db,
+    [...aggregates.values()].map((row) => ({
+      userId: row.userId,
+      scope: row.scope,
+      points: row.points,
+      exact: row.exact,
+      correctOutcome: row.correctOutcome,
+      predictions: row.predictions,
+    })),
+    now,
+  );
   const roundWinners = await rebuildRoundWinners(db);
   const awards = await grantAutomaticAwards(db);
-  return { matches: matches.length, scores: scoreOps.length, leaderboards: aggregates.size, roundWinners, awards };
+  return {
+    matches: matches.length,
+    scores: scoreOps.length,
+    leaderboards: aggregates.size,
+    roundWinners,
+    awards,
+  };
 }

@@ -3,7 +3,9 @@ import { syncMatchInsights } from "../lib/football/api-sports/matchInsights";
 
 async function main() {
   try {
-    const result = await syncMatchInsights(await getDb(), { force: process.env.SYNC_INSIGHTS_FORCE !== "false" });
+    const result = await syncMatchInsights(await getDb(), {
+      force: process.env.SYNC_INSIGHTS_FORCE !== "false",
+    });
     console.log(JSON.stringify(result, null, 2));
   } finally {
     await closeMongo();

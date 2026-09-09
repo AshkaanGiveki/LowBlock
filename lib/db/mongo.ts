@@ -1,33 +1,289 @@
-import { MongoClient, type Db } from "mongodb"; import { env } from "@/lib/env";
-const globalForMongo=globalThis as unknown as {mongo?:MongoClient; mongoPromise?:Promise<MongoClient>};
-function directUri(){if(!env.MONGODB_URI||!env.MONGODB_DIRECT_HOSTS)return undefined; const match=env.MONGODB_URI.match(/^mongodb\+srv:\/\/([^@]+)@([^/?]+)(?:\/[^?]*)?(?:\?.*)?$/); if(!match)return undefined; const replica=env.MONGODB_REPLICA_SET?`&replicaSet=${encodeURIComponent(env.MONGODB_REPLICA_SET)}`:""; return `mongodb://${match[1]}@${env.MONGODB_DIRECT_HOSTS}/?authSource=admin&tls=true${replica}`;}
-const mongoOptions = { serverSelectionTimeoutMS: 10_000, connectTimeoutMS: 10_000, socketTimeoutMS: 10_000, waitQueueTimeoutMS: 10_000, retryWrites: true, monitorCommands: true } as const;
-const ignoredMongoCommands = new Set(["hello", "ismaster", "saslContinue", "getMore"]);
+import { MongoClient, type Db } from "mongodb";
+import { env } from "@/lib/env";
+const globalForMongo = globalThis as unknown as {
+  mongo?: MongoClient;
+  mongoPromise?: Promise<MongoClient>;
+};
+function directUri() {
+  if (!env.MONGODB_URI || !env.MONGODB_DIRECT_HOSTS) return undefined;
+  const match = env.MONGODB_URI.match(
+    /^mongodb\+srv:\/\/([^@]+)@([^/?]+)(?:\/[^?]*)?(?:\?.*)?$/,
+  );
+  if (!match) return undefined;
+  const replica = env.MONGODB_REPLICA_SET
+    ? `&replicaSet=${encodeURIComponent(env.MONGODB_REPLICA_SET)}`
+    : "";
+  return `mongodb://${match[1]}@${env.MONGODB_DIRECT_HOSTS}/?authSource=admin&tls=true${replica}`;
+}
+const mongoOptions = {
+  serverSelectionTimeoutMS: 10_000,
+  connectTimeoutMS: 10_000,
+  socketTimeoutMS: 10_000,
+  waitQueueTimeoutMS: 10_000,
+  retryWrites: true,
+  monitorCommands: true,
+} as const;
+const ignoredMongoCommands = new Set([
+  "hello",
+  "ismaster",
+  "saslContinue",
+  "getMore",
+]);
 function instrumentMongoClient(client: MongoClient) {
   const started = new Map<number, number>();
-  client.on("commandStarted", event => { if (!ignoredMongoCommands.has(event.commandName)) started.set(event.requestId, performance.now()); });
-  client.on("commandSucceeded", event => {
-    const start = started.get(event.requestId); started.delete(event.requestId); if (start === undefined) return;
-    const reply = event.reply as { n?: number; cursor?: { firstBatch?: unknown[] } };
-    const resultCount = typeof reply.n === "number" ? reply.n : reply.cursor?.firstBatch?.length;
-    console.info(JSON.stringify({ type: "lowblock.db.query", operation: event.commandName, durationMs: Math.round((performance.now() - start) * 100) / 100, resultCount: resultCount ?? null }));
+  client.on("commandStarted", (event) => {
+    if (!ignoredMongoCommands.has(event.commandName))
+      started.set(event.requestId, performance.now());
   });
-  client.on("commandFailed", event => {
-    const start = started.get(event.requestId); started.delete(event.requestId); if (start === undefined) return;
-    console.warn(JSON.stringify({ type: "lowblock.db.query", operation: event.commandName, durationMs: Math.round((performance.now() - start) * 100) / 100, resultCount: null, failed: true }));
+  client.on("commandSucceeded", (event) => {
+    const start = started.get(event.requestId);
+    started.delete(event.requestId);
+    if (start === undefined) return;
+    const reply = event.reply as {
+      n?: number;
+      cursor?: { firstBatch?: unknown[] };
+    };
+    const resultCount =
+      typeof reply.n === "number" ? reply.n : reply.cursor?.firstBatch?.length;
+    console.info(
+      JSON.stringify({
+        type: "lowblock.db.query",
+        operation: event.commandName,
+        durationMs: Math.round((performance.now() - start) * 100) / 100,
+        resultCount: resultCount ?? null,
+      }),
+    );
+  });
+  client.on("commandFailed", (event) => {
+    const start = started.get(event.requestId);
+    started.delete(event.requestId);
+    if (start === undefined) return;
+    console.warn(
+      JSON.stringify({
+        type: "lowblock.db.query",
+        operation: event.commandName,
+        durationMs: Math.round((performance.now() - start) * 100) / 100,
+        resultCount: null,
+        failed: true,
+      }),
+    );
   });
   return client;
 }
-async function connect(){if(!env.MONGODB_URI)throw new Error("MONGODB_URI is not configured"); const fallback=directUri(); const client=globalForMongo.mongo??instrumentMongoClient(new MongoClient(fallback??env.MONGODB_URI,mongoOptions)); try{return await client.connect();}catch(error){if(!fallback)throw error; const srv=instrumentMongoClient(new MongoClient(env.MONGODB_URI,mongoOptions)); await srv.connect(); return srv;}}
-export async function getDb():Promise<Db>{if(!env.MONGODB_URI)throw new Error("MONGODB_URI is not configured"); if(!globalForMongo.mongoPromise){globalForMongo.mongoPromise=connect().then(client=>{globalForMongo.mongo=client; return client;}).catch(error=>{globalForMongo.mongoPromise=undefined; throw error;});} return (await globalForMongo.mongoPromise).db();}
-export async function closeMongo(){ const client = globalForMongo.mongo; globalForMongo.mongo = undefined; globalForMongo.mongoPromise = undefined; if (client) await client.close(); }
-export async function withMongoTransaction<T>(operation: (db: Db, session: import("mongodb").ClientSession) => Promise<T>) { const db = await getDb(); const client = globalForMongo.mongo; if (!client) throw new Error("Mongo client is not connected"); const session = client.startSession(); try { session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10_000 }); const result = await operation(db, session); await session.commitTransaction({ timeoutMS: 10_000 }); return result; } catch (error) { if (session.inTransaction()) await session.abortTransaction({ timeoutMS: 10_000 }).catch(() => undefined); throw error; } finally { await session.endSession(); } }
-export async function ensureIndexes(){const db=await getDb(); await Promise.all([
- db.collection("users").createIndex({normalizedUsername:1},{unique:true}),db.collection("sessions").createIndex({tokenHash:1},{unique:true}),db.collection("sessions").createIndex({expiresAt:1},{expireAfterSeconds:0}),
- db.collection("teams").createIndex({provider:1,providerTeamId:1},{unique:true}),db.collection("matches").createIndex({provider:1,providerMatchId:1},{unique:true}),db.collection("matches").createIndex({leagueCode:1,seasonStartYear:1,matchday:1}),db.collection("matches").createIndex({roundId:1,status:1,kickoffAt:1}),
- db.collection("predictions").createIndex({userId:1,matchId:1},{unique:true}),db.collection("predictionLockSnapshots").createIndex({predictionId:1},{unique:true}),db.collection("predictionLockSnapshots").createIndex({clubIdAtLock:1,matchId:1}),
- db.collection("predictionScores").createIndex({userId:1,matchId:1},{unique:true}),db.collection("predictionScores").createIndex({seasonStartYear:1,leagueCode:1,matchday:1,clubIdAtLock:1}),
- db.collection("leaderboardStats").createIndex({userId:1,scope:1},{unique:true}),db.collection("clubs").createIndex({ownerId:1},{unique:true}),db.collection("clubs").createIndex({state:1,discoveryMode:1}),db.collection("clubMemberships").createIndex({userId:1},{unique:true,partialFilterExpression:{leftAt:null},name:"active_membership_per_user"}),db.collection("clubMemberships").createIndex({clubId:1,leftAt:1}),db.collection("clubJoinRequests").createIndex({userId:1,clubId:1,status:1},{unique:true}),db.collection("clubInvitations").createIndex({clubId:1,email:1,status:1}),db.collection("clubInvitations").createIndex({tokenHash:1},{unique:true}),
- db.collection("seasons").createIndex({startYear:1},{unique:true}),db.collection("leagueSeasons").createIndex({leagueCode:1,seasonId:1},{unique:true}),db.collection("rounds").createIndex({leagueSeasonId:1,number:1},{unique:true}),db.collection("rounds").createIndex({status:1}),
- db.collection("footballApiQuota").createIndex({day:1},{unique:true}),db.collection("matchInsights").createIndex({matchId:1},{unique:true}),db.collection("h2hInsights").createIndex({pairKey:1},{unique:true}),db.collection("leagueInsightStandings").createIndex({leagueCode:1,season:1,day:1},{unique:true}),db.collection("syncRuns").createIndex({provider:1,startedAt:-1}),db.collection("externalIdentities").createIndex({provider:1,providerUserId:1},{unique:true}),db.collection("externalIdentities").createIndex({userId:1,provider:1},{unique:true}),db.collection("accountLinkTokens").createIndex({tokenHash:1},{unique:true}),db.collection("accountLinkTokens").createIndex({expiresAt:1},{expireAfterSeconds:0}),db.collection("notificationPreferences").createIndex({userId:1},{unique:true}),db.collection("notificationDeliveries").createIndex({userId:1,matchId:1,channel:1,type:1},{unique:true}),db.collection("channelPublications").createIndex({dateKey:1,type:1},{unique:true})]);}
-export async function ensurePerformanceIndexes(){const db=await getDb(); await Promise.all([db.collection("predictionScores").createIndex({seasonStartYear:1,leagueCode:1,clubIdAtLock:1,kickoffAt:1,userId:1},{name:"prediction_scores_scope_time"}),db.collection("leaderboardStats").createIndex({scope:1,points:-1,exact:-1,correctOutcome:-1,globalPoints:-1,earliestPredictionAt:1,predictions:-1,userId:1},{name:"leaderboard_rank_order"}),db.collection("rankSnapshots").createIndex({scope:1,dayKey:1},{unique:true}),db.collection("matches").createIndex({provider:1,status:1,kickoffAt:1,leagueCode:1},{name:"matches_public_schedule"})]);}
+async function connect() {
+  if (!env.MONGODB_URI) throw new Error("MONGODB_URI is not configured");
+  const fallback = directUri();
+  const client =
+    globalForMongo.mongo ??
+    instrumentMongoClient(
+      new MongoClient(fallback ?? env.MONGODB_URI, mongoOptions),
+    );
+  try {
+    return await client.connect();
+  } catch (error) {
+    if (!fallback) throw error;
+    const srv = instrumentMongoClient(
+      new MongoClient(env.MONGODB_URI, mongoOptions),
+    );
+    await srv.connect();
+    return srv;
+  }
+}
+export async function getDb(): Promise<Db> {
+  if (!env.MONGODB_URI) throw new Error("MONGODB_URI is not configured");
+  if (!globalForMongo.mongoPromise) {
+    globalForMongo.mongoPromise = connect()
+      .then((client) => {
+        globalForMongo.mongo = client;
+        return client;
+      })
+      .catch((error) => {
+        globalForMongo.mongoPromise = undefined;
+        throw error;
+      });
+  }
+  return (await globalForMongo.mongoPromise).db();
+}
+export async function closeMongo() {
+  const client = globalForMongo.mongo;
+  globalForMongo.mongo = undefined;
+  globalForMongo.mongoPromise = undefined;
+  if (client) await client.close();
+}
+export async function withMongoTransaction<T>(
+  operation: (db: Db, session: import("mongodb").ClientSession) => Promise<T>,
+) {
+  const db = await getDb();
+  const client = globalForMongo.mongo;
+  if (!client) throw new Error("Mongo client is not connected");
+  const session = client.startSession();
+  try {
+    session.startTransaction({
+      readConcern: { level: "snapshot" },
+      writeConcern: { w: "majority" },
+      maxCommitTimeMS: 10_000,
+    });
+    const result = await operation(db, session);
+    await session.commitTransaction({ timeoutMS: 10_000 });
+    return result;
+  } catch (error) {
+    if (session.inTransaction())
+      await session
+        .abortTransaction({ timeoutMS: 10_000 })
+        .catch(() => undefined);
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+}
+export async function ensureIndexes() {
+  const db = await getDb();
+  await Promise.all([
+    db
+      .collection("users")
+      .createIndex({ normalizedUsername: 1 }, { unique: true }),
+    db.collection("sessions").createIndex({ tokenHash: 1 }, { unique: true }),
+    db
+      .collection("sessions")
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db
+      .collection("teams")
+      .createIndex({ provider: 1, providerTeamId: 1 }, { unique: true }),
+    db
+      .collection("matches")
+      .createIndex({ provider: 1, providerMatchId: 1 }, { unique: true }),
+    db
+      .collection("matches")
+      .createIndex({ leagueCode: 1, seasonStartYear: 1, matchday: 1 }),
+    db
+      .collection("matches")
+      .createIndex({ roundId: 1, status: 1, kickoffAt: 1 }),
+    db
+      .collection("predictions")
+      .createIndex({ userId: 1, matchId: 1 }, { unique: true }),
+    db
+      .collection("predictionLockSnapshots")
+      .createIndex({ predictionId: 1 }, { unique: true }),
+    db
+      .collection("predictionLockSnapshots")
+      .createIndex({ clubIdAtLock: 1, matchId: 1 }),
+    db
+      .collection("predictionScores")
+      .createIndex({ userId: 1, matchId: 1 }, { unique: true }),
+    db
+      .collection("predictionScores")
+      .createIndex({
+        seasonStartYear: 1,
+        leagueCode: 1,
+        matchday: 1,
+        clubIdAtLock: 1,
+      }),
+    db
+      .collection("leaderboardStats")
+      .createIndex({ userId: 1, scope: 1 }, { unique: true }),
+    db.collection("clubs").createIndex({ ownerId: 1 }, { unique: true }),
+    db.collection("clubs").createIndex({ state: 1, discoveryMode: 1 }),
+    db
+      .collection("clubMemberships")
+      .createIndex(
+        { userId: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { leftAt: null },
+          name: "active_membership_per_user",
+        },
+      ),
+    db.collection("clubMemberships").createIndex({ clubId: 1, leftAt: 1 }),
+    db
+      .collection("clubJoinRequests")
+      .createIndex({ userId: 1, clubId: 1, status: 1 }, { unique: true }),
+    db
+      .collection("clubInvitations")
+      .createIndex({ clubId: 1, email: 1, status: 1 }),
+    db
+      .collection("clubInvitations")
+      .createIndex({ tokenHash: 1 }, { unique: true }),
+    db.collection("seasons").createIndex({ startYear: 1 }, { unique: true }),
+    db
+      .collection("leagueSeasons")
+      .createIndex({ leagueCode: 1, seasonId: 1 }, { unique: true }),
+    db
+      .collection("rounds")
+      .createIndex({ leagueSeasonId: 1, number: 1 }, { unique: true }),
+    db.collection("rounds").createIndex({ status: 1 }),
+    db.collection("footballApiQuota").createIndex({ day: 1 }, { unique: true }),
+    db
+      .collection("matchInsights")
+      .createIndex({ matchId: 1 }, { unique: true }),
+    db.collection("h2hInsights").createIndex({ pairKey: 1 }, { unique: true }),
+    db
+      .collection("leagueInsightStandings")
+      .createIndex({ leagueCode: 1, season: 1, day: 1 }, { unique: true }),
+    db.collection("syncRuns").createIndex({ provider: 1, startedAt: -1 }),
+    db
+      .collection("externalIdentities")
+      .createIndex({ provider: 1, providerUserId: 1 }, { unique: true }),
+    db
+      .collection("externalIdentities")
+      .createIndex({ userId: 1, provider: 1 }, { unique: true }),
+    db
+      .collection("accountLinkTokens")
+      .createIndex({ tokenHash: 1 }, { unique: true }),
+    db
+      .collection("accountLinkTokens")
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db
+      .collection("notificationPreferences")
+      .createIndex({ userId: 1 }, { unique: true }),
+    db
+      .collection("notificationDeliveries")
+      .createIndex(
+        { userId: 1, matchId: 1, channel: 1, type: 1 },
+        { unique: true },
+      ),
+    db
+      .collection("channelPublications")
+      .createIndex({ dateKey: 1, type: 1 }, { unique: true }),
+  ]);
+}
+export async function ensurePerformanceIndexes() {
+  const db = await getDb();
+  await Promise.all([
+    db
+      .collection("predictionScores")
+      .createIndex(
+        {
+          seasonStartYear: 1,
+          leagueCode: 1,
+          clubIdAtLock: 1,
+          kickoffAt: 1,
+          userId: 1,
+        },
+        { name: "prediction_scores_scope_time" },
+      ),
+    db
+      .collection("leaderboardStats")
+      .createIndex(
+        {
+          scope: 1,
+          points: -1,
+          exact: -1,
+          correctOutcome: -1,
+          globalPoints: -1,
+          earliestPredictionAt: 1,
+          predictions: -1,
+          userId: 1,
+        },
+        { name: "leaderboard_rank_order" },
+      ),
+    db
+      .collection("rankSnapshots")
+      .createIndex({ scope: 1, dayKey: 1 }, { unique: true }),
+    db
+      .collection("matches")
+      .createIndex(
+        { provider: 1, status: 1, kickoffAt: 1, leagueCode: 1 },
+        { name: "matches_public_schedule" },
+      ),
+  ]);
+}
