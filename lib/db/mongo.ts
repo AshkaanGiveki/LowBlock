@@ -147,6 +147,9 @@ export async function ensureIndexes() {
       .collection("sessions")
       .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db
+      .collection("telegramWebhookUpdates")
+      .createIndex({ updateId: 1 }, { unique: true }),
+    db
       .collection("teams")
       .createIndex({ provider: 1, providerTeamId: 1 }, { unique: true }),
     db

@@ -444,8 +444,7 @@ function MatchStatusBadge({
     homeGoals != null && awayGoals != null
       ? `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}`
       : "—";
-  if (live) {
-    const minute = elapsed ?? Math.max(1, Math.floor((now - kickoff) / 60_000));
+  if (live)
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/12 px-3 py-1.5 text-red-100 shadow-[0_0_22px_rgba(248,113,113,.12)]">
         <span className="relative flex h-2.5 w-2.5">
@@ -454,12 +453,13 @@ function MatchStatusBadge({
         </span>
         <b className="tracking-[.12em]">LIVE</b>
         <strong className="text-sm text-white">{result}</strong>
-        <small className="rounded-md bg-white/10 px-1.5 py-0.5 font-black">
-          {formatNumber(minute, language)}′
-        </small>
+        {elapsed != null && (
+          <small className="rounded-md bg-white/10 px-1.5 py-0.5 font-black">
+            {formatNumber(elapsed, language)}′
+          </small>
+        )}
       </span>
     );
-  }
   if (finished)
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-brand shadow-[0_0_22px_rgba(32,184,121,.1)]">

@@ -244,16 +244,11 @@ function Team({ team, name }: any) {
   );
 }
 function Status({ match, live, finished, number }: any) {
-  const minute =
-    match.elapsed ??
-    Math.max(
-      1,
-      Math.floor((Date.now() - new Date(match.kickoffAt).getTime()) / 60000),
-    );
   if (live)
     return (
       <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-black text-red-200">
-        <CircleDot size={11} className="animate-pulse" /> LIVE {number(minute)}′
+        <CircleDot size={11} className="animate-pulse" /> LIVE{" "}
+        {match.elapsed != null && `${number(match.elapsed)}′`}
       </div>
     );
   if (finished)

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
@@ -18,11 +18,10 @@ type TelegramMessage = {
   };
   chat?: { id?: number };
 };
+type TelegramUpdate = { update_id?: number; message?: TelegramMessage };
 
 export async function POST(req: Request) {
-  const update = (await req.json().catch(() => null)) as {
-    message?: TelegramMessage;
-  } | null;
+  const update = (await req.json().catch(() => null)) as TelegramUpdate | null;
   const message = update?.message;
   const text = typeof message?.text === "string" ? message.text.trim() : "";
   const chatId = message?.chat?.id;
@@ -41,7 +40,12 @@ export async function POST(req: Request) {
         process.env.TELEGRAM_WEBHOOK_SECRET
     )
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    await handleAdminSync(String(chatId));
+    if (
+      update?.update_id == null ||
+      !(await claimTelegramUpdate(update.update_id))
+    )
+      return NextResponse.json({ ok: true });
+    after(() => handleAdminSync(String(chatId)));
     return NextResponse.json({ ok: true });
   }
 
@@ -113,6 +117,18 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function claimTelegramUpdate(updateId: number) {
+  const collection = (await getDb()).collection("telegramWebhookUpdates");
+  await collection.createIndex({ updateId: 1 }, { unique: true });
+  try {
+    await collection.insertOne({ updateId, claimedAt: new Date() });
+    return true;
+  } catch (error) {
+    if ((error as { code?: number })?.code === 11000) return false;
+    throw error;
+  }
 }
 
 function commandName(text: string) {
