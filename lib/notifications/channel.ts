@@ -1,6 +1,6 @@
-import { Client } from "@upstash/qstash";
 import type { Db } from "mongodb";
 import { env } from "@/lib/env";
+import { getQstashClient } from "./qstash";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { scheduleMatchdayPolling } from "@/lib/notifications/matchday";
 
@@ -276,7 +276,7 @@ export async function scheduleFirstMatchChannelReminder(
   db: Db,
   date = new Date(),
 ) {
-  if (!env.QSTASH_TOKEN || !env.NEXT_PUBLIC_APP_URL) return false;
+  const qstash = getQstashClient();
   const dateKey = utcDateKey(date);
   const bounds = utcDayBounds(dateKey);
   const match = await db
@@ -297,7 +297,7 @@ export async function scheduleFirstMatchChannelReminder(
   if (!match) return false;
   const runAt = new Date(new Date(match.kickoffAt).getTime() - 1800000);
   if (runAt <= new Date()) return false;
-  await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
+  await qstash.publishJSON({
     url: `${env.NEXT_PUBLIC_APP_URL}/api/notifications/channel-first-match`,
     body: { dateKey, matchId: match.providerMatchId },
     notBefore: Math.floor(runAt.getTime() / 1000),
@@ -306,7 +306,7 @@ export async function scheduleFirstMatchChannelReminder(
   return true;
 }
 export async function scheduleChannelDailyPosts(date = new Date()) {
-  if (!env.QSTASH_TOKEN || !env.NEXT_PUBLIC_APP_URL) return 0;
+  const qstash = getQstashClient();
   const dateKey = utcDateKey(date);
   const bounds = utcDayBounds(dateKey);
   const jobs = [
@@ -324,7 +324,7 @@ export async function scheduleChannelDailyPosts(date = new Date()) {
   let scheduled = 0;
   for (const job of jobs) {
     if (job.runAt <= new Date()) continue;
-    await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
+    await qstash.publishJSON({
       url: `${env.NEXT_PUBLIC_APP_URL}${job.path}`,
       body: { dateKey },
       notBefore: Math.floor(job.runAt.getTime() / 1000),
