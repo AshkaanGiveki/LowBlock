@@ -10,7 +10,26 @@ import { AwardReveal } from "@/components/AwardReveal";
 import { PlatformBootstrap } from "@/components/PlatformBootstrap";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } } }));
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: { staleTime: 30_000, refetchOnWindowFocus: false },
+        },
+      }),
+  );
   const [store] = useState(makeStore);
-  return <Provider store={store}><QueryClientProvider client={queryClient}><LanguageProvider><ToastProvider><PlatformBootstrap />{children}<AwardReveal /></ToastProvider></LanguageProvider></QueryClientProvider></Provider>;
+  return (
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <ToastProvider>
+            <PlatformBootstrap />
+            {children}
+            <AwardReveal />
+          </ToastProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+    </Provider>
+  );
 }

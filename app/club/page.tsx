@@ -502,7 +502,12 @@ function ClubLeaderboard({
                 >
                   {index < 3 ? <Crown size={14} /> : row.rank}
                 </span>
-                <UserAvatar name={row.username} avatarUrl={row.avatarUrl} isDefendingChampion={row.isDefendingChampion} className="h-10 w-10 text-xs" />
+                <UserAvatar
+                  name={row.username}
+                  avatarUrl={row.avatarUrl}
+                  isDefendingChampion={row.isDefendingChampion}
+                  className="h-10 w-10 text-xs"
+                />
                 <span className="min-w-0 flex-1">
                   <b className="block truncate text-sm">{row.username}</b>
                   <small className="text-[10px] text-[var(--muted)]">

@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { BackButton } from "@/components/BackButton";
 import { UserAvatar } from "@/components/UserAvatar";
+import { LocalDate } from "@/components/LocalDateTime";
 
 type Request = {
   _id: string;
@@ -279,7 +280,12 @@ function RequestCard({
         href={`/u/${encodeURIComponent(username)}`}
         className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-brand/30 bg-brand/10 text-sm font-black text-brand transition hover:border-brand"
       >
-        <UserAvatar name={username} avatarUrl={request.user?.avatarUrl} isDefendingChampion={request.isDefendingChampion} className="h-full w-full text-sm" />
+        <UserAvatar
+          name={username}
+          avatarUrl={request.user?.avatarUrl}
+          isDefendingChampion={request.isDefendingChampion}
+          className="h-full w-full text-sm"
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <Link
@@ -290,7 +296,7 @@ function RequestCard({
         </Link>
         <small className="text-xs text-[var(--muted)]">
           {t("درخواست ارسال شده در", "Requested")}{" "}
-          {new Date(request.createdAt).toLocaleDateString()}
+          <LocalDate value={request.createdAt} locale="en-GB" />
         </small>
       </div>
       <div className="flex shrink-0 items-center gap-2">

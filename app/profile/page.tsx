@@ -7,7 +7,11 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { ConnectedAccounts } from "@/components/ConnectedAccounts";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PlatformNotificationToggle } from "@/components/PlatformNotificationToggle";
-type User = { username: string; avatarUrl: string | null; isDefendingChampion?: boolean };
+type User = {
+  username: string;
+  avatarUrl: string | null;
+  isDefendingChampion?: boolean;
+};
 export default function ProfilePage() {
   const router = useRouter();
   const { t } = useLanguage();
@@ -20,7 +24,9 @@ export default function ProfilePage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [embeddedPlatform, setEmbeddedPlatform] = useState<"telegram" | "bale" | null>(null);
+  const [embeddedPlatform, setEmbeddedPlatform] = useState<
+    "telegram" | "bale" | null
+  >(null);
   const [platformUsername, setPlatformUsername] = useState<string | null>(null);
   const [platformChecked, setPlatformChecked] = useState(false);
   useEffect(() => {
@@ -33,9 +39,27 @@ export default function ProfilePage() {
       });
   }, [router]);
   useEffect(() => {
-    const w = window as Window & { Telegram?: { WebApp?: { initData?: string; initDataUnsafe?: { user?: { username?: string } } } }; Bale?: { WebApp?: { initData?: string; initDataUnsafe?: { user?: { username?: string } } } } };
-    const platform = w.Telegram?.WebApp?.initData ? "telegram" : w.Bale?.WebApp?.initData ? "bale" : null;
-    const webApp = platform === "telegram" ? w.Telegram?.WebApp : w.Bale?.WebApp;
+    const w = window as Window & {
+      Telegram?: {
+        WebApp?: {
+          initData?: string;
+          initDataUnsafe?: { user?: { username?: string } };
+        };
+      };
+      Bale?: {
+        WebApp?: {
+          initData?: string;
+          initDataUnsafe?: { user?: { username?: string } };
+        };
+      };
+    };
+    const platform = w.Telegram?.WebApp?.initData
+      ? "telegram"
+      : w.Bale?.WebApp?.initData
+        ? "bale"
+        : null;
+    const webApp =
+      platform === "telegram" ? w.Telegram?.WebApp : w.Bale?.WebApp;
     setEmbeddedPlatform(platform);
     setPlatformUsername(webApp?.initDataUnsafe?.user?.username ?? null);
     setPlatformChecked(true);
@@ -111,13 +135,23 @@ export default function ProfilePage() {
             {t("پروفایل شما", "Your profile")}
           </h1>
         </section>
-        {platformChecked && embeddedPlatform && <PlatformNotificationToggle provider={embeddedPlatform} username={platformUsername} />}
+        {platformChecked && embeddedPlatform && (
+          <PlatformNotificationToggle
+            provider={embeddedPlatform}
+            username={platformUsername}
+          />
+        )}
         <form
           onSubmit={save}
           className="mt-4 rounded-2xl border border-white/[.08] bg-[#101512] p-5 md:p-7"
         >
           <div className="mb-7 flex items-center gap-4">
-            <UserAvatar name={user?.username ?? "Profile"} avatarUrl={avatarUrl} isDefendingChampion={user?.isDefendingChampion} className="h-16 w-16 border border-brand/30 text-xl" />
+            <UserAvatar
+              name={user?.username ?? "Profile"}
+              avatarUrl={avatarUrl}
+              isDefendingChampion={user?.isDefendingChampion}
+              className="h-16 w-16 border border-brand/30 text-xl"
+            />
             <div>
               <b>{user?.username ?? "…"}</b>
               <p className="mt-1 text-xs text-[var(--muted)]">
@@ -238,7 +272,35 @@ export default function ProfilePage() {
             </button>
           </div>
         </form>
-        {platformChecked && (embeddedPlatform ? <section className="mt-4 rounded-2xl border border-brand/20 bg-[linear-gradient(135deg,rgba(32,184,121,.12),rgba(16,21,18,.96))] p-5 md:p-7"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand"><PlatformIcon provider={embeddedPlatform}/></span><div className="min-w-0"><h2 className="font-black text-white">{t("حساب متصل به پلتفرم", "Platform-linked account")}</h2><p className="mt-2 text-sm leading-6 text-white/65">{t(`این حساب LowBlock به حساب ${embeddedPlatform === "telegram" ? "تلگرام" : "بله"}${platformUsername ? ` @${platformUsername}` : ""} شما متصل است.`, `This LowBlock account is linked to your ${embeddedPlatform === "telegram" ? "Telegram" : "Bale"}${platformUsername ? ` @${platformUsername}` : ""} account.`)}</p><p className="mt-2 text-xs leading-5 text-white/45">{t("برای قطع اتصال یا مدیریت حساب‌های متصل، LowBlock را مستقیماً در مرورگر باز کنید.", "To disconnect or manage connected accounts, open LowBlock directly in your browser.")}</p></div></div></section> : <ConnectedAccounts />)}
+        {platformChecked &&
+          (embeddedPlatform ? (
+            <section className="mt-4 rounded-2xl border border-brand/20 bg-[linear-gradient(135deg,rgba(32,184,121,.12),rgba(16,21,18,.96))] p-5 md:p-7">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand">
+                  <PlatformIcon provider={embeddedPlatform} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="font-black text-white">
+                    {t("حساب متصل به پلتفرم", "Platform-linked account")}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-white/65">
+                    {t(
+                      `این حساب LowBlock به حساب ${embeddedPlatform === "telegram" ? "تلگرام" : "بله"}${platformUsername ? ` @${platformUsername}` : ""} شما متصل است.`,
+                      `This LowBlock account is linked to your ${embeddedPlatform === "telegram" ? "Telegram" : "Bale"}${platformUsername ? ` @${platformUsername}` : ""} account.`,
+                    )}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-white/45">
+                    {t(
+                      "برای قطع اتصال یا مدیریت حساب‌های متصل، LowBlock را مستقیماً در مرورگر باز کنید.",
+                      "To disconnect or manage connected accounts, open LowBlock directly in your browser.",
+                    )}
+                  </p>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <ConnectedAccounts />
+          ))}
       </div>
     </main>
   );

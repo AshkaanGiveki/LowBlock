@@ -21,12 +21,31 @@ import { PublicAwardsSection } from "@/components/PublicAwardsSection";
 
 export const revalidate = 60;
 
-export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
   const { username } = await params;
   const db = await getDb();
-  const user = await db.collection<any>("users").findOne({ normalizedUsername: username.toLowerCase() }, { projection: { username: 1, bio: 1 } });
-  if (!user) return { title: "Profile not found", robots: { index: false, follow: false } };
-  return { title: `${user.username}'s Football Prediction Profile`, description: user.bio || `View ${user.username}'s public LowBlock football prediction profile, awards, and leaderboard performance.`, alternates: { canonical: `/u/${encodeURIComponent(user.username)}` } };
+  const user = await db
+    .collection<any>("users")
+    .findOne(
+      { normalizedUsername: username.toLowerCase() },
+      { projection: { username: 1, bio: 1 } },
+    );
+  if (!user)
+    return {
+      title: "Profile not found",
+      robots: { index: false, follow: false },
+    };
+  return {
+    title: `${user.username}'s Football Prediction Profile`,
+    description:
+      user.bio ||
+      `View ${user.username}'s public LowBlock football prediction profile, awards, and leaderboard performance.`,
+    alternates: { canonical: `/u/${encodeURIComponent(user.username)}` },
+  };
 }
 
 export default async function PublicProfile({
@@ -37,10 +56,12 @@ export default async function PublicProfile({
   const { username } = await params;
   const db = await getDb();
   const [user, championId] = await Promise.all([
-    db.collection<any>("users").findOne(
-      { normalizedUsername: username.toLowerCase() },
-      { projection: { username: 1, avatarUrl: 1, bio: 1 } },
-    ),
+    db
+      .collection<any>("users")
+      .findOne(
+        { normalizedUsername: username.toLowerCase() },
+        { projection: { username: 1, avatarUrl: 1, bio: 1 } },
+      ),
     getDefendingChampionUserId(db),
   ]);
   if (!user) notFound();
@@ -121,7 +142,12 @@ export default async function PublicProfile({
             <span className="absolute -inset-4 rounded-full border border-dashed border-brand/35" />
             <span className="absolute -inset-8 rounded-full border border-brand/10" />
             <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-full border-2 border-brand/70 bg-brand/15 text-3xl font-black text-white shadow-[0_0_0_8px_rgba(32,184,121,.1),0_18px_50px_rgba(0,0,0,.3)] sm:h-32 sm:w-32">
-              <UserAvatar name={user.username} avatarUrl={user.avatarUrl} isDefendingChampion={String(user._id) === championId} className="h-full w-full text-3xl" />
+              <UserAvatar
+                name={user.username}
+                avatarUrl={user.avatarUrl}
+                isDefendingChampion={String(user._id) === championId}
+                className="h-full w-full text-3xl"
+              />
             </div>
             <span className="absolute -bottom-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#0d1711] bg-brand text-[#07100b]">
               <Crown size={15} />

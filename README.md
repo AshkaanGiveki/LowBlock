@@ -56,11 +56,11 @@ The interface is designed around a calm, focused matchday flow: join the competi
 
 ## What LowBlock feels like
 
-| Before kick-off | During the round | After the whistle |
-|---|---|---|
-| Lock in a score prediction | Follow fixtures and round progress | Explore analytics and earned points |
-| See team form and kick-off time | Compare your position with the league | Review every prediction and result |
-| Compete in a fair, transparent system | Keep predictions private until the match starts | Build a season-long record |
+| Before kick-off                       | During the round                                | After the whistle                   |
+| ------------------------------------- | ----------------------------------------------- | ----------------------------------- |
+| Lock in a score prediction            | Follow fixtures and round progress              | Explore analytics and earned points |
+| See team form and kick-off time       | Compare your position with the league           | Review every prediction and result  |
+| Compete in a fair, transparent system | Keep predictions private until the match starts | Build a season-long record          |
 
 ## Product highlights
 
@@ -93,13 +93,13 @@ The scheduled sync fetches match lists and results first. Only after a successfu
 
 LowBlock’s default scoring rules are intentionally simple and transparent:
 
-| Outcome | Points |
-|---|---:|
-| Exact score | 10 |
-| Correct winner or draw | 5 |
-| Correct goal difference | 7 |
-| Valid participation | 2 |
-| No prediction | 0 |
+| Outcome                 | Points |
+| ----------------------- | -----: |
+| Exact score             |     10 |
+| Correct winner or draw  |      5 |
+| Correct goal difference |      7 |
+| Valid participation     |      2 |
+| No prediction           |      0 |
 
 The scoring implementation is the authority; this table is a quick explanation for players. If the product rules change, update the engine and this table together.
 
@@ -143,29 +143,29 @@ Never commit `.env.local`, API tokens, MongoDB credentials, or session secrets.
 
 ## Environment reference
 
-| Variable | Purpose |
-|---|---|
-| `MONGODB_URI` | MongoDB connection string |
-| `MONGODB_DIRECT_HOSTS` | Optional direct host override for Atlas troubleshooting |
-| `MONGODB_REPLICA_SET` | Optional replica-set name |
-| `SESSION_SECRET` | Secret used to sign website sessions |
-| `CRON_SECRET` | Secret protecting scheduled sync endpoints |
-| `TELEGRAM_BOT_TOKEN` | Server-only Telegram Bot API token used for Mini App verification and delivery |
-| `TELEGRAM_BOT_USERNAME` | Telegram bot username used for account-link deep links |
-| `TELEGRAM_ADMIN_CHAT_ID` | Exact Telegram chat ID allowed to run the private `/sync_now` result-sync command |
-| `TELEGRAM_WEBHOOK_SECRET` | Secret token configured with Telegram’s webhook and required for the private admin command |
-| `BALE_BOT_TOKEN` | Server-only Bale bot token used for Mini App verification |
-| `BALE_BOT_USERNAME` | Bale bot username used for account-link deep links |
-| `QSTASH_TOKEN` | Server-only Upstash QStash publishing token |
-| `QSTASH_CURRENT_SIGNING_KEY` | QStash callback verification key |
-| `QSTASH_NEXT_SIGNING_KEY` | QStash callback key during key rotation |
-| `NEXT_PUBLIC_APP_URL` | Canonical public URL used by links and metadata |
-| `APP_TIMEZONE` | Scheduling/display timezone; defaults to `Asia/Tehran` |
-| `FOOTBALL_API_KEY` | API-Football key |
-| `FOOTBALL_API_BASE_URL` | Football provider base URL |
-| `FOOTBALL_API_SEASON` | Optional explicit season override |
-| `FOOTBALL_API_DAILY_LIMIT` | Provider request budget |
-| `FOOTBALL_API_DETAIL_BATCH_SIZE` | Detail-fetch batch size |
+| Variable                         | Purpose                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `MONGODB_URI`                    | MongoDB connection string                                                                  |
+| `MONGODB_DIRECT_HOSTS`           | Optional direct host override for Atlas troubleshooting                                    |
+| `MONGODB_REPLICA_SET`            | Optional replica-set name                                                                  |
+| `SESSION_SECRET`                 | Secret used to sign website sessions                                                       |
+| `CRON_SECRET`                    | Secret protecting scheduled sync endpoints                                                 |
+| `TELEGRAM_BOT_TOKEN`             | Server-only Telegram Bot API token used for Mini App verification and delivery             |
+| `TELEGRAM_BOT_USERNAME`          | Telegram bot username used for account-link deep links                                     |
+| `TELEGRAM_ADMIN_CHAT_ID`         | Exact Telegram chat ID allowed to run the private `/sync_now` result-sync command          |
+| `TELEGRAM_WEBHOOK_SECRET`        | Secret token configured with Telegram’s webhook and required for the private admin command |
+| `BALE_BOT_TOKEN`                 | Server-only Bale bot token used for Mini App verification                                  |
+| `BALE_BOT_USERNAME`              | Bale bot username used for account-link deep links                                         |
+| `QSTASH_TOKEN`                   | Server-only Upstash QStash publishing token                                                |
+| `QSTASH_CURRENT_SIGNING_KEY`     | QStash callback verification key                                                           |
+| `QSTASH_NEXT_SIGNING_KEY`        | QStash callback key during key rotation                                                    |
+| `NEXT_PUBLIC_APP_URL`            | Canonical public URL used by links and metadata                                            |
+| `APP_TIMEZONE`                   | Scheduling/display timezone; defaults to `Asia/Tehran`                                     |
+| `FOOTBALL_API_KEY`               | API-Football key                                                                           |
+| `FOOTBALL_API_BASE_URL`          | Football provider base URL                                                                 |
+| `FOOTBALL_API_SEASON`            | Optional explicit season override                                                          |
+| `FOOTBALL_API_DAILY_LIMIT`       | Provider request budget                                                                    |
+| `FOOTBALL_API_DETAIL_BATCH_SIZE` | Detail-fetch batch size                                                                    |
 
 ## Repository map
 

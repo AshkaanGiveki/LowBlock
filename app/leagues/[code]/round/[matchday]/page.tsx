@@ -14,11 +14,23 @@ import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ code: string; matchday: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string; matchday: string }>;
+}): Promise<Metadata> {
   const { code, matchday } = await params;
   const league = getLeague(code);
-  if (!league) return { title: "Round not found", robots: { index: false, follow: false } };
-  return { title: `${league.enName} Round ${matchday} Predictions`, description: `Follow ${league.enName} Round ${matchday}, compare predictions, and see the LowBlock round leaderboard.`, alternates: { canonical: `/leagues/${league.code}/round/${matchday}` } };
+  if (!league)
+    return {
+      title: "Round not found",
+      robots: { index: false, follow: false },
+    };
+  return {
+    title: `${league.enName} Round ${matchday} Predictions`,
+    description: `Follow ${league.enName} Round ${matchday}, compare predictions, and see the LowBlock round leaderboard.`,
+    alternates: { canonical: `/leagues/${league.code}/round/${matchday}` },
+  };
 }
 
 export default async function RoundPage({
@@ -131,19 +143,31 @@ export default async function RoundPage({
             </div>
           </div>
         </div>
-        <Suspense fallback={<div className="mt-6 h-72 animate-pulse rounded-3xl bg-white/[.06]" />}><RoundMatchGrid
-          focusMatchId={focusMatchId}
-          fixtures={matches.map((match) => ({
-            providerMatchId: match.providerMatchId,
-            kickoffAt: new Date(match.kickoffAt).toISOString(),
-            status: match.status,
-            homeGoals: match.homeGoals,
-            awayGoals: match.awayGoals,
-            homeTeam: match.homeTeam,
-            awayTeam: match.awayTeam,
-          }))}
-        /></Suspense>
-        <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-3xl bg-white/[.06]" />}><LeagueRoundLeaderboard players={players} /></Suspense>
+        <Suspense
+          fallback={
+            <div className="mt-6 h-72 animate-pulse rounded-3xl bg-white/[.06]" />
+          }
+        >
+          <RoundMatchGrid
+            focusMatchId={focusMatchId}
+            fixtures={matches.map((match) => ({
+              providerMatchId: match.providerMatchId,
+              kickoffAt: new Date(match.kickoffAt).toISOString(),
+              status: match.status,
+              homeGoals: match.homeGoals,
+              awayGoals: match.awayGoals,
+              homeTeam: match.homeTeam,
+              awayTeam: match.awayTeam,
+            }))}
+          />
+        </Suspense>
+        <Suspense
+          fallback={
+            <div className="mt-6 h-96 animate-pulse rounded-3xl bg-white/[.06]" />
+          }
+        >
+          <LeagueRoundLeaderboard players={players} />
+        </Suspense>
       </div>
     </main>
   );

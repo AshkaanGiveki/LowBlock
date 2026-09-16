@@ -29,7 +29,19 @@ export function Nav() {
   const pathname = usePathname();
   const { language, setLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
-  const { data: navData } = useQuery({ queryKey: ["navigation-context"], queryFn: async () => { const [meResponse, clubResponse] = await Promise.all([fetch("/api/auth/me"), fetch("/api/clubs")]); return { me: await meResponse.json(), club: await clubResponse.json() }; }, staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const { data: navData } = useQuery({
+    queryKey: ["navigation-context"],
+    queryFn: async () => {
+      const [meResponse, clubResponse] = await Promise.all([
+        fetch("/api/auth/me"),
+        fetch("/api/clubs"),
+      ]);
+      return { me: await meResponse.json(), club: await clubResponse.json() };
+    },
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
   const avatar = navData?.me?.user?.avatarUrl ?? null;
   const isDefendingChampion = Boolean(navData?.me?.user?.isDefendingChampion);
   const clubImage = navData?.club?.club?.imageUrl ?? null;
@@ -67,7 +79,12 @@ export function Nav() {
       <header className="fixed inset-x-0 top-0 z-50 h-[70px] border-b border-white/[.07] bg-[#080b0a]/85 backdrop-blur-2xl">
         <div className="relative mx-auto h-full max-w-7xl px-5 md:px-8">
           <LanguageMenu language={language} setLanguage={setLanguage} fa={fa} />
-          <DesktopUtilityBar avatar={avatar} language={language} setLanguage={setLanguage} fa={fa} />
+          <DesktopUtilityBar
+            avatar={avatar}
+            language={language}
+            setLanguage={setLanguage}
+            fa={fa}
+          />
         </div>
         {loading && (
           <motion.span
@@ -127,7 +144,15 @@ export function Nav() {
               animate={{ y: active("/profile") ? 2 : 0 }}
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
               className="relative z-10 h-7 w-7 rounded-full object-cover"
-            ><Image src={avatar} alt="Profile" width={28} height={28} className="h-full w-full rounded-full object-cover" /></motion.div>
+            >
+              <Image
+                src={avatar}
+                alt="Profile"
+                width={28}
+                height={28}
+                className="h-full w-full rounded-full object-cover"
+              />
+            </motion.div>
           ) : (
             navIcon(UserRound, active("/profile"))
           )}
@@ -217,6 +242,46 @@ function LanguageMenu({
   );
 }
 
-function DesktopUtilityBar({ avatar, language, setLanguage, fa }: { avatar: string | null; language: "fa" | "en"; setLanguage: (value: "fa" | "en") => void; fa: boolean }) {
-  return <div className="desktop-utility-only"><Link href="/profile" className="desktop-user-chip"><UserAvatar name={fa ? "پروفایل" : "Profile"} avatarUrl={avatar} className="h-8 w-8 text-[10px]" /><span><small>{fa ? "حساب شما" : "YOUR ACCOUNT"}</small><b>{fa ? "پروفایل من" : "My profile"}</b></span><ChevronDown size={14} /></Link><button type="button" className="desktop-utility-button" onClick={() => setLanguage(fa ? "en" : "fa")} aria-label={fa ? "Switch to English" : "تغییر زبان به فارسی"}>{fa ? "EN" : "فا"}</button><Link href="/help" className="desktop-utility-button" aria-label={fa ? "راهنما" : "Help"}><Globe2 size={17} /></Link></div>;
+function DesktopUtilityBar({
+  avatar,
+  language,
+  setLanguage,
+  fa,
+}: {
+  avatar: string | null;
+  language: "fa" | "en";
+  setLanguage: (value: "fa" | "en") => void;
+  fa: boolean;
+}) {
+  return (
+    <div className="desktop-utility-only">
+      <Link href="/profile" className="desktop-user-chip">
+        <UserAvatar
+          name={fa ? "پروفایل" : "Profile"}
+          avatarUrl={avatar}
+          className="h-8 w-8 text-[10px]"
+        />
+        <span>
+          <small>{fa ? "حساب شما" : "YOUR ACCOUNT"}</small>
+          <b>{fa ? "پروفایل من" : "My profile"}</b>
+        </span>
+        <ChevronDown size={14} />
+      </Link>
+      <button
+        type="button"
+        className="desktop-utility-button"
+        onClick={() => setLanguage(fa ? "en" : "fa")}
+        aria-label={fa ? "Switch to English" : "تغییر زبان به فارسی"}
+      >
+        {fa ? "EN" : "فا"}
+      </button>
+      <Link
+        href="/help"
+        className="desktop-utility-button"
+        aria-label={fa ? "راهنما" : "Help"}
+      >
+        <Globe2 size={17} />
+      </Link>
+    </div>
+  );
 }

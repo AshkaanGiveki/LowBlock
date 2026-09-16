@@ -5,6 +5,7 @@ import { T, useLanguage } from "@/components/LanguageProvider";
 import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
 import { UserAvatar } from "@/components/UserAvatar";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type Match = {
   matchId: string;
@@ -49,7 +50,12 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                 className="flex w-full items-center gap-3 p-4 text-start"
               >
                 <b className="w-6 text-[var(--muted)]">{n(index + 1)}</b>
-                <UserAvatar name={player.username} avatarUrl={player.avatarUrl} isDefendingChampion={player.isDefendingChampion} className="h-11 w-11" />
+                <UserAvatar
+                  name={player.username}
+                  avatarUrl={player.avatarUrl}
+                  isDefendingChampion={player.isDefendingChampion}
+                  className="h-11 w-11"
+                />
                 <span className="flex-1">
                   <b className="block">{player.username}</b>
                   <small className="text-[var(--muted)]">
@@ -79,9 +85,10 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                       className="rounded-xl bg-black/20 p-3"
                     >
                       <div className="text-[10px] text-[var(--muted)]">
-                        {new Date(match.kickoffAt).toLocaleString(
-                          language === "fa" ? "fa-IR" : "en-GB",
-                        )}{" "}
+                        <LocalDateTime
+                          value={match.kickoffAt}
+                          locale={language === "fa" ? "fa-IR" : "en-GB"}
+                        />{" "}
                         <span className="float-end text-brand">
                           {match.revealed ? (
                             match.points === null ? (

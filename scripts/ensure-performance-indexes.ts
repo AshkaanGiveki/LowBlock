@@ -9,12 +9,18 @@ void (async () => {
       db.collection("predictionScores").indexes(),
       db.collection("matches").indexes(),
     ]);
-    console.log(JSON.stringify({
-      database: db.databaseName,
-      leaderboardStats: indexes[0].map(index => index.name),
-      predictionScores: indexes[1].map(index => index.name),
-      matches: indexes[2].map(index => index.name),
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          database: db.databaseName,
+          leaderboardStats: indexes[0].map((index) => index.name),
+          predictionScores: indexes[1].map((index) => index.name),
+          matches: indexes[2].map((index) => index.name),
+        },
+        null,
+        2,
+      ),
+    );
   } finally {
     await closeMongo();
   }

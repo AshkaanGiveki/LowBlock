@@ -2,72 +2,574 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, BookOpen, ChevronDown, CircleHelp, Clock3, LockKeyhole, Search, ShieldCheck, Sparkles, Trophy, UsersRound, X } from "lucide-react";
+import {
+  BarChart3,
+  BookOpen,
+  ChevronDown,
+  CircleHelp,
+  Clock3,
+  LockKeyhole,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
-type HelpItem = { category: string; icon: typeof BookOpen; question: string; answer: string; questionFa: string; answerFa: string };
+type HelpItem = {
+  category: string;
+  icon: typeof BookOpen;
+  question: string;
+  answer: string;
+  questionFa: string;
+  answerFa: string;
+};
 
 const items: HelpItem[] = [
-  { category: "Getting started", icon: Sparkles, question: "What is LowBlock?", answer: "LowBlock is a football prediction competition. Make one score prediction for each fixture, earn points when the official result is final, and climb the global, league, round, and Club leaderboards.", questionFa: "LowBlock چیست؟", answerFa: "LowBlock یک رقابت پیش‌بینی فوتبال است. برای هر مسابقه فقط یک نتیجه ثبت می‌کنید، پس از نهایی‌شدن نتیجه رسمی امتیاز می‌گیرید و در جدول‌های جهانی، لیگ، راند و باشگاه پیشرفت می‌کنید." },
-  { category: "Getting started", icon: Sparkles, question: "Do I need to join a Club to compete?", answer: "No. Every registered user automatically competes in the public LowBlock community. A Club is an optional social team layer on top of your global competition.", questionFa: "آیا برای رقابت باید عضو باشگاه باشم؟", answerFa: "خیر. هر کاربر ثبت‌نام‌شده به‌صورت خودکار در رقابت عمومی LowBlock حضور دارد. باشگاه یک لایه اجتماعی اختیاری در کنار رقابت جهانی شماست." },
-  { category: "Predictions", icon: BookOpen, question: "Where do I submit predictions?", answer: "Use the central Predict page. There is only one prediction interface. The same prediction is used everywhere: globally, in leagues, rounds, and your Club.", questionFa: "پیش‌بینی را از کجا ثبت کنم؟", answerFa: "از صفحه اصلی «پیش‌بینی» استفاده کنید. فقط یک محل برای ثبت پیش‌بینی وجود دارد و همان نتیجه در جدول جهانی، لیگ‌ها، راندها و باشگاه شما استفاده می‌شود." },
-  { category: "Predictions", icon: LockKeyhole, question: "Can I edit a prediction?", answer: "Yes, until the server-side prediction deadline. After a fixture locks, your prediction is immutable. The deadline is determined by LowBlock’s backend, not your device clock.", questionFa: "آیا می‌توانم پیش‌بینی را ویرایش کنم؟", answerFa: "بله، تا قبل از مهلت قفل‌شدن مسابقه. پس از قفل‌شدن، پیش‌بینی قابل تغییر نیست. این مهلت توسط سرور LowBlock تعیین می‌شود، نه ساعت دستگاه شما." },
-  { category: "Predictions", icon: LockKeyhole, question: "Can I make different predictions for different competitions?", answer: "No. One user and one fixture always equals one prediction. This prevents duplicate or contradictory predictions across Clubs, leagues, rounds, and future competition modes.", questionFa: "آیا می‌توانم برای هر رقابت نتیجه متفاوتی ثبت کنم؟", answerFa: "خیر. برای هر کاربر و هر مسابقه فقط یک پیش‌بینی وجود دارد. این قانون از ثبت نتایج متناقض در باشگاه، لیگ، راند و رقابت‌های آینده جلوگیری می‌کند." },
-  { category: "Scoring", icon: Trophy, question: "How are points calculated?", answer: "When a fixture becomes final, LowBlock scores each eligible prediction once with the canonical scoring function. Exact-score points and correct-outcome points are stored with that prediction score and reused by every leaderboard.", questionFa: "امتیازها چگونه محاسبه می‌شوند؟", answerFa: "وقتی مسابقه نهایی شد، LowBlock هر پیش‌بینی معتبر را فقط یک‌بار با سیستم امتیازدهی اصلی محاسبه می‌کند. امتیاز نتیجه دقیق و نتیجه صحیح همراه با امتیاز پیش‌بینی ذخیره می‌شود و همه جدول‌ها از همان داده استفاده می‌کنند." },
-  { category: "Scoring", icon: BarChart3, question: "Why can the same points appear in several places?", answer: "Because they are the same canonical score. Global, league, round, Club, season, lifetime, and profile views are different filters over the same scored predictions—not separate scoring engines.", questionFa: "چرا یک امتیاز در چند صفحه نمایش داده می‌شود؟", answerFa: "چون همه این صفحات از یک امتیاز اصلی استفاده می‌کنند. جدول جهانی، لیگ، راند، باشگاه، فصل، مادام‌العمر و پروفایل فقط فیلترهای متفاوت روی همان پیش‌بینی‌های امتیازدهی‌شده هستند؛ سیستم‌های جداگانه‌ای وجود ندارد." },
-  { category: "Scoring", icon: Trophy, question: "What is Overall?", answer: "Overall is an aggregation of all supported leagues. It is not a sixth league and it does not duplicate points. A user’s Overall total is the sum of their eligible scored predictions across leagues.", questionFa: "منظور از Overall چیست؟", answerFa: "Overall جمع امتیاز همه لیگ‌های پشتیبانی‌شده است. یک لیگ ششم نیست و امتیازها را دوباره حساب نمی‌کند؛ مجموع پیش‌بینی‌های امتیازدار شما در لیگ‌هاست." },
-  { category: "Scoring", icon: Trophy, question: "How many points is each prediction worth?", answer: "The current scoring table is: Exact score = 10 points; correct non-draw outcome plus the correct goal difference = 7 points; correct winner or draw without the correct difference = 5 points; every other valid prediction = 2 participation points; no prediction = 0 points.", questionFa: "هر نوع پیش‌بینی چند امتیاز دارد؟", answerFa: "جدول امتیاز فعلی این است: نتیجه دقیق = ۱۰ امتیاز؛ برنده صحیح، به‌جز مساوی، همراه با اختلاف گل صحیح = ۷ امتیاز؛ برنده یا مساوی صحیح بدون اختلاف گل صحیح = ۵ امتیاز؛ هر پیش‌بینی معتبر دیگر = ۲ امتیاز مشارکت؛ بدون پیش‌بینی = صفر امتیاز." },
-  { category: "Scoring", icon: BarChart3, question: "Can you show scoring examples?", answer: "Example: if the final score is Arsenal 2–1 Liverpool, predicting 2–1 earns 10 points. Predicting 3–2 earns 7 points because the winner and +1 goal difference are correct. Predicting 1–0 earns 5 points because Arsenal wins but the difference is not +1. Predicting 1–1 earns 2 points because the prediction is valid but the outcome is wrong.", questionFa: "برای امتیازدهی مثال می‌زنید؟", answerFa: "مثال: اگر نتیجه آرسنال و لیورپول ۲–۱ باشد، پیش‌بینی ۲–۱، ۱۰ امتیاز دارد. پیش‌بینی ۳–۲، ۷ امتیاز دارد چون برنده و اختلاف گل +۱ درست است. پیش‌بینی ۱–۰، ۵ امتیاز دارد چون آرسنال برنده شده اما اختلاف گل درست نیست. پیش‌بینی ۱–۱، ۲ امتیاز مشارکت دارد چون پیش‌بینی معتبر است اما نتیجه درست نیست." },
-  { category: "Scoring", icon: Trophy, question: "What is a Round Win?", answer: "A Round Win is awarded only after every eligible fixture in that official round is final. The round leaderboard uses the same canonical scores. A live or pending round cannot produce an official winner.", questionFa: "برد راند چیست؟", answerFa: "برد راند فقط بعد از نهایی‌شدن همه مسابقه‌های معتبر همان راند ثبت می‌شود. جدول راند از همان امتیازهای اصلی استفاده می‌کند و راند زنده یا Pending برنده رسمی ندارد." },
-  { category: "Rounds & fixtures", icon: Clock3, question: "What do Upcoming, Live, Pending, and Final mean?", answer: "Upcoming means no fixture in the round has started. Live means at least one fixture is in progress. Pending means an unresolved or postponed fixture remains. Final means every eligible, non-void fixture is complete.", questionFa: "Upcoming، Live، Pending و Final یعنی چه؟", answerFa: "Upcoming یعنی هیچ مسابقه‌ای در راند شروع نشده است. Live یعنی حداقل یک مسابقه در جریان است. Pending یعنی مسابقه‌ای ناتمام یا تعویق‌افتاده باقی مانده است. Final یعنی همه مسابقه‌های معتبر راند به پایان رسیده‌اند." },
-  { category: "Rounds & fixtures", icon: Clock3, question: "What happens to a postponed match?", answer: "It stays attached to its official round unless the football-data provider changes that assignment. The round remains provisional until every non-void fixture is resolved, so an official round winner is not awarded too early.", questionFa: "با مسابقه تعویق‌افتاده چه می‌شود؟", answerFa: "مسابقه تا زمانی که منبع رسمی داده تخصیص آن را تغییر ندهد، در همان راند باقی می‌ماند. راند تا تعیین تکلیف همه مسابقه‌های معتبر موقت می‌ماند و برنده رسمی زودتر اعلام نمی‌شود." },
-  { category: "Rounds & fixtures", icon: Clock3, question: "What happens to a suspended or cancelled match?", answer: "A suspended fixture keeps its prediction, round, and Club attribution until play resumes. A cancelled fixture marked VOID produces no points and does not prevent its round from becoming final.", questionFa: "با مسابقه متوقف‌شده یا لغوشده چه می‌شود؟", answerFa: "مسابقه متوقف‌شده همان پیش‌بینی، راند و نسبت باشگاهی را حفظ می‌کند تا ادامه پیدا کند. مسابقه لغوشده که VOID باشد امتیازی ندارد و مانع نهایی‌شدن راند نمی‌شود." },
-  { category: "Clubs", icon: UsersRound, question: "What is a Club?", answer: "A Club is your persistent social team inside LowBlock. It has its own members, identity, Club standings, league views, round views, and recruitment settings, while every member still competes globally.", questionFa: "باشگاه چیست؟", answerFa: "باشگاه تیم اجتماعی پایدار شما در LowBlock است. باشگاه اعضا، هویت، جدول باشگاهی، صفحه لیگ، صفحه راند و تنظیمات جذب خودش را دارد؛ در عین حال هر عضو همچنان در رقابت جهانی حضور دارد." },
-  { category: "Clubs", icon: UsersRound, question: "What is the benefit of joining a Club?", answer: "A Club gives you a smaller, social competition alongside LowBlock: compare results with your teammates, see Club standings, follow league and round performance, reveal locked predictions to Clubmates, recruit friends, and build a persistent team identity. Your global points continue exactly as before.", questionFa: "عضویت در باشگاه چه فایده‌ای دارد؟", answerFa: "باشگاه در کنار رقابت جهانی، یک رقابت اجتماعی و نزدیک‌تر برای شما می‌سازد: مقایسه با هم‌تیمی‌ها، جدول داخلی باشگاه، عملکرد لیگ و راند، نمایش پیش‌بینی‌های قفل‌شده به اعضا، جذب دوستان و ساخت هویت تیمی پایدار. امتیاز جهانی شما هم بدون تغییر ادامه پیدا می‌کند." },
-  { category: "Clubs", icon: UsersRound, question: "How do I join a new Club?", answer: "You can open a Club invite link and accept it, or go to Club → Find a Club, choose a recruiting Club, and send a join request. If the owner accepts, you will see a confirmation before leaving your current Club. Your previous history remains available.", questionFa: "چگونه به یک باشگاه جدید بپیوندم؟", answerFa: "می‌توانید لینک دعوت باشگاه را باز و قبول کنید، یا از مسیر باشگاه ← پیدا کردن باشگاه، یک باشگاه در حال جذب را انتخاب و درخواست عضویت ارسال کنید. اگر مالک درخواست را قبول کند، قبل از ترک باشگاه فعلی صفحه تأیید نمایش داده می‌شود و سابقه قبلی شما حفظ خواهد شد." },
-  { category: "Clubs", icon: ShieldCheck, question: "Can I switch Clubs immediately?", answer: "No. You can request admission while staying in your current Club. The switch happens only after the target owner accepts and you explicitly confirm the transfer. This prevents accidental loss of current representation.", questionFa: "آیا می‌توانم فوراً باشگاهم را عوض کنم؟", answerFa: "خیر. می‌توانید در حالی که عضو باشگاه فعلی هستید درخواست عضویت بدهید. انتقال فقط بعد از قبول مالک باشگاه مقصد و تأیید صریح شما انجام می‌شود تا تغییر ناخواسته عضویت رخ ندهد." },
-  { category: "Clubs", icon: ShieldCheck, question: "Who can manage a Club?", answer: "The owner can edit Club identity, manage recruiting, review requests, remove members, and transfer ownership. A regular member can view the Club competition but cannot use owner controls.", questionFa: "چه کسی می‌تواند باشگاه را مدیریت کند؟", answerFa: "مالک می‌تواند هویت باشگاه و جذب عضو را مدیریت کند، درخواست‌ها را بررسی کند، اعضا را حذف کند و مالکیت را منتقل کند. عضو عادی فقط به بخش‌های رقابتی باشگاه دسترسی دارد و کنترل‌های مالک را نمی‌بیند." },
-  { category: "Clubs", icon: UsersRound, question: "How does a Club become active?", answer: "A Club starts in Forming state and becomes Active when its membership reaches three people. Once active, it stays active even if membership later drops below three.", questionFa: "باشگاه چه زمانی فعال می‌شود؟", answerFa: "باشگاه ابتدا در وضعیت «در حال شکل‌گیری» است و با رسیدن اعضا به سه نفر فعال می‌شود. پس از فعال‌شدن، اگر تعداد اعضا بعداً کمتر از سه نفر شود، غیرفعال نمی‌شود." },
-  { category: "Clubs", icon: UsersRound, question: "Can I belong to more than one Club?", answer: "No. You can actively represent one Club at a time and own a maximum of one Club in the free product. Your previous membership periods and results remain in history.", questionFa: "آیا می‌توانم عضو چند باشگاه باشم؟", answerFa: "خیر. در هر زمان فقط نماینده یک باشگاه هستید و در نسخه رایگان حداکثر مالک یک باشگاه می‌توانید باشید. سابقه عضویت و نتایج قبلی شما حفظ می‌شود." },
-  { category: "Clubs", icon: UsersRound, question: "When does a prediction count for my Club?", answer: "Club attribution is captured when the fixture locks, not when you first type the prediction. If you switch Clubs before lock, the locked prediction represents your new Club. Global scoring is never affected by Club membership.", questionFa: "پیش‌بینی چه زمانی برای باشگاه من ثبت می‌شود؟", answerFa: "نسبت‌دادن پیش‌بینی به باشگاه هنگام قفل‌شدن مسابقه انجام می‌شود، نه هنگام تایپ اولیه. اگر قبل از قفل‌شدن باشگاه را عوض کنید، پیش‌بینی برای باشگاه جدید شما ثبت می‌شود. امتیاز جهانی به عضویت باشگاه وابسته نیست." },
-  { category: "Clubs", icon: ShieldCheck, question: "How do invitations and recruitment work?", answer: "An owner can share a stable invite link or enable recruiting. Recruiting uses a join request: the owner reviews the requester and accepts or declines. A pending requester cannot create a new Club or send competing requests until the request is resolved.", questionFa: "دعوت و جذب عضو چگونه کار می‌کند؟", answerFa: "مالک می‌تواند لینک دعوت پایدار را به اشتراک بگذارد یا جذب عمومی را فعال کند. در حالت جذب، کاربر درخواست عضویت می‌فرستد و مالک آن را بررسی و قبول یا رد می‌کند. تا تعیین تکلیف درخواست، کاربر نمی‌تواند باشگاه جدید بسازد یا درخواست‌های رقیب بفرستد." },
-  { category: "Privacy & profiles", icon: ShieldCheck, question: "When can other people see my prediction?", answer: "Before lock, other Club members can see that you submitted a prediction but not the score. After lock, eligible Clubmates can see the score. Public history only reveals predictions after the fixture has started.", questionFa: "دیگران چه زمانی پیش‌بینی من را می‌بینند؟", answerFa: "قبل از قفل‌شدن، اعضای باشگاه فقط می‌بینند که پیش‌بینی ثبت کرده‌اید، نه نتیجه آن را. پس از قفل، اعضای مجاز باشگاه نتیجه را می‌بینند. سابقه عمومی نیز فقط بعد از شروع مسابقه نمایش داده می‌شود." },
-  { category: "Privacy & profiles", icon: ShieldCheck, question: "What is shown on a public profile?", answer: "A public profile can show global performance, eligible Club identity, statistics, and historical predictions. Upcoming or unlocked predictions are never exposed. Private Club identities and internal Club details stay protected.", questionFa: "در پروفایل عمومی چه چیزهایی نمایش داده می‌شود؟", answerFa: "پروفایل عمومی می‌تواند عملکرد جهانی، هویت باشگاه در صورت مجازبودن، آمار و پیش‌بینی‌های تاریخی را نشان دهد. پیش‌بینی‌های آینده یا قفل‌نشده هرگز نمایش داده نمی‌شوند و هویت و جزئیات باشگاه خصوصی محفوظ می‌ماند." },
-  { category: "Data & updates", icon: Clock3, question: "How often is football data updated?", answer: "LowBlock synchronizes football data through its scheduled server jobs. Fixture status, kickoff changes, scores, and finalization are stored centrally so every page reads the same current fixture state.", questionFa: "داده‌های فوتبال هر چند وقت به‌روز می‌شوند؟", answerFa: "LowBlock داده‌های فوتبال را با کارهای زمان‌بندی‌شده سرور همگام می‌کند. وضعیت مسابقه، زمان شروع، نتیجه و نهایی‌شدن در یک منبع مرکزی ذخیره می‌شود تا همه صفحات وضعیت یکسانی نشان دهند." },
-  { category: "Data & updates", icon: BarChart3, question: "What if an official result is corrected?", answer: "The canonical score is recalculated idempotently for affected predictions. Related leaderboards, rounds, Club totals, profiles, and statistics are then refreshed so the corrected result is consistent everywhere.", questionFa: "اگر نتیجه رسمی اصلاح شود چه اتفاقی می‌افتد؟", answerFa: "امتیاز اصلی پیش‌بینی‌های مرتبط دوباره و بدون ایجاد رکورد تکراری محاسبه می‌شود. سپس جدول‌ها، راندها، امتیاز باشگاه‌ها، پروفایل‌ها و آمار مرتبط به‌روزرسانی می‌شوند تا نتیجه اصلاح‌شده همه‌جا یکسان باشد." },
-  { category: "Account & troubleshooting", icon: CircleHelp, question: "Why can’t I submit a prediction?", answer: "Check whether the fixture is still open, whether you are signed in, and whether the request has completed. A live, finished, void, or locked fixture cannot accept a new prediction.", questionFa: "چرا نمی‌توانم پیش‌بینی ثبت کنم؟", answerFa: "بررسی کنید مسابقه هنوز برای پیش‌بینی باز باشد، وارد حساب شده باشید و درخواست قبلی کامل شده باشد. مسابقه زنده، تمام‌شده، VOID یا قفل‌شده پیش‌بینی جدید نمی‌پذیرد." },
-  { category: "Account & troubleshooting", icon: CircleHelp, question: "Why do I see a loading state?", answer: "Leaderboards, Club members, and data insights load from protected server endpoints. The loading state prevents stale or contradictory numbers from appearing while the authoritative response is being fetched.", questionFa: "چرا صفحه در حالت بارگذاری می‌ماند؟", answerFa: "جدول‌ها، اعضای باشگاه و اطلاعات تکمیلی از مسیرهای امن سرور دریافت می‌شوند. حالت بارگذاری مانع نمایش عددهای قدیمی یا متناقض تا زمان دریافت پاسخ معتبر می‌شود." },
-  { category: "Account & troubleshooting", icon: CircleHelp, question: "How do I change language?", answer: "Use the language control in the header. Persian uses RTL layout and Persian number formatting where supported; English uses LTR layout. The same product rules apply in both languages.", questionFa: "چگونه زبان را تغییر دهم؟", answerFa: "از کنترل زبان در سربرگ استفاده کنید. فارسی با چیدمان راست‌به‌چپ و در بخش‌های پشتیبانی‌شده با اعداد فارسی نمایش داده می‌شود؛ انگلیسی چپ‌به‌راست است. قوانین محصول در هر دو زبان یکسان است." },
+  {
+    category: "Getting started",
+    icon: Sparkles,
+    question: "What is LowBlock?",
+    answer:
+      "LowBlock is a football prediction competition. Make one score prediction for each fixture, earn points when the official result is final, and climb the global, league, round, and Club leaderboards.",
+    questionFa: "LowBlock چیست؟",
+    answerFa:
+      "LowBlock یک رقابت پیش‌بینی فوتبال است. برای هر مسابقه فقط یک نتیجه ثبت می‌کنید، پس از نهایی‌شدن نتیجه رسمی امتیاز می‌گیرید و در جدول‌های جهانی، لیگ، راند و باشگاه پیشرفت می‌کنید.",
+  },
+  {
+    category: "Getting started",
+    icon: Sparkles,
+    question: "Do I need to join a Club to compete?",
+    answer:
+      "No. Every registered user automatically competes in the public LowBlock community. A Club is an optional social team layer on top of your global competition.",
+    questionFa: "آیا برای رقابت باید عضو باشگاه باشم؟",
+    answerFa:
+      "خیر. هر کاربر ثبت‌نام‌شده به‌صورت خودکار در رقابت عمومی LowBlock حضور دارد. باشگاه یک لایه اجتماعی اختیاری در کنار رقابت جهانی شماست.",
+  },
+  {
+    category: "Predictions",
+    icon: BookOpen,
+    question: "Where do I submit predictions?",
+    answer:
+      "Use the central Predict page. There is only one prediction interface. The same prediction is used everywhere: globally, in leagues, rounds, and your Club.",
+    questionFa: "پیش‌بینی را از کجا ثبت کنم؟",
+    answerFa:
+      "از صفحه اصلی «پیش‌بینی» استفاده کنید. فقط یک محل برای ثبت پیش‌بینی وجود دارد و همان نتیجه در جدول جهانی، لیگ‌ها، راندها و باشگاه شما استفاده می‌شود.",
+  },
+  {
+    category: "Predictions",
+    icon: LockKeyhole,
+    question: "Can I edit a prediction?",
+    answer:
+      "Yes, until the server-side prediction deadline. After a fixture locks, your prediction is immutable. The deadline is determined by LowBlock’s backend, not your device clock.",
+    questionFa: "آیا می‌توانم پیش‌بینی را ویرایش کنم؟",
+    answerFa:
+      "بله، تا قبل از مهلت قفل‌شدن مسابقه. پس از قفل‌شدن، پیش‌بینی قابل تغییر نیست. این مهلت توسط سرور LowBlock تعیین می‌شود، نه ساعت دستگاه شما.",
+  },
+  {
+    category: "Predictions",
+    icon: LockKeyhole,
+    question: "Can I make different predictions for different competitions?",
+    answer:
+      "No. One user and one fixture always equals one prediction. This prevents duplicate or contradictory predictions across Clubs, leagues, rounds, and future competition modes.",
+    questionFa: "آیا می‌توانم برای هر رقابت نتیجه متفاوتی ثبت کنم؟",
+    answerFa:
+      "خیر. برای هر کاربر و هر مسابقه فقط یک پیش‌بینی وجود دارد. این قانون از ثبت نتایج متناقض در باشگاه، لیگ، راند و رقابت‌های آینده جلوگیری می‌کند.",
+  },
+  {
+    category: "Scoring",
+    icon: Trophy,
+    question: "How are points calculated?",
+    answer:
+      "When a fixture becomes final, LowBlock scores each eligible prediction once with the canonical scoring function. Exact-score points and correct-outcome points are stored with that prediction score and reused by every leaderboard.",
+    questionFa: "امتیازها چگونه محاسبه می‌شوند؟",
+    answerFa:
+      "وقتی مسابقه نهایی شد، LowBlock هر پیش‌بینی معتبر را فقط یک‌بار با سیستم امتیازدهی اصلی محاسبه می‌کند. امتیاز نتیجه دقیق و نتیجه صحیح همراه با امتیاز پیش‌بینی ذخیره می‌شود و همه جدول‌ها از همان داده استفاده می‌کنند.",
+  },
+  {
+    category: "Scoring",
+    icon: BarChart3,
+    question: "Why can the same points appear in several places?",
+    answer:
+      "Because they are the same canonical score. Global, league, round, Club, season, lifetime, and profile views are different filters over the same scored predictions—not separate scoring engines.",
+    questionFa: "چرا یک امتیاز در چند صفحه نمایش داده می‌شود؟",
+    answerFa:
+      "چون همه این صفحات از یک امتیاز اصلی استفاده می‌کنند. جدول جهانی، لیگ، راند، باشگاه، فصل، مادام‌العمر و پروفایل فقط فیلترهای متفاوت روی همان پیش‌بینی‌های امتیازدهی‌شده هستند؛ سیستم‌های جداگانه‌ای وجود ندارد.",
+  },
+  {
+    category: "Scoring",
+    icon: Trophy,
+    question: "What is Overall?",
+    answer:
+      "Overall is an aggregation of all supported leagues. It is not a sixth league and it does not duplicate points. A user’s Overall total is the sum of their eligible scored predictions across leagues.",
+    questionFa: "منظور از Overall چیست؟",
+    answerFa:
+      "Overall جمع امتیاز همه لیگ‌های پشتیبانی‌شده است. یک لیگ ششم نیست و امتیازها را دوباره حساب نمی‌کند؛ مجموع پیش‌بینی‌های امتیازدار شما در لیگ‌هاست.",
+  },
+  {
+    category: "Scoring",
+    icon: Trophy,
+    question: "How many points is each prediction worth?",
+    answer:
+      "The current scoring table is: Exact score = 10 points; correct non-draw outcome plus the correct goal difference = 7 points; correct winner or draw without the correct difference = 5 points; every other valid prediction = 2 participation points; no prediction = 0 points.",
+    questionFa: "هر نوع پیش‌بینی چند امتیاز دارد؟",
+    answerFa:
+      "جدول امتیاز فعلی این است: نتیجه دقیق = ۱۰ امتیاز؛ برنده صحیح، به‌جز مساوی، همراه با اختلاف گل صحیح = ۷ امتیاز؛ برنده یا مساوی صحیح بدون اختلاف گل صحیح = ۵ امتیاز؛ هر پیش‌بینی معتبر دیگر = ۲ امتیاز مشارکت؛ بدون پیش‌بینی = صفر امتیاز.",
+  },
+  {
+    category: "Scoring",
+    icon: BarChart3,
+    question: "Can you show scoring examples?",
+    answer:
+      "Example: if the final score is Arsenal 2–1 Liverpool, predicting 2–1 earns 10 points. Predicting 3–2 earns 7 points because the winner and +1 goal difference are correct. Predicting 1–0 earns 5 points because Arsenal wins but the difference is not +1. Predicting 1–1 earns 2 points because the prediction is valid but the outcome is wrong.",
+    questionFa: "برای امتیازدهی مثال می‌زنید؟",
+    answerFa:
+      "مثال: اگر نتیجه آرسنال و لیورپول ۲–۱ باشد، پیش‌بینی ۲–۱، ۱۰ امتیاز دارد. پیش‌بینی ۳–۲، ۷ امتیاز دارد چون برنده و اختلاف گل +۱ درست است. پیش‌بینی ۱–۰، ۵ امتیاز دارد چون آرسنال برنده شده اما اختلاف گل درست نیست. پیش‌بینی ۱–۱، ۲ امتیاز مشارکت دارد چون پیش‌بینی معتبر است اما نتیجه درست نیست.",
+  },
+  {
+    category: "Scoring",
+    icon: Trophy,
+    question: "What is a Round Win?",
+    answer:
+      "A Round Win is awarded only after every eligible fixture in that official round is final. The round leaderboard uses the same canonical scores. A live or pending round cannot produce an official winner.",
+    questionFa: "برد راند چیست؟",
+    answerFa:
+      "برد راند فقط بعد از نهایی‌شدن همه مسابقه‌های معتبر همان راند ثبت می‌شود. جدول راند از همان امتیازهای اصلی استفاده می‌کند و راند زنده یا Pending برنده رسمی ندارد.",
+  },
+  {
+    category: "Rounds & fixtures",
+    icon: Clock3,
+    question: "What do Upcoming, Live, Pending, and Final mean?",
+    answer:
+      "Upcoming means no fixture in the round has started. Live means at least one fixture is in progress. Pending means an unresolved or postponed fixture remains. Final means every eligible, non-void fixture is complete.",
+    questionFa: "Upcoming، Live، Pending و Final یعنی چه؟",
+    answerFa:
+      "Upcoming یعنی هیچ مسابقه‌ای در راند شروع نشده است. Live یعنی حداقل یک مسابقه در جریان است. Pending یعنی مسابقه‌ای ناتمام یا تعویق‌افتاده باقی مانده است. Final یعنی همه مسابقه‌های معتبر راند به پایان رسیده‌اند.",
+  },
+  {
+    category: "Rounds & fixtures",
+    icon: Clock3,
+    question: "What happens to a postponed match?",
+    answer:
+      "It stays attached to its official round unless the football-data provider changes that assignment. The round remains provisional until every non-void fixture is resolved, so an official round winner is not awarded too early.",
+    questionFa: "با مسابقه تعویق‌افتاده چه می‌شود؟",
+    answerFa:
+      "مسابقه تا زمانی که منبع رسمی داده تخصیص آن را تغییر ندهد، در همان راند باقی می‌ماند. راند تا تعیین تکلیف همه مسابقه‌های معتبر موقت می‌ماند و برنده رسمی زودتر اعلام نمی‌شود.",
+  },
+  {
+    category: "Rounds & fixtures",
+    icon: Clock3,
+    question: "What happens to a suspended or cancelled match?",
+    answer:
+      "A suspended fixture keeps its prediction, round, and Club attribution until play resumes. A cancelled fixture marked VOID produces no points and does not prevent its round from becoming final.",
+    questionFa: "با مسابقه متوقف‌شده یا لغوشده چه می‌شود؟",
+    answerFa:
+      "مسابقه متوقف‌شده همان پیش‌بینی، راند و نسبت باشگاهی را حفظ می‌کند تا ادامه پیدا کند. مسابقه لغوشده که VOID باشد امتیازی ندارد و مانع نهایی‌شدن راند نمی‌شود.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "What is a Club?",
+    answer:
+      "A Club is your persistent social team inside LowBlock. It has its own members, identity, Club standings, league views, round views, and recruitment settings, while every member still competes globally.",
+    questionFa: "باشگاه چیست؟",
+    answerFa:
+      "باشگاه تیم اجتماعی پایدار شما در LowBlock است. باشگاه اعضا، هویت، جدول باشگاهی، صفحه لیگ، صفحه راند و تنظیمات جذب خودش را دارد؛ در عین حال هر عضو همچنان در رقابت جهانی حضور دارد.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "What is the benefit of joining a Club?",
+    answer:
+      "A Club gives you a smaller, social competition alongside LowBlock: compare results with your teammates, see Club standings, follow league and round performance, reveal locked predictions to Clubmates, recruit friends, and build a persistent team identity. Your global points continue exactly as before.",
+    questionFa: "عضویت در باشگاه چه فایده‌ای دارد؟",
+    answerFa:
+      "باشگاه در کنار رقابت جهانی، یک رقابت اجتماعی و نزدیک‌تر برای شما می‌سازد: مقایسه با هم‌تیمی‌ها، جدول داخلی باشگاه، عملکرد لیگ و راند، نمایش پیش‌بینی‌های قفل‌شده به اعضا، جذب دوستان و ساخت هویت تیمی پایدار. امتیاز جهانی شما هم بدون تغییر ادامه پیدا می‌کند.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "How do I join a new Club?",
+    answer:
+      "You can open a Club invite link and accept it, or go to Club → Find a Club, choose a recruiting Club, and send a join request. If the owner accepts, you will see a confirmation before leaving your current Club. Your previous history remains available.",
+    questionFa: "چگونه به یک باشگاه جدید بپیوندم؟",
+    answerFa:
+      "می‌توانید لینک دعوت باشگاه را باز و قبول کنید، یا از مسیر باشگاه ← پیدا کردن باشگاه، یک باشگاه در حال جذب را انتخاب و درخواست عضویت ارسال کنید. اگر مالک درخواست را قبول کند، قبل از ترک باشگاه فعلی صفحه تأیید نمایش داده می‌شود و سابقه قبلی شما حفظ خواهد شد.",
+  },
+  {
+    category: "Clubs",
+    icon: ShieldCheck,
+    question: "Can I switch Clubs immediately?",
+    answer:
+      "No. You can request admission while staying in your current Club. The switch happens only after the target owner accepts and you explicitly confirm the transfer. This prevents accidental loss of current representation.",
+    questionFa: "آیا می‌توانم فوراً باشگاهم را عوض کنم؟",
+    answerFa:
+      "خیر. می‌توانید در حالی که عضو باشگاه فعلی هستید درخواست عضویت بدهید. انتقال فقط بعد از قبول مالک باشگاه مقصد و تأیید صریح شما انجام می‌شود تا تغییر ناخواسته عضویت رخ ندهد.",
+  },
+  {
+    category: "Clubs",
+    icon: ShieldCheck,
+    question: "Who can manage a Club?",
+    answer:
+      "The owner can edit Club identity, manage recruiting, review requests, remove members, and transfer ownership. A regular member can view the Club competition but cannot use owner controls.",
+    questionFa: "چه کسی می‌تواند باشگاه را مدیریت کند؟",
+    answerFa:
+      "مالک می‌تواند هویت باشگاه و جذب عضو را مدیریت کند، درخواست‌ها را بررسی کند، اعضا را حذف کند و مالکیت را منتقل کند. عضو عادی فقط به بخش‌های رقابتی باشگاه دسترسی دارد و کنترل‌های مالک را نمی‌بیند.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "How does a Club become active?",
+    answer:
+      "A Club starts in Forming state and becomes Active when its membership reaches three people. Once active, it stays active even if membership later drops below three.",
+    questionFa: "باشگاه چه زمانی فعال می‌شود؟",
+    answerFa:
+      "باشگاه ابتدا در وضعیت «در حال شکل‌گیری» است و با رسیدن اعضا به سه نفر فعال می‌شود. پس از فعال‌شدن، اگر تعداد اعضا بعداً کمتر از سه نفر شود، غیرفعال نمی‌شود.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "Can I belong to more than one Club?",
+    answer:
+      "No. You can actively represent one Club at a time and own a maximum of one Club in the free product. Your previous membership periods and results remain in history.",
+    questionFa: "آیا می‌توانم عضو چند باشگاه باشم؟",
+    answerFa:
+      "خیر. در هر زمان فقط نماینده یک باشگاه هستید و در نسخه رایگان حداکثر مالک یک باشگاه می‌توانید باشید. سابقه عضویت و نتایج قبلی شما حفظ می‌شود.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "When does a prediction count for my Club?",
+    answer:
+      "Club attribution is captured when the fixture locks, not when you first type the prediction. If you switch Clubs before lock, the locked prediction represents your new Club. Global scoring is never affected by Club membership.",
+    questionFa: "پیش‌بینی چه زمانی برای باشگاه من ثبت می‌شود؟",
+    answerFa:
+      "نسبت‌دادن پیش‌بینی به باشگاه هنگام قفل‌شدن مسابقه انجام می‌شود، نه هنگام تایپ اولیه. اگر قبل از قفل‌شدن باشگاه را عوض کنید، پیش‌بینی برای باشگاه جدید شما ثبت می‌شود. امتیاز جهانی به عضویت باشگاه وابسته نیست.",
+  },
+  {
+    category: "Clubs",
+    icon: ShieldCheck,
+    question: "How do invitations and recruitment work?",
+    answer:
+      "An owner can share a stable invite link or enable recruiting. Recruiting uses a join request: the owner reviews the requester and accepts or declines. A pending requester cannot create a new Club or send competing requests until the request is resolved.",
+    questionFa: "دعوت و جذب عضو چگونه کار می‌کند؟",
+    answerFa:
+      "مالک می‌تواند لینک دعوت پایدار را به اشتراک بگذارد یا جذب عمومی را فعال کند. در حالت جذب، کاربر درخواست عضویت می‌فرستد و مالک آن را بررسی و قبول یا رد می‌کند. تا تعیین تکلیف درخواست، کاربر نمی‌تواند باشگاه جدید بسازد یا درخواست‌های رقیب بفرستد.",
+  },
+  {
+    category: "Privacy & profiles",
+    icon: ShieldCheck,
+    question: "When can other people see my prediction?",
+    answer:
+      "Before lock, other Club members can see that you submitted a prediction but not the score. After lock, eligible Clubmates can see the score. Public history only reveals predictions after the fixture has started.",
+    questionFa: "دیگران چه زمانی پیش‌بینی من را می‌بینند؟",
+    answerFa:
+      "قبل از قفل‌شدن، اعضای باشگاه فقط می‌بینند که پیش‌بینی ثبت کرده‌اید، نه نتیجه آن را. پس از قفل، اعضای مجاز باشگاه نتیجه را می‌بینند. سابقه عمومی نیز فقط بعد از شروع مسابقه نمایش داده می‌شود.",
+  },
+  {
+    category: "Privacy & profiles",
+    icon: ShieldCheck,
+    question: "What is shown on a public profile?",
+    answer:
+      "A public profile can show global performance, eligible Club identity, statistics, and historical predictions. Upcoming or unlocked predictions are never exposed. Private Club identities and internal Club details stay protected.",
+    questionFa: "در پروفایل عمومی چه چیزهایی نمایش داده می‌شود؟",
+    answerFa:
+      "پروفایل عمومی می‌تواند عملکرد جهانی، هویت باشگاه در صورت مجازبودن، آمار و پیش‌بینی‌های تاریخی را نشان دهد. پیش‌بینی‌های آینده یا قفل‌نشده هرگز نمایش داده نمی‌شوند و هویت و جزئیات باشگاه خصوصی محفوظ می‌ماند.",
+  },
+  {
+    category: "Data & updates",
+    icon: Clock3,
+    question: "How often is football data updated?",
+    answer:
+      "LowBlock synchronizes football data through its scheduled server jobs. Fixture status, kickoff changes, scores, and finalization are stored centrally so every page reads the same current fixture state.",
+    questionFa: "داده‌های فوتبال هر چند وقت به‌روز می‌شوند؟",
+    answerFa:
+      "LowBlock داده‌های فوتبال را با کارهای زمان‌بندی‌شده سرور همگام می‌کند. وضعیت مسابقه، زمان شروع، نتیجه و نهایی‌شدن در یک منبع مرکزی ذخیره می‌شود تا همه صفحات وضعیت یکسانی نشان دهند.",
+  },
+  {
+    category: "Data & updates",
+    icon: BarChart3,
+    question: "What if an official result is corrected?",
+    answer:
+      "The canonical score is recalculated idempotently for affected predictions. Related leaderboards, rounds, Club totals, profiles, and statistics are then refreshed so the corrected result is consistent everywhere.",
+    questionFa: "اگر نتیجه رسمی اصلاح شود چه اتفاقی می‌افتد؟",
+    answerFa:
+      "امتیاز اصلی پیش‌بینی‌های مرتبط دوباره و بدون ایجاد رکورد تکراری محاسبه می‌شود. سپس جدول‌ها، راندها، امتیاز باشگاه‌ها، پروفایل‌ها و آمار مرتبط به‌روزرسانی می‌شوند تا نتیجه اصلاح‌شده همه‌جا یکسان باشد.",
+  },
+  {
+    category: "Account & troubleshooting",
+    icon: CircleHelp,
+    question: "Why can’t I submit a prediction?",
+    answer:
+      "Check whether the fixture is still open, whether you are signed in, and whether the request has completed. A live, finished, void, or locked fixture cannot accept a new prediction.",
+    questionFa: "چرا نمی‌توانم پیش‌بینی ثبت کنم؟",
+    answerFa:
+      "بررسی کنید مسابقه هنوز برای پیش‌بینی باز باشد، وارد حساب شده باشید و درخواست قبلی کامل شده باشد. مسابقه زنده، تمام‌شده، VOID یا قفل‌شده پیش‌بینی جدید نمی‌پذیرد.",
+  },
+  {
+    category: "Account & troubleshooting",
+    icon: CircleHelp,
+    question: "Why do I see a loading state?",
+    answer:
+      "Leaderboards, Club members, and data insights load from protected server endpoints. The loading state prevents stale or contradictory numbers from appearing while the authoritative response is being fetched.",
+    questionFa: "چرا صفحه در حالت بارگذاری می‌ماند؟",
+    answerFa:
+      "جدول‌ها، اعضای باشگاه و اطلاعات تکمیلی از مسیرهای امن سرور دریافت می‌شوند. حالت بارگذاری مانع نمایش عددهای قدیمی یا متناقض تا زمان دریافت پاسخ معتبر می‌شود.",
+  },
+  {
+    category: "Account & troubleshooting",
+    icon: CircleHelp,
+    question: "How do I change language?",
+    answer:
+      "Use the language control in the header. Persian uses RTL layout and Persian number formatting where supported; English uses LTR layout. The same product rules apply in both languages.",
+    questionFa: "چگونه زبان را تغییر دهم؟",
+    answerFa:
+      "از کنترل زبان در سربرگ استفاده کنید. فارسی با چیدمان راست‌به‌چپ و در بخش‌های پشتیبانی‌شده با اعداد فارسی نمایش داده می‌شود؛ انگلیسی چپ‌به‌راست است. قوانین محصول در هر دو زبان یکسان است.",
+  },
 ];
 
 const operationalItems: HelpItem[] = [
-  { category: "Data & updates", icon: Clock3, question: "When do match details update?", answer: "Match details are refreshed once every day at 03:00 Iran time. The daily refresh brings the official schedule for the new match day into LowBlock and updates the available fixture information.", questionFa: "جزئیات مسابقه‌ها چه زمانی به‌روز می‌شوند؟", answerFa: "جزئیات مسابقه‌ها هر روز ساعت ۳ بامداد به وقت ایران به‌روزرسانی می‌شوند. در همین به‌روزرسانی، برنامه رسمی روز جدید وارد LowBlock می‌شود و اطلاعات مسابقه‌ها تازه می‌شود." },
-  { category: "Data & updates", icon: Clock3, question: "When do the new day’s matches become available?", answer: "Today’s fixtures are added during the 03:00 Iran-time refresh. That means the matches you can predict today are loaded at the start of the new LowBlock day, not continuously throughout the day.", questionFa: "مسابقه‌های روز جدید چه زمانی اضافه می‌شوند؟", answerFa: "مسابقه‌های روز جدید در به‌روزرسانی ساعت ۳ بامداد به وقت ایران اضافه می‌شوند. یعنی مسابقه‌های قابل پیش‌بینی امروز در شروع روز جدید LowBlock بارگذاری می‌شوند، نه به‌صورت لحظه‌ای در طول روز." },
-  { category: "Data & updates", icon: Clock3, question: "How often do user rankings update?", answer: "User rankings are refreshed once a day at 03:00 Iran time. If your points change after a match is finalized, the updated position appears with the next scheduled ranking refresh.", questionFa: "رتبه‌بندی کاربران هر چند وقت یک‌بار به‌روز می‌شود؟", answerFa: "رتبه‌بندی کاربران روزی یک‌بار، ساعت ۳ بامداد به وقت ایران، به‌روزرسانی می‌شود. اگر بعد از نهایی‌شدن یک مسابقه امتیازتان تغییر کند، جایگاه جدیدتان در به‌روزرسانی بعدی جدول نمایش داده می‌شود." },
-  { category: "Data & updates", icon: BarChart3, question: "Why has my ranking not changed yet?", answer: "Rankings are not recalculated after every individual match. They are refreshed in the daily 03:00 Iran-time job, so a correct prediction may affect your position at the next scheduled update.", questionFa: "چرا رتبه‌ام هنوز تغییر نکرده است؟", answerFa: "جدول رتبه‌بندی بعد از هر مسابقه جداگانه محاسبه نمی‌شود. رتبه‌ها در فرایند روزانه ساعت ۳ بامداد به وقت ایران به‌روزرسانی می‌شوند؛ بنابراین اثر یک پیش‌بینی درست ممکن است در نوبت بعدی دیده شود." },
-  { category: "Rounds & fixtures", icon: Clock3, question: "Which matches can I predict?", answer: "You can predict all matches scheduled to be played today and loaded into LowBlock’s daily fixture list. New matches are added at 03:00 Iran time. Matches from future days are not available until their day is loaded.", questionFa: "کدام مسابقه‌ها را می‌توانم پیش‌بینی کنم؟", answerFa: "می‌توانید همه مسابقه‌هایی را پیش‌بینی کنید که برای امروز برنامه‌ریزی شده‌اند و در فهرست روزانه LowBlock قرار گرفته‌اند. مسابقه‌های روز جدید ساعت ۳ بامداد به وقت ایران اضافه می‌شوند و مسابقه‌های روزهای بعد تا رسیدن نوبتشان در دسترس نیستند." },
-  { category: "Rounds & fixtures", icon: LockKeyhole, question: "Can I predict a match for tomorrow?", answer: "Not yet. LowBlock opens the daily fixture list one day at a time. Tomorrow’s matches become available during the 03:00 Iran-time refresh when the new match day begins.", questionFa: "آیا می‌توانم مسابقه فردا را پیش‌بینی کنم؟", answerFa: "فعلاً نه. LowBlock مسابقه‌ها را روزبه‌روز باز می‌کند. مسابقه‌های فردا با شروع روز جدید، در به‌روزرسانی ساعت ۳ بامداد به وقت ایران، در دسترس قرار می‌گیرند." },
-  { category: "Rounds & fixtures", icon: Clock3, question: "What if a match I expect is not listed?", answer: "First check whether the match belongs to today’s official schedule and whether the daily 03:00 Iran-time refresh has completed. If it is still missing after that, report the match and include the teams, competition, and scheduled date.", questionFa: "اگر مسابقه‌ای که انتظارش را دارم در فهرست نبود چه کار کنم؟", answerFa: "اول بررسی کنید مسابقه واقعاً در برنامه رسمی امروز باشد و به‌روزرسانی ساعت ۳ بامداد به وقت ایران انجام شده باشد. اگر بعد از آن هنوز مسابقه را نمی‌بینید، نام دو تیم، مسابقه یا لیگ و تاریخ برگزاری را برای پشتیبانی بفرستید." },
-  { category: "Predictions", icon: BookOpen, question: "What do I need to enter before saving a prediction?", answer: "You must enter a score for both teams. A prediction with only one team’s score is incomplete and cannot be saved.", questionFa: "برای ذخیره پیش‌بینی چه چیزی باید وارد کنم؟", answerFa: "باید برای هر دو تیم یک نتیجه وارد کنید. پیش‌بینی‌ای که فقط نتیجه یک تیم را داشته باشد ناقص است و ذخیره نمی‌شود." },
-  { category: "Predictions", icon: LockKeyhole, question: "Why can’t I save my prediction?", answer: "The most common reasons are that one of the two team scores is missing, the match is already locked, the match is no longer available, or your connection did not complete the request. The message shown by LowBlock explains the specific reason when it is safe to do so.", questionFa: "چرا پیش‌بینی‌ام ذخیره نمی‌شود؟", answerFa: "معمولاً یکی از این دلیل‌ها وجود دارد: نتیجه یکی از دو تیم را وارد نکرده‌اید، مهلت مسابقه تمام شده، مسابقه دیگر در دسترس نیست یا درخواست به‌دلیل مشکل اتصال کامل نشده است. LowBlock تا جایی که مشکلی برای امنیت ایجاد نکند، دلیل دقیق را در پیام خطا نشان می‌دهد." },
-  { category: "Predictions", icon: LockKeyhole, question: "When is a prediction locked?", answer: "A prediction is locked when the fixture reaches LowBlock’s server-side cutoff, normally when the match is no longer open for prediction. The server time is authoritative, not the clock on your phone or computer.", questionFa: "پیش‌بینی چه زمانی قفل می‌شود؟", answerFa: "وقتی مهلت ثبت مسابقه در سرور LowBlock تمام شود، پیش‌بینی قفل می‌شود؛ معمولاً از همان زمانی که مسابقه دیگر برای پیش‌بینی باز نیست. ساعت سرور ملاک است، نه ساعتی که روی گوشی یا کامپیوتر شما نمایش داده می‌شود." },
-  { category: "Scoring", icon: Trophy, question: "When are prediction points calculated?", answer: "Points are calculated after the match result is accepted as final. The resulting points are then included in the next scheduled ranking and statistics refresh.", questionFa: "امتیاز پیش‌بینی‌ها چه زمانی محاسبه می‌شود؟", answerFa: "امتیاز بعد از نهایی‌شدن نتیجه مسابقه محاسبه می‌شود. سپس در نوبت بعدی به‌روزرسانی جدول و آمار، امتیاز جدید در رتبه‌بندی‌ها نمایش داده می‌شود." },
-  { category: "Scoring", icon: BarChart3, question: "Why do my points and ranking update at different times?", answer: "A prediction can be scored when its match becomes final, while the visible rankings are refreshed by the daily 03:00 Iran-time job. This short gap keeps all leaderboards consistent with the same scheduled snapshot.", questionFa: "چرا امتیاز و رتبه‌ام هم‌زمان به‌روز نمی‌شوند؟", answerFa: "ممکن است امتیاز پیش‌بینی بلافاصله بعد از نهایی‌شدن مسابقه محاسبه شود، اما رتبه‌های قابل مشاهده با فرایند روزانه ساعت ۳ بامداد به وقت ایران به‌روزرسانی می‌شوند. این فاصله کمک می‌کند همه جدول‌ها از یک snapshot یکسان و هماهنگ استفاده کنند." },
-  { category: "Clubs", icon: UsersRound, question: "Can I join a Club before creating one?", answer: "Yes. You do not need to create a Club to use LowBlock or compete globally. Joining an existing Club is often the easiest way to start.", questionFa: "آیا قبل از ساختن باشگاه می‌توانم عضو یک باشگاه شوم؟", answerFa: "بله. برای استفاده از LowBlock یا شرکت در رقابت جهانی لازم نیست حتماً باشگاه بسازید. برای شروع، پیوستن به یک باشگاه موجود معمولاً انتخاب ساده‌تری است." },
-  { category: "Clubs", icon: UsersRound, question: "What happens if I create a Club and nobody joins?", answer: "Your Club remains yours, but you do not lose the ability to manage it. If you are the only member, you can leave and close the empty Club. This safely releases your Club-creation capacity.", questionFa: "اگر باشگاه بسازم و هیچ‌کس عضو نشود چه می‌شود؟", answerFa: "باشگاه همچنان برای شما باقی می‌ماند و می‌توانید آن را مدیریت کنید. اگر تنها عضو باشگاه باشید، می‌توانید با تأیید خودتان خارج شوید تا باشگاه خالی بسته شود و ظرفیت ساخت باشگاه دوباره آزاد شود." },
-  { category: "Clubs", icon: ShieldCheck, question: "Why can’t an owner leave when other members are present?", answer: "A Club must always have a clear owner. Transfer ownership to another active member first; after that, you can leave normally. This prevents the Club and its members from being stranded without an administrator.", questionFa: "چرا وقتی اعضای دیگری هستند مالک نمی‌تواند باشگاه را ترک کند؟", answerFa: "باشگاه باید همیشه یک مالک مشخص داشته باشد. اول مالکیت را به یکی از اعضای فعال منتقل کنید و بعد از باشگاه خارج شوید. این قانون نمی‌گذارد باشگاه بدون مدیر بماند و اعضا در یک وضعیت بلاتکلیف گیر کنند." },
-  { category: "Clubs", icon: ShieldCheck, question: "What happens when the owner removes a member?", answer: "The selected member is removed only after the owner confirms the custom LowBlock dialog. Their global predictions, points, and personal history remain intact; only their active Club membership ends.", questionFa: "وقتی مالک یک عضو را حذف می‌کند چه اتفاقی می‌افتد؟", answerFa: "عضو فقط بعد از تأیید مالک در پنجره اختصاصی LowBlock حذف می‌شود. پیش‌بینی‌ها، امتیازهای جهانی و سابقه شخصی او حفظ می‌شوند و فقط عضویت فعالش در آن باشگاه پایان پیدا می‌کند." },
-  { category: "Clubs", icon: ShieldCheck, question: "Can I leave my Club whenever I want?", answer: "Yes, use Leave Club from the Club members area and confirm the action. If you are the owner and other members remain, transfer ownership before leaving. If you are the sole owner, leaving closes the empty Club.", questionFa: "آیا هر وقت بخواهم می‌توانم از باشگاهم خارج شوم؟", answerFa: "بله. از بخش اعضای باشگاه گزینه «ترک باشگاه» را بزنید و خروج را تأیید کنید. اگر مالک هستید و اعضای دیگری باقی مانده‌اند، قبل از خروج مالکیت را منتقل کنید. اگر تنها مالک و عضو باشید، خروج شما باشگاه خالی را می‌بندد." },
-  { category: "Clubs", icon: UsersRound, question: "Do I lose global points when I leave a Club?", answer: "No. Leaving, switching, or being removed from a Club never deletes your global points, predictions, ranking history, or personal statistics. It only changes your active Club relationship.", questionFa: "آیا با ترک باشگاه امتیازهای جهانی‌ام از بین می‌رود؟", answerFa: "نه. با ترک باشگاه، جابه‌جایی بین باشگاه‌ها یا حذف‌شدن، امتیازهای جهانی، پیش‌بینی‌ها، سابقه رتبه و آمار شخصی شما حذف نمی‌شود. فقط ارتباط فعال شما با آن باشگاه تغییر می‌کند." },
-  { category: "Clubs", icon: UsersRound, question: "What happens when I accept an invitation to another Club?", answer: "If you already belong to a Club, LowBlock warns you before switching. Confirming the move ends your current active membership and joins the invited Club, while your global history stays untouched.", questionFa: "با قبول دعوت‌نامه یک باشگاه دیگر چه می‌شود؟", answerFa: "اگر از قبل عضو یک باشگاه باشید، LowBlock قبل از جابه‌جایی به شما هشدار می‌دهد. با تأیید، عضویت فعال قبلی‌تان پایان پیدا می‌کند و به باشگاه دعوت‌کننده می‌پیوندید؛ سابقه جهانی شما دست‌نخورده باقی می‌ماند." },
-  { category: "Privacy & profiles", icon: ShieldCheck, question: "Why do I sometimes see my username or avatar after loading?", answer: "Profile details come from your authenticated account. A short loading state can appear while the current account information is being fetched; LowBlock should not replace your identity with a generic Club label once your profile is available.", questionFa: "چرا گاهی نام کاربری یا آواتارم بعد از بارگذاری نمایش داده می‌شود؟", answerFa: "اطلاعات پروفایل از حساب واردشده شما دریافت می‌شود. ممکن است هنگام دریافت اطلاعات حساب، چند لحظه حالت بارگذاری ببینید؛ اما وقتی پروفایل آماده شد، LowBlock نباید هویت شما را با یک برچسب عمومی باشگاه جایگزین کند." },
-  { category: "Account & troubleshooting", icon: CircleHelp, question: "Why does the app show a message instead of a technical error code?", answer: "LowBlock translates safe, known errors into a clear explanation in your selected language. Sensitive implementation details are hidden, while the useful reason and next action are shown.", questionFa: "چرا به‌جای کد فنی، پیام قابل فهم می‌بینم؟", answerFa: "LowBlock خطاهای شناخته‌شده و امن را به زبان انتخابی شما به یک توضیح روشن تبدیل می‌کند. جزئیات فنی و حساس نمایش داده نمی‌شوند؛ در عوض، دلیل قابل فهم و کاری که باید انجام دهید به شما گفته می‌شود." },
-  { category: "Account & troubleshooting", icon: CircleHelp, question: "What should I do if the numbers look outdated?", answer: "Refresh the page after the relevant scheduled update. Match details and rankings are refreshed daily at 03:00 Iran time. If the data is still incorrect after that cycle, report the affected page and item.", questionFa: "اگر عددها قدیمی به نظر برسند چه کار کنم؟", answerFa: "بعد از زمان به‌روزرسانی مربوط، صفحه را دوباره بازخوانی کنید. جزئیات مسابقه و رتبه‌بندی هر روز ساعت ۳ بامداد به وقت ایران تازه می‌شوند. اگر بعد از این چرخه هنوز اطلاعات اشتباه بود، نام صفحه و مورد مشکل‌دار را برای پشتیبانی بفرستید." },
+  {
+    category: "Data & updates",
+    icon: Clock3,
+    question: "When do match details update?",
+    answer:
+      "Match details are refreshed once every day at 03:00 Iran time. The daily refresh brings the official schedule for the new match day into LowBlock and updates the available fixture information.",
+    questionFa: "جزئیات مسابقه‌ها چه زمانی به‌روز می‌شوند؟",
+    answerFa:
+      "جزئیات مسابقه‌ها هر روز ساعت ۳ بامداد به وقت ایران به‌روزرسانی می‌شوند. در همین به‌روزرسانی، برنامه رسمی روز جدید وارد LowBlock می‌شود و اطلاعات مسابقه‌ها تازه می‌شود.",
+  },
+  {
+    category: "Data & updates",
+    icon: Clock3,
+    question: "When do the new day’s matches become available?",
+    answer:
+      "Today’s fixtures are added during the 03:00 Iran-time refresh. That means the matches you can predict today are loaded at the start of the new LowBlock day, not continuously throughout the day.",
+    questionFa: "مسابقه‌های روز جدید چه زمانی اضافه می‌شوند؟",
+    answerFa:
+      "مسابقه‌های روز جدید در به‌روزرسانی ساعت ۳ بامداد به وقت ایران اضافه می‌شوند. یعنی مسابقه‌های قابل پیش‌بینی امروز در شروع روز جدید LowBlock بارگذاری می‌شوند، نه به‌صورت لحظه‌ای در طول روز.",
+  },
+  {
+    category: "Data & updates",
+    icon: Clock3,
+    question: "How often do user rankings update?",
+    answer:
+      "User rankings are refreshed once a day at 03:00 Iran time. If your points change after a match is finalized, the updated position appears with the next scheduled ranking refresh.",
+    questionFa: "رتبه‌بندی کاربران هر چند وقت یک‌بار به‌روز می‌شود؟",
+    answerFa:
+      "رتبه‌بندی کاربران روزی یک‌بار، ساعت ۳ بامداد به وقت ایران، به‌روزرسانی می‌شود. اگر بعد از نهایی‌شدن یک مسابقه امتیازتان تغییر کند، جایگاه جدیدتان در به‌روزرسانی بعدی جدول نمایش داده می‌شود.",
+  },
+  {
+    category: "Data & updates",
+    icon: BarChart3,
+    question: "Why has my ranking not changed yet?",
+    answer:
+      "Rankings are not recalculated after every individual match. They are refreshed in the daily 03:00 Iran-time job, so a correct prediction may affect your position at the next scheduled update.",
+    questionFa: "چرا رتبه‌ام هنوز تغییر نکرده است؟",
+    answerFa:
+      "جدول رتبه‌بندی بعد از هر مسابقه جداگانه محاسبه نمی‌شود. رتبه‌ها در فرایند روزانه ساعت ۳ بامداد به وقت ایران به‌روزرسانی می‌شوند؛ بنابراین اثر یک پیش‌بینی درست ممکن است در نوبت بعدی دیده شود.",
+  },
+  {
+    category: "Rounds & fixtures",
+    icon: Clock3,
+    question: "Which matches can I predict?",
+    answer:
+      "You can predict all matches scheduled to be played today and loaded into LowBlock’s daily fixture list. New matches are added at 03:00 Iran time. Matches from future days are not available until their day is loaded.",
+    questionFa: "کدام مسابقه‌ها را می‌توانم پیش‌بینی کنم؟",
+    answerFa:
+      "می‌توانید همه مسابقه‌هایی را پیش‌بینی کنید که برای امروز برنامه‌ریزی شده‌اند و در فهرست روزانه LowBlock قرار گرفته‌اند. مسابقه‌های روز جدید ساعت ۳ بامداد به وقت ایران اضافه می‌شوند و مسابقه‌های روزهای بعد تا رسیدن نوبتشان در دسترس نیستند.",
+  },
+  {
+    category: "Rounds & fixtures",
+    icon: LockKeyhole,
+    question: "Can I predict a match for tomorrow?",
+    answer:
+      "Not yet. LowBlock opens the daily fixture list one day at a time. Tomorrow’s matches become available during the 03:00 Iran-time refresh when the new match day begins.",
+    questionFa: "آیا می‌توانم مسابقه فردا را پیش‌بینی کنم؟",
+    answerFa:
+      "فعلاً نه. LowBlock مسابقه‌ها را روزبه‌روز باز می‌کند. مسابقه‌های فردا با شروع روز جدید، در به‌روزرسانی ساعت ۳ بامداد به وقت ایران، در دسترس قرار می‌گیرند.",
+  },
+  {
+    category: "Rounds & fixtures",
+    icon: Clock3,
+    question: "What if a match I expect is not listed?",
+    answer:
+      "First check whether the match belongs to today’s official schedule and whether the daily 03:00 Iran-time refresh has completed. If it is still missing after that, report the match and include the teams, competition, and scheduled date.",
+    questionFa: "اگر مسابقه‌ای که انتظارش را دارم در فهرست نبود چه کار کنم؟",
+    answerFa:
+      "اول بررسی کنید مسابقه واقعاً در برنامه رسمی امروز باشد و به‌روزرسانی ساعت ۳ بامداد به وقت ایران انجام شده باشد. اگر بعد از آن هنوز مسابقه را نمی‌بینید، نام دو تیم، مسابقه یا لیگ و تاریخ برگزاری را برای پشتیبانی بفرستید.",
+  },
+  {
+    category: "Predictions",
+    icon: BookOpen,
+    question: "What do I need to enter before saving a prediction?",
+    answer:
+      "You must enter a score for both teams. A prediction with only one team’s score is incomplete and cannot be saved.",
+    questionFa: "برای ذخیره پیش‌بینی چه چیزی باید وارد کنم؟",
+    answerFa:
+      "باید برای هر دو تیم یک نتیجه وارد کنید. پیش‌بینی‌ای که فقط نتیجه یک تیم را داشته باشد ناقص است و ذخیره نمی‌شود.",
+  },
+  {
+    category: "Predictions",
+    icon: LockKeyhole,
+    question: "Why can’t I save my prediction?",
+    answer:
+      "The most common reasons are that one of the two team scores is missing, the match is already locked, the match is no longer available, or your connection did not complete the request. The message shown by LowBlock explains the specific reason when it is safe to do so.",
+    questionFa: "چرا پیش‌بینی‌ام ذخیره نمی‌شود؟",
+    answerFa:
+      "معمولاً یکی از این دلیل‌ها وجود دارد: نتیجه یکی از دو تیم را وارد نکرده‌اید، مهلت مسابقه تمام شده، مسابقه دیگر در دسترس نیست یا درخواست به‌دلیل مشکل اتصال کامل نشده است. LowBlock تا جایی که مشکلی برای امنیت ایجاد نکند، دلیل دقیق را در پیام خطا نشان می‌دهد.",
+  },
+  {
+    category: "Predictions",
+    icon: LockKeyhole,
+    question: "When is a prediction locked?",
+    answer:
+      "A prediction is locked when the fixture reaches LowBlock’s server-side cutoff, normally when the match is no longer open for prediction. The server time is authoritative, not the clock on your phone or computer.",
+    questionFa: "پیش‌بینی چه زمانی قفل می‌شود؟",
+    answerFa:
+      "وقتی مهلت ثبت مسابقه در سرور LowBlock تمام شود، پیش‌بینی قفل می‌شود؛ معمولاً از همان زمانی که مسابقه دیگر برای پیش‌بینی باز نیست. ساعت سرور ملاک است، نه ساعتی که روی گوشی یا کامپیوتر شما نمایش داده می‌شود.",
+  },
+  {
+    category: "Scoring",
+    icon: Trophy,
+    question: "When are prediction points calculated?",
+    answer:
+      "Points are calculated after the match result is accepted as final. The resulting points are then included in the next scheduled ranking and statistics refresh.",
+    questionFa: "امتیاز پیش‌بینی‌ها چه زمانی محاسبه می‌شود؟",
+    answerFa:
+      "امتیاز بعد از نهایی‌شدن نتیجه مسابقه محاسبه می‌شود. سپس در نوبت بعدی به‌روزرسانی جدول و آمار، امتیاز جدید در رتبه‌بندی‌ها نمایش داده می‌شود.",
+  },
+  {
+    category: "Scoring",
+    icon: BarChart3,
+    question: "Why do my points and ranking update at different times?",
+    answer:
+      "A prediction can be scored when its match becomes final, while the visible rankings are refreshed by the daily 03:00 Iran-time job. This short gap keeps all leaderboards consistent with the same scheduled snapshot.",
+    questionFa: "چرا امتیاز و رتبه‌ام هم‌زمان به‌روز نمی‌شوند؟",
+    answerFa:
+      "ممکن است امتیاز پیش‌بینی بلافاصله بعد از نهایی‌شدن مسابقه محاسبه شود، اما رتبه‌های قابل مشاهده با فرایند روزانه ساعت ۳ بامداد به وقت ایران به‌روزرسانی می‌شوند. این فاصله کمک می‌کند همه جدول‌ها از یک snapshot یکسان و هماهنگ استفاده کنند.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "Can I join a Club before creating one?",
+    answer:
+      "Yes. You do not need to create a Club to use LowBlock or compete globally. Joining an existing Club is often the easiest way to start.",
+    questionFa: "آیا قبل از ساختن باشگاه می‌توانم عضو یک باشگاه شوم؟",
+    answerFa:
+      "بله. برای استفاده از LowBlock یا شرکت در رقابت جهانی لازم نیست حتماً باشگاه بسازید. برای شروع، پیوستن به یک باشگاه موجود معمولاً انتخاب ساده‌تری است.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "What happens if I create a Club and nobody joins?",
+    answer:
+      "Your Club remains yours, but you do not lose the ability to manage it. If you are the only member, you can leave and close the empty Club. This safely releases your Club-creation capacity.",
+    questionFa: "اگر باشگاه بسازم و هیچ‌کس عضو نشود چه می‌شود؟",
+    answerFa:
+      "باشگاه همچنان برای شما باقی می‌ماند و می‌توانید آن را مدیریت کنید. اگر تنها عضو باشگاه باشید، می‌توانید با تأیید خودتان خارج شوید تا باشگاه خالی بسته شود و ظرفیت ساخت باشگاه دوباره آزاد شود.",
+  },
+  {
+    category: "Clubs",
+    icon: ShieldCheck,
+    question: "Why can’t an owner leave when other members are present?",
+    answer:
+      "A Club must always have a clear owner. Transfer ownership to another active member first; after that, you can leave normally. This prevents the Club and its members from being stranded without an administrator.",
+    questionFa: "چرا وقتی اعضای دیگری هستند مالک نمی‌تواند باشگاه را ترک کند؟",
+    answerFa:
+      "باشگاه باید همیشه یک مالک مشخص داشته باشد. اول مالکیت را به یکی از اعضای فعال منتقل کنید و بعد از باشگاه خارج شوید. این قانون نمی‌گذارد باشگاه بدون مدیر بماند و اعضا در یک وضعیت بلاتکلیف گیر کنند.",
+  },
+  {
+    category: "Clubs",
+    icon: ShieldCheck,
+    question: "What happens when the owner removes a member?",
+    answer:
+      "The selected member is removed only after the owner confirms the custom LowBlock dialog. Their global predictions, points, and personal history remain intact; only their active Club membership ends.",
+    questionFa: "وقتی مالک یک عضو را حذف می‌کند چه اتفاقی می‌افتد؟",
+    answerFa:
+      "عضو فقط بعد از تأیید مالک در پنجره اختصاصی LowBlock حذف می‌شود. پیش‌بینی‌ها، امتیازهای جهانی و سابقه شخصی او حفظ می‌شوند و فقط عضویت فعالش در آن باشگاه پایان پیدا می‌کند.",
+  },
+  {
+    category: "Clubs",
+    icon: ShieldCheck,
+    question: "Can I leave my Club whenever I want?",
+    answer:
+      "Yes, use Leave Club from the Club members area and confirm the action. If you are the owner and other members remain, transfer ownership before leaving. If you are the sole owner, leaving closes the empty Club.",
+    questionFa: "آیا هر وقت بخواهم می‌توانم از باشگاهم خارج شوم؟",
+    answerFa:
+      "بله. از بخش اعضای باشگاه گزینه «ترک باشگاه» را بزنید و خروج را تأیید کنید. اگر مالک هستید و اعضای دیگری باقی مانده‌اند، قبل از خروج مالکیت را منتقل کنید. اگر تنها مالک و عضو باشید، خروج شما باشگاه خالی را می‌بندد.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "Do I lose global points when I leave a Club?",
+    answer:
+      "No. Leaving, switching, or being removed from a Club never deletes your global points, predictions, ranking history, or personal statistics. It only changes your active Club relationship.",
+    questionFa: "آیا با ترک باشگاه امتیازهای جهانی‌ام از بین می‌رود؟",
+    answerFa:
+      "نه. با ترک باشگاه، جابه‌جایی بین باشگاه‌ها یا حذف‌شدن، امتیازهای جهانی، پیش‌بینی‌ها، سابقه رتبه و آمار شخصی شما حذف نمی‌شود. فقط ارتباط فعال شما با آن باشگاه تغییر می‌کند.",
+  },
+  {
+    category: "Clubs",
+    icon: UsersRound,
+    question: "What happens when I accept an invitation to another Club?",
+    answer:
+      "If you already belong to a Club, LowBlock warns you before switching. Confirming the move ends your current active membership and joins the invited Club, while your global history stays untouched.",
+    questionFa: "با قبول دعوت‌نامه یک باشگاه دیگر چه می‌شود؟",
+    answerFa:
+      "اگر از قبل عضو یک باشگاه باشید، LowBlock قبل از جابه‌جایی به شما هشدار می‌دهد. با تأیید، عضویت فعال قبلی‌تان پایان پیدا می‌کند و به باشگاه دعوت‌کننده می‌پیوندید؛ سابقه جهانی شما دست‌نخورده باقی می‌ماند.",
+  },
+  {
+    category: "Privacy & profiles",
+    icon: ShieldCheck,
+    question: "Why do I sometimes see my username or avatar after loading?",
+    answer:
+      "Profile details come from your authenticated account. A short loading state can appear while the current account information is being fetched; LowBlock should not replace your identity with a generic Club label once your profile is available.",
+    questionFa:
+      "چرا گاهی نام کاربری یا آواتارم بعد از بارگذاری نمایش داده می‌شود؟",
+    answerFa:
+      "اطلاعات پروفایل از حساب واردشده شما دریافت می‌شود. ممکن است هنگام دریافت اطلاعات حساب، چند لحظه حالت بارگذاری ببینید؛ اما وقتی پروفایل آماده شد، LowBlock نباید هویت شما را با یک برچسب عمومی باشگاه جایگزین کند.",
+  },
+  {
+    category: "Account & troubleshooting",
+    icon: CircleHelp,
+    question:
+      "Why does the app show a message instead of a technical error code?",
+    answer:
+      "LowBlock translates safe, known errors into a clear explanation in your selected language. Sensitive implementation details are hidden, while the useful reason and next action are shown.",
+    questionFa: "چرا به‌جای کد فنی، پیام قابل فهم می‌بینم؟",
+    answerFa:
+      "LowBlock خطاهای شناخته‌شده و امن را به زبان انتخابی شما به یک توضیح روشن تبدیل می‌کند. جزئیات فنی و حساس نمایش داده نمی‌شوند؛ در عوض، دلیل قابل فهم و کاری که باید انجام دهید به شما گفته می‌شود.",
+  },
+  {
+    category: "Account & troubleshooting",
+    icon: CircleHelp,
+    question: "What should I do if the numbers look outdated?",
+    answer:
+      "Refresh the page after the relevant scheduled update. Match details and rankings are refreshed daily at 03:00 Iran time. If the data is still incorrect after that cycle, report the affected page and item.",
+    questionFa: "اگر عددها قدیمی به نظر برسند چه کار کنم؟",
+    answerFa:
+      "بعد از زمان به‌روزرسانی مربوط، صفحه را دوباره بازخوانی کنید. جزئیات مسابقه و رتبه‌بندی هر روز ساعت ۳ بامداد به وقت ایران تازه می‌شوند. اگر بعد از این چرخه هنوز اطلاعات اشتباه بود، نام صفحه و مورد مشکل‌دار را برای پشتیبانی بفرستید.",
+  },
 ];
 
 items.push(...operationalItems);
-const categories = ["All", ...Array.from(new Set(items.map((item) => item.category)))];
-const topicCards: Array<{ icon: typeof BookOpen; en: string; fa: string }> = [[Sparkles, "Getting started", "شروع کار"], [BookOpen, "Predictions", "پیش‌بینی‌ها"], [Trophy, "Scoring", "امتیازدهی"], [UsersRound, "Clubs", "باشگاه‌ها"]].map(([icon, en, fa]) => ({ icon: icon as typeof BookOpen, en: en as string, fa: fa as string }));
+const categories = [
+  "All",
+  ...Array.from(new Set(items.map((item) => item.category))),
+];
+const topicCards: Array<{ icon: typeof BookOpen; en: string; fa: string }> = [
+  [Sparkles, "Getting started", "شروع کار"],
+  [BookOpen, "Predictions", "پیش‌بینی‌ها"],
+  [Trophy, "Scoring", "امتیازدهی"],
+  [UsersRound, "Clubs", "باشگاه‌ها"],
+].map(([icon, en, fa]) => ({
+  icon: icon as typeof BookOpen,
+  en: en as string,
+  fa: fa as string,
+}));
 
 export default function HelpPage() {
   const { language, t } = useLanguage();
@@ -75,17 +577,211 @@ export default function HelpPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [open, setOpen] = useState<number | null>(0);
-  const visible = useMemo(() => items.filter((item) => {
-    const text = `${item.question} ${item.answer} ${item.questionFa} ${item.answerFa}`.toLowerCase();
-    return (category === "All" || item.category === category) && (!query.trim() || text.includes(query.trim().toLowerCase()));
-  }), [category, query]);
+  const visible = useMemo(
+    () =>
+      items.filter((item) => {
+        const text =
+          `${item.question} ${item.answer} ${item.questionFa} ${item.answerFa}`.toLowerCase();
+        return (
+          (category === "All" || item.category === category) &&
+          (!query.trim() || text.includes(query.trim().toLowerCase()))
+        );
+      }),
+    [category, query],
+  );
 
-  return <main className="help-page min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-6xl">
-    <section className="help-hero relative overflow-hidden rounded-[2.25rem] border border-brand/20 p-7 md:p-12"><div className="help-hero-glow"/><div className="relative z-10 max-w-3xl"><div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-black tracking-[.14em] text-brand"><CircleHelp size={14}/>{t("مرکز راهنما", "LOWBLOCK HELP CENTRE")}</div><h1 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">{t("هر چیزی که لازم است بدانید.", "Everything you need to know.")}</h1><p className="mt-4 max-w-2xl text-sm leading-8 text-white/60">{t("راهنمای کامل پیش‌بینی، امتیازدهی، لیگ‌ها، راندها، باشگاه‌ها و حریم خصوصی LowBlock.", "A complete guide to predictions, scoring, leagues, rounds, Clubs, data, and privacy in LowBlock.")}</p><label className="help-search mt-8 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3.5"><Search size={19} className="shrink-0 text-brand"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("جست‌وجو در راهنما…", "Search the Help centre…")} className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"/>{query && <button type="button" onClick={() => setQuery("")} aria-label={t("پاک‌کردن جست‌وجو", "Clear search")}><X size={16} className="text-white/45"/></button>}</label></div><div className="help-hero-mark" aria-hidden="true"><BookOpen size={38}/><span>?</span></div></section>
-    <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{topicCards.map(({ icon: Icon, en, fa: faLabel }) => <button type="button" key={en} onClick={() => setCategory(en)} className={`help-topic-card ${category === en ? "is-active" : ""}`}><span><Icon size={18}/></span><b>{fa ? faLabel : en}</b><small>{fa ? "پاسخ‌های کاربردی" : "Practical answers"}</small></button>)}</section>
-    <div className="mt-8 grid gap-7 lg:grid-cols-[15rem_1fr]">
-      <aside className="help-category-panel"><p className="help-section-kicker">{t("دسته‌بندی‌ها", "EXPLORE TOPICS")}</p><div className="mt-3 flex gap-2 overflow-x-auto lg:grid lg:overflow-visible">{categories.map((name) => <button type="button" key={name} onClick={() => setCategory(name)} className={`help-category-button ${category === name ? "is-active" : ""}`}>{name === "All" ? t("همه موضوعات", "All topics") : fa ? ({ "Getting started": "شروع کار", Predictions: "پیش‌بینی‌ها", Scoring: "امتیازدهی", "Rounds & fixtures": "راند و مسابقه", Clubs: "باشگاه‌ها", "Privacy & profiles": "حریم خصوصی و پروفایل", "Data & updates": "داده و به‌روزرسانی", "Account & troubleshooting": "حساب و رفع مشکل" } as Record<string, string>)[name] : name}</button>)}</div></aside>
-      <section className="min-w-0"><div className="mb-4 flex items-end justify-between gap-4"><div><p className="help-section-kicker">{t("پرسش‌های متداول", "KNOWLEDGE BASE")}</p><h2 className="mt-1 text-2xl font-black md:text-3xl">{category === "All" ? t("پاسخ‌های مهم، یک‌جا", "Clear answers, all in one place") : (fa ? ({ "Getting started": "شروع کار", Predictions: "پیش‌بینی‌ها", Scoring: "امتیازدهی", "Rounds & fixtures": "راند و مسابقه", Clubs: "باشگاه‌ها", "Privacy & profiles": "حریم خصوصی و پروفایل", "Data & updates": "داده و به‌روزرسانی", "Account & troubleshooting": "حساب و رفع مشکل" } as Record<string, string>)[category] : category)}</h2></div><span className="help-result-count">{visible.length} {t("پاسخ", "answers")}</span></div><div className="space-y-3">{visible.length ? visible.map((item) => { const index = items.indexOf(item); const isOpen = open === index; const Icon = item.icon; return <article key={item.question} className={`help-answer ${isOpen ? "is-open" : ""}`}><button type="button" onClick={() => setOpen(isOpen ? null : index)} className="flex w-full items-center gap-4 px-5 py-5 text-start"><span className="help-answer-icon"><Icon size={18}/></span><span className="min-w-0 flex-1"><small>{fa ? item.category === "Getting started" ? "شروع کار" : item.category : item.category}</small><b className="mt-1 block text-sm leading-6 md:text-base">{fa ? item.questionFa : item.question}</b></span><ChevronDown size={18} className={`shrink-0 text-white/35 transition-transform ${isOpen ? "rotate-180 text-brand" : ""}`}/></button><AnimatePresence initial={false}>{isOpen && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"><p className="border-t border-white/[.06] px-5 pb-5 pt-4 ps-[4.5rem] text-sm leading-8 text-white/60">{fa ? item.answerFa : item.answer}</p></motion.div>}</AnimatePresence></article>; }) : <div className="rounded-2xl border border-dashed border-white/15 p-14 text-center"><CircleHelp size={30} className="mx-auto text-brand"/><p className="mt-4 text-sm text-white/55">{t("پاسخی با این جست‌وجو پیدا نشد.", "No answers matched your search.")}</p></div>}</div></section>
-    </div>
-  </div></main>;
+  return (
+    <main className="help-page min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
+      <div className="mx-auto max-w-6xl">
+        <section className="help-hero relative overflow-hidden rounded-[2.25rem] border border-brand/20 p-7 md:p-12">
+          <div className="help-hero-glow" />
+          <div className="relative z-10 max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-black tracking-[.14em] text-brand">
+              <CircleHelp size={14} />
+              {t("مرکز راهنما", "LOWBLOCK HELP CENTRE")}
+            </div>
+            <h1 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">
+              {t("هر چیزی که لازم است بدانید.", "Everything you need to know.")}
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-8 text-white/60">
+              {t(
+                "راهنمای کامل پیش‌بینی، امتیازدهی، لیگ‌ها، راندها، باشگاه‌ها و حریم خصوصی LowBlock.",
+                "A complete guide to predictions, scoring, leagues, rounds, Clubs, data, and privacy in LowBlock.",
+              )}
+            </p>
+            <label className="help-search mt-8 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3.5">
+              <Search size={19} className="shrink-0 text-brand" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("جست‌وجو در راهنما…", "Search the Help centre…")}
+                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label={t("پاک‌کردن جست‌وجو", "Clear search")}
+                >
+                  <X size={16} className="text-white/45" />
+                </button>
+              )}
+            </label>
+          </div>
+          <div className="help-hero-mark" aria-hidden="true">
+            <BookOpen size={38} />
+            <span>?</span>
+          </div>
+        </section>
+        <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {topicCards.map(({ icon: Icon, en, fa: faLabel }) => (
+            <button
+              type="button"
+              key={en}
+              onClick={() => setCategory(en)}
+              className={`help-topic-card ${category === en ? "is-active" : ""}`}
+            >
+              <span>
+                <Icon size={18} />
+              </span>
+              <b>{fa ? faLabel : en}</b>
+              <small>{fa ? "پاسخ‌های کاربردی" : "Practical answers"}</small>
+            </button>
+          ))}
+        </section>
+        <div className="mt-8 grid gap-7 lg:grid-cols-[15rem_1fr]">
+          <aside className="help-category-panel">
+            <p className="help-section-kicker">
+              {t("دسته‌بندی‌ها", "EXPLORE TOPICS")}
+            </p>
+            <div className="mt-3 flex gap-2 overflow-x-auto lg:grid lg:overflow-visible">
+              {categories.map((name) => (
+                <button
+                  type="button"
+                  key={name}
+                  onClick={() => setCategory(name)}
+                  className={`help-category-button ${category === name ? "is-active" : ""}`}
+                >
+                  {name === "All"
+                    ? t("همه موضوعات", "All topics")
+                    : fa
+                      ? (
+                          {
+                            "Getting started": "شروع کار",
+                            Predictions: "پیش‌بینی‌ها",
+                            Scoring: "امتیازدهی",
+                            "Rounds & fixtures": "راند و مسابقه",
+                            Clubs: "باشگاه‌ها",
+                            "Privacy & profiles": "حریم خصوصی و پروفایل",
+                            "Data & updates": "داده و به‌روزرسانی",
+                            "Account & troubleshooting": "حساب و رفع مشکل",
+                          } as Record<string, string>
+                        )[name]
+                      : name}
+                </button>
+              ))}
+            </div>
+          </aside>
+          <section className="min-w-0">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <p className="help-section-kicker">
+                  {t("پرسش‌های متداول", "KNOWLEDGE BASE")}
+                </p>
+                <h2 className="mt-1 text-2xl font-black md:text-3xl">
+                  {category === "All"
+                    ? t(
+                        "پاسخ‌های مهم، یک‌جا",
+                        "Clear answers, all in one place",
+                      )
+                    : fa
+                      ? (
+                          {
+                            "Getting started": "شروع کار",
+                            Predictions: "پیش‌بینی‌ها",
+                            Scoring: "امتیازدهی",
+                            "Rounds & fixtures": "راند و مسابقه",
+                            Clubs: "باشگاه‌ها",
+                            "Privacy & profiles": "حریم خصوصی و پروفایل",
+                            "Data & updates": "داده و به‌روزرسانی",
+                            "Account & troubleshooting": "حساب و رفع مشکل",
+                          } as Record<string, string>
+                        )[category]
+                      : category}
+                </h2>
+              </div>
+              <span className="help-result-count">
+                {visible.length} {t("پاسخ", "answers")}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {visible.length ? (
+                visible.map((item) => {
+                  const index = items.indexOf(item);
+                  const isOpen = open === index;
+                  const Icon = item.icon;
+                  return (
+                    <article
+                      key={item.question}
+                      className={`help-answer ${isOpen ? "is-open" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpen(isOpen ? null : index)}
+                        className="flex w-full items-center gap-4 px-5 py-5 text-start"
+                      >
+                        <span className="help-answer-icon">
+                          <Icon size={18} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <small>
+                            {fa
+                              ? item.category === "Getting started"
+                                ? "شروع کار"
+                                : item.category
+                              : item.category}
+                          </small>
+                          <b className="mt-1 block text-sm leading-6 md:text-base">
+                            {fa ? item.questionFa : item.question}
+                          </b>
+                        </span>
+                        <ChevronDown
+                          size={18}
+                          className={`shrink-0 text-white/35 transition-transform ${isOpen ? "rotate-180 text-brand" : ""}`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {isOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <p className="border-t border-white/[.06] px-5 pb-5 pt-4 ps-[4.5rem] text-sm leading-8 text-white/60">
+                              {fa ? item.answerFa : item.answer}
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/15 p-14 text-center">
+                  <CircleHelp size={30} className="mx-auto text-brand" />
+                  <p className="mt-4 text-sm text-white/55">
+                    {t(
+                      "پاسخی با این جست‌وجو پیدا نشد.",
+                      "No answers matched your search.",
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
 }

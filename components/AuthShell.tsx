@@ -1,2 +1,38 @@
 import { Brand } from "@/components/Brand";
-export function AuthShell({title,subtitle,children}:{title:React.ReactNode;subtitle:React.ReactNode;children:React.ReactNode}){return <main className="auth-shell relative grid min-h-screen place-items-center overflow-hidden px-5 py-24"><div className="auth-shell-orb auth-shell-orb-one"/><div className="auth-shell-orb auth-shell-orb-two"/><div className="relative z-10 w-full max-w-md"><div className="auth-brand-lockup"><Brand variant="stacked" className="mx-auto"/><span className="auth-brand-line"/></div><div className="auth-panel panel p-6 md:p-9"><div className="mb-8"><span className="auth-eyebrow">LOWBLOCK · FOOTBALL PREDICTIONS</span><h1 className="mt-3 text-3xl font-black tracking-tight">{title}</h1><p className="mt-3 text-sm leading-7 text-[var(--muted)]">{subtitle}</p></div>{children}</div><p className="auth-footnote">Make every match count <span>•</span> Predict with confidence</p></div></main>}
+export function AuthShell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: React.ReactNode;
+  subtitle: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <main className="auth-shell relative grid min-h-screen place-items-center overflow-hidden px-5 py-24">
+      <div className="auth-shell-orb auth-shell-orb-one" />
+      <div className="auth-shell-orb auth-shell-orb-two" />
+      <div className="relative z-10 w-full max-w-md">
+        <div className="auth-brand-lockup">
+          <Brand variant="stacked" className="mx-auto" />
+          <span className="auth-brand-line" />
+        </div>
+        <div className="auth-panel panel p-6 md:p-9">
+          <div className="mb-8">
+            <span className="auth-eyebrow">
+              LOWBLOCK · FOOTBALL PREDICTIONS
+            </span>
+            <h1 className="mt-3 text-3xl font-black tracking-tight">{title}</h1>
+            <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+              {subtitle}
+            </p>
+          </div>
+          {children}
+        </div>
+        <p className="auth-footnote">
+          Make every match count <span>•</span> Predict with confidence
+        </p>
+      </div>
+    </main>
+  );
+}

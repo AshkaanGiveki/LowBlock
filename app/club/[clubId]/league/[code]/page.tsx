@@ -14,7 +14,11 @@ import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClubLeaguePage({ params }: { params: Promise<{ clubId: string; code: string }> }) {
+export default async function ClubLeaguePage({
+  params,
+}: {
+  params: Promise<{ clubId: string; code: string }>;
+}) {
   const { clubId, code } = await params;
   const league = getLeague(code);
   if (!league || !ObjectId.isValid(clubId)) notFound();
@@ -22,16 +26,86 @@ export default async function ClubLeaguePage({ params }: { params: Promise<{ clu
   if (!userId) notFound();
   const db = await getDb();
   let club;
-  try { ({ club } = await requireClubMember(db, clubId, userId)); } catch { notFound(); }
-  const year = Number((await db.collection("matches").findOne({ leagueCode: code }, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }))?.seasonStartYear ?? new Date().getUTCFullYear());
-  const rows = await getCanonicalLeaderboard(db, { clubId, leagueCode: code, seasonStartYear: year }, 100);
-  const rounds = await db.collection<any>("rounds").find({ leagueCode: code, seasonId: String(year) }).sort({ number: 1 }).toArray();
-  const roundItems = rounds.map((round) => ({ number: Number(round.number), count: Number(round.eligibleFixtures ?? 0), active: round.status === "LIVE" || round.status === "UPCOMING", live: round.status === "LIVE", completed: round.status === "FINAL" }));
+  try {
+    ({ club } = await requireClubMember(db, clubId, userId));
+  } catch {
+    notFound();
+  }
+  const year = Number(
+    (
+      await db
+        .collection("matches")
+        .findOne(
+          { leagueCode: code },
+          { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } },
+        )
+    )?.seasonStartYear ?? new Date().getUTCFullYear(),
+  );
+  const rows = await getCanonicalLeaderboard(
+    db,
+    { clubId, leagueCode: code, seasonStartYear: year },
+    100,
+  );
+  const rounds = await db
+    .collection<any>("rounds")
+    .find({ leagueCode: code, seasonId: String(year) })
+    .sort({ number: 1 })
+    .toArray();
+  const roundItems = rounds.map((round) => ({
+    number: Number(round.number),
+    count: Number(round.eligibleFixtures ?? 0),
+    active: round.status === "LIVE" || round.status === "UPCOMING",
+    live: round.status === "LIVE",
+    completed: round.status === "FINAL",
+  }));
   const lastActive = roundItems.filter((round) => round.active).at(-1)?.number;
-  return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-5xl">
-    <BackButton />
-    <section className="relative overflow-hidden rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.22),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-7"><div className="flex min-w-0 items-center gap-4"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/[.03] p-2"><LeagueLogo src={league.logo} className="h-full w-full" /></span><div className="min-w-0"><p className="text-xs font-black tracking-[.2em] text-brand">{club.name}</p><h1 className="mt-2 truncate text-3xl font-black"><T fa={league.faName} en={league.enName} /></h1><p className="mt-2 text-sm text-white/60"><T fa={`فصل ${year}/${String(year + 1).slice(-2)}`} en={`Season ${year}/${String(year + 1).slice(-2)}`} /></p></div></div></section>
-    <LeagueRoundRail code={code} basePath={`/club/${clubId}/league/${code}`} rounds={roundItems.map((round) => ({ ...round, active: round.number === lastActive }))} />
-    <Suspense fallback={<div className="mt-8 h-[620px] animate-pulse rounded-[2rem] bg-white/[.06]" />}><ClubLeaderboard rows={rows} titleFa="رقابت اعضای باشگاه" titleEn="Club league race" subtitleFa="امتیازهای اعضا در این لیگ، از همان جدول رسمی LowBlock محاسبه می‌شود." subtitleEn="Every member is ranked from the canonical LowBlock scorebook." /></Suspense>
-  </div></main>;
+  return (
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
+      <div className="mx-auto max-w-5xl">
+        <BackButton />
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/[.08] bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.22),transparent_38%),linear-gradient(145deg,#14251c,#0a0f0c)] p-7">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/[.03] p-2">
+              <LeagueLogo src={league.logo} className="h-full w-full" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black tracking-[.2em] text-brand">
+                {club.name}
+              </p>
+              <h1 className="mt-2 truncate text-3xl font-black">
+                <T fa={league.faName} en={league.enName} />
+              </h1>
+              <p className="mt-2 text-sm text-white/60">
+                <T
+                  fa={`فصل ${year}/${String(year + 1).slice(-2)}`}
+                  en={`Season ${year}/${String(year + 1).slice(-2)}`}
+                />
+              </p>
+            </div>
+          </div>
+        </section>
+        <LeagueRoundRail
+          code={code}
+          basePath={`/club/${clubId}/league/${code}`}
+          rounds={roundItems.map((round) => ({
+            ...round,
+            active: round.number === lastActive,
+          }))}
+        />
+        <Suspense
+          fallback={
+            <div className="mt-8 h-[620px] animate-pulse rounded-[2rem] bg-white/[.06]" />
+          }
+        >
+          <ClubLeaderboard
+            rows={rows}
+            titleFa="رقابت اعضای باشگاه"
+            titleEn="Club league race"
+            subtitleFa="امتیازهای اعضا در این لیگ، از همان جدول رسمی LowBlock محاسبه می‌شود."
+            subtitleEn="Every member is ranked from the canonical LowBlock scorebook."
+          />
+        </Suspense>
+      </div>
+    </main>
+  );
 }
