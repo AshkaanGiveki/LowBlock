@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/mongo";
-import { scheduleMatchReminder } from "./qstash";
+import { getQstashClient, scheduleMatchReminder } from "./qstash";
 import { env } from "@/lib/env";
 import { teamName } from "@/lib/football/team-names";
 import { readableFa } from "@/lib/text";
@@ -12,6 +12,7 @@ const preferenceField = (provider: Provider) =>
     : "balePredictionRemindersEnabled";
 
 export async function scheduleUpcomingReminders() {
+  getQstashClient();
   const db = await getDb();
   const now = Date.now();
   const matches = await db

@@ -8,6 +8,7 @@ import {
   scheduleChannelDailyPosts,
 } from "@/lib/notifications/channel";
 import { Client } from "@upstash/qstash";
+import { qstashConfigStatus } from "@/lib/notifications/qstash";
 
 async function run(request: Request) {
   if (
@@ -22,6 +23,7 @@ async function run(request: Request) {
     let remindersScheduled = 0;
     let channelReminderScheduled = 0;
     let channelDailyPostsScheduled = 0;
+    let notificationError: string | null = null;
     try {
       const db = await getDb();
       remindersScheduled = await scheduleUpcomingReminders();
@@ -32,8 +34,9 @@ async function run(request: Request) {
         channelDailyPostsScheduled += await scheduleChannelDailyPosts(day);
       }
     } catch (error) {
+      notificationError = error instanceof Error ? error.message : "unknown";
       console.error("notification_scheduling_failed", {
-        error: error instanceof Error ? error.message : "unknown",
+        error: notificationError,
       });
     }
     return NextResponse.json({
@@ -42,6 +45,11 @@ async function run(request: Request) {
       remindersScheduled,
       channelReminderScheduled,
       channelDailyPostsScheduled,
+      notifications: {
+        ok: !notificationError,
+        ...qstashConfigStatus(),
+        error: notificationError,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "sync failed";

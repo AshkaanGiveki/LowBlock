@@ -112,6 +112,19 @@ export function validateProductionEnv() {
     throw new Error(
       `Missing required production environment variables: ${missing.join(", ")}`,
     );
-  if (!env.NEXT_PUBLIC_APP_URL || !/^https?:\/\//.test(env.NEXT_PUBLIC_APP_URL))
+  if (
+    !env.NEXT_PUBLIC_APP_URL ||
+    !/^https?:\/\//.test(env.NEXT_PUBLIC_APP_URL) ||
+    /localhost|127\.0\.0\.1/.test(env.NEXT_PUBLIC_APP_URL)
+  )
     throw new Error("NEXT_PUBLIC_APP_URL must be an absolute http(s) URL");
+  const notificationMissing = [
+    "QSTASH_TOKEN",
+    "QSTASH_CURRENT_SIGNING_KEY",
+    "TELEGRAM_BOT_TOKEN",
+  ].filter((key) => !process.env[key]);
+  if (notificationMissing.length)
+    throw new Error(
+      `Missing required production notification variables: ${notificationMissing.join(", ")}`,
+    );
 }
