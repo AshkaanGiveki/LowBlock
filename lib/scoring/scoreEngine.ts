@@ -93,7 +93,10 @@ async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
  * each score is replaced for the same prediction/match and stats are rebuilt
  * from the canonical score rows rather than incremented.
  */
-export async function runScoreEngine() {
+export async function runScoreEngine(
+  options: { rebuildLeaderboards?: boolean } = {},
+) {
+  const rebuildLeaderboards = options.rebuildLeaderboards ?? true;
   const db = await getDb();
   const matches = await db
     .collection<Match>("matches")
@@ -109,7 +112,7 @@ export async function runScoreEngine() {
       matches: 0,
       scores: 0,
       leaderboards: 0,
-      awards: await grantAutomaticAwards(db),
+      awards: rebuildLeaderboards ? await grantAutomaticAwards(db) : null,
     };
   const byMatch = new Map(
     matches.map((match) => [match.providerMatchId, match]),
@@ -320,15 +323,22 @@ export async function runScoreEngine() {
       await transactionDb
         .collection("predictionScores")
         .bulkWrite(scoreOps, { ordered: false, session });
-    if (touchedUsers.length)
+    if (rebuildLeaderboards && touchedUsers.length)
       await transactionDb
         .collection("leaderboardStats")
         .deleteMany({ userId: { $in: touchedUsers } }, { session });
-    if (statOps.length)
+    if (rebuildLeaderboards && statOps.length)
       await transactionDb
         .collection("leaderboardStats")
         .bulkWrite(statOps, { ordered: false, session });
   });
+  if (!rebuildLeaderboards)
+    return {
+      matches: matches.length,
+      scores: scoreOps.length,
+      leaderboards: 0,
+      awards: null,
+    };
   await writeRankSnapshots(
     db,
     [...aggregates.values()].map((row) => ({
@@ -350,4 +360,8 @@ export async function runScoreEngine() {
     roundWinners,
     awards,
   };
+}
+
+export async function runLeaderboardEngine() {
+  return runScoreEngine({ rebuildLeaderboards: true });
 }

@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { BackButton } from "@/components/BackButton";
 import { UserAvatar } from "@/components/UserAvatar";
+import { LocalDate } from "@/components/LocalDateTime";
 
 type Request = {
   _id: string;
@@ -295,7 +296,7 @@ function RequestCard({
         </Link>
         <small className="text-xs text-[var(--muted)]">
           {t("درخواست ارسال شده در", "Requested")}{" "}
-          {new Date(request.createdAt).toLocaleDateString()}
+          <LocalDate value={request.createdAt} locale="en-GB" />
         </small>
       </div>
       <div className="flex shrink-0 items-center gap-2">

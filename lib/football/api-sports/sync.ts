@@ -5,7 +5,10 @@ import {
   isQualityInternationalFriendly,
 } from "@/lib/football/leagues";
 import { apiRequest, remainingApiRequests } from "./client";
-import { runScoreEngine } from "@/lib/scoring/scoreEngine";
+import {
+  runLeaderboardEngine,
+  runScoreEngine,
+} from "@/lib/scoring/scoreEngine";
 import { rebuildRoundRecords } from "@/lib/football/roundLifecycle";
 import { invalidateCompetitionCaches } from "@/lib/domain/cache";
 import { syncMatchInsights } from "./matchInsights";
@@ -203,9 +206,10 @@ export async function syncFootballApiDate(dateKey: string) {
   await ensureIndexes();
   await ensurePerformanceIndexes();
   const result = await saveDailyFixtures(dateKey, db);
-  const scoreEngine = await runScoreEngine();
+  const scoreEngine = await runScoreEngine({ rebuildLeaderboards: false });
+  const leaderboardEngine = await runLeaderboardEngine();
   invalidateCompetitionCaches();
-  return { ...result, scoreEngine };
+  return { ...result, scoreEngine, leaderboardEngine };
 }
 
 export async function syncFootballApi() {
@@ -239,11 +243,10 @@ export async function syncFootballApi() {
     }
   } else {
     const currentDate = new Date();
-    const dateKeys = [currentDate.toISOString().slice(0, 10)];
-    if (currentDate.getUTCHours() === 0)
-      dateKeys.push(
-        new Date(currentDate.getTime() - 86400000).toISOString().slice(0, 10),
-      );
+    const dateKeys = [
+      currentDate.toISOString().slice(0, 10),
+      new Date(currentDate.getTime() - 86400000).toISOString().slice(0, 10),
+    ];
     for (const date of dateKeys) {
       const result = await apiRequest<Fixture>({ date, timezone: "UTC" });
       listRequests++;
@@ -317,8 +320,7 @@ export async function syncFootballApi() {
           total += await saveFixtures(db, league.code, [fixture], true);
       }
     }
-  const shouldSyncInsights =
-    env.FOOTBALL_API_MODE === "season" || new Date().getUTCHours() === 0;
+  const shouldSyncInsights = env.FOOTBALL_API_MODE === "season";
   const insights = shouldSyncInsights
     ? await syncMatchInsights(db)
     : {
@@ -331,24 +333,33 @@ export async function syncFootballApi() {
         providerErrors: [],
       };
   const rounds = await rebuildRoundRecords(db);
-  await db
-    .collection("syncRuns")
-    .insertOne({
-      provider: "football-api",
-      mode: env.FOOTBALL_API_MODE,
-      startedAt,
-      finishedAt: new Date(),
-      status: "OK",
-      listRequests,
-      detailRequests,
-      fixturesUpdated: total,
-      roundsUpdated: rounds,
-      insights,
-    });
-  const scoreEngine = await runScoreEngine();
+  const scoreEngine = await runScoreEngine({ rebuildLeaderboards: false });
+  const leaderboardEngine = await runLeaderboardEngine();
   invalidateCompetitionCaches();
+  await db.collection("syncRuns").insertOne({
+    provider: "football-api",
+    mode: env.FOOTBALL_API_MODE,
+    startedAt,
+    finishedAt: new Date(),
+    status: "OK",
+    listRequests,
+    detailRequests,
+    fixturesUpdated: total,
+    roundsUpdated: rounds,
+    insights,
+    scoreEngine,
+    leaderboardEngine,
+  });
   console.log(
     `Football API sync complete: ${total} fixtures, ${listRequests + detailRequests + insights.h2hRequests} provider requests; ${rounds} rounds; insight snapshots: ${insights.snapshots}; score engine: ${scoreEngine.scores}`,
   );
-  return { total, listRequests, detailRequests, rounds, insights, scoreEngine };
+  return {
+    total,
+    listRequests,
+    detailRequests,
+    rounds,
+    insights,
+    scoreEngine,
+    leaderboardEngine,
+  };
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { BarChart3, CalendarDays, ChevronRight, Radio } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { MatchAnalytics } from "@/components/MatchAnalytics";
-import { formatIranDate, formatIranTime } from "@/lib/football/time";
+import { LocalDate, LocalTime } from "@/components/LocalDateTime";
 import { teamName } from "@/lib/football/team-names";
 import { closeMatchRoute, openMatchRoute } from "@/components/matchNavigation";
 import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
@@ -89,8 +89,8 @@ export function RoundMatchGrid({
                 <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
                   <span className="inline-flex items-center gap-1.5">
                     <CalendarDays size={13} />
-                    {formatIranDate(fixture.kickoffAt, locale)} ·{" "}
-                    {formatIranTime(fixture.kickoffAt, locale)}
+                    <LocalDate value={fixture.kickoffAt} locale={locale} /> ·{" "}
+                    <LocalTime value={fixture.kickoffAt} locale={locale} />
                   </span>
                   <span
                     className={`inline-flex items-center gap-1 font-black ${live ? "text-red-300" : finished ? "text-brand" : ""}`}

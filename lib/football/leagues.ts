@@ -242,9 +242,9 @@ export const LEAGUES = [
     faName: "لیگ اروپا",
     enName: "UEFA Europa League",
     short: "UEL",
-    globalLeaderboard: false,
-    h2h: false,
-    defaultClubLeaderboard: false,
+    globalLeaderboard: true,
+    h2h: true,
+    defaultClubLeaderboard: true,
     kind: "TOURNAMENT",
   },
   {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, ChevronDown, Sparkles } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { teamName } from "@/lib/football/team-names";
+import { LocalDate } from "@/components/LocalDateTime";
 
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Row = {
@@ -83,9 +84,10 @@ export function PublicPredictionHistory({ username }: { username: string }) {
             <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
               <span className="inline-flex items-center gap-1">
                 <CalendarDays size={12} />
-                {new Date(row.kickoffAt).toLocaleDateString(
-                  language === "fa" ? "fa-IR" : "en-GB",
-                )}
+                <LocalDate
+                  value={row.kickoffAt}
+                  locale={language === "fa" ? "fa-IR" : "en-GB"}
+                />
               </span>
               <span>
                 {row.leagueCode} ·{" "}

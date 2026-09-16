@@ -7,6 +7,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 import { TeamCrest } from "@/components/TeamCrest";
+import { LocalShortDate } from "@/components/LocalDateTime";
 
 type H2HMeeting = {
   fixtureId: string;
@@ -238,10 +239,10 @@ function H2HCard({
                 />
               </span>
               <time className="hidden w-16 text-end text-[9px] text-[var(--muted)] sm:block">
-                {new Date(item.date).toLocaleDateString(
-                  language === "fa" ? "fa-IR" : "en-GB",
-                  { month: "short", day: "numeric" },
-                )}
+                <LocalShortDate
+                  value={item.date}
+                  locale={language === "fa" ? "fa-IR" : "en-GB"}
+                />
               </time>
             </div>
           ))

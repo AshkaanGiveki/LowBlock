@@ -3,7 +3,7 @@ import { useState } from "react";
 import { BarChart3, CalendarDays } from "lucide-react";
 import { MatchAnalytics } from "@/components/MatchAnalytics";
 import { useLanguage } from "@/components/LanguageProvider";
-import { formatIranDate, formatIranTime } from "@/lib/football/time";
+import { LocalDate, LocalTime } from "@/components/LocalDateTime";
 import { teamName } from "@/lib/football/team-names";
 type Fixture = {
   providerMatchId: string;
@@ -38,15 +38,15 @@ export function ClubRoundFixtures({
               <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarDays size={13} />
-                  {formatIranDate(
-                    fixture.kickoffAt,
-                    language === "fa" ? "fa-IR" : "en-GB",
-                  )}{" "}
+                  <LocalDate
+                    value={fixture.kickoffAt}
+                    locale={language === "fa" ? "fa-IR" : "en-GB"}
+                  />{" "}
                   ·{" "}
-                  {formatIranTime(
-                    fixture.kickoffAt,
-                    language === "fa" ? "fa-IR" : "en-GB",
-                  )}
+                  <LocalTime
+                    value={fixture.kickoffAt}
+                    locale={language === "fa" ? "fa-IR" : "en-GB"}
+                  />
                 </span>
                 <span className={finished ? "text-brand" : ""}>
                   {fixture.status}

@@ -5,6 +5,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { teamName } from "@/lib/football/team-names";
 import { TeamCrest } from "@/components/TeamCrest";
 import { MatchAnalytics } from "@/components/MatchAnalytics";
+import { LocalDateTime } from "@/components/LocalDateTime";
 type Row = {
   matchId: string;
   kickoffAt: string;
@@ -52,9 +53,10 @@ export function PredictionHistory({ rows }: { rows: Row[] }) {
                 <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
                   <span className="flex items-center gap-1">
                     <Clock3 size={12} />
-                    {new Date(row.kickoffAt).toLocaleString(
-                      language === "fa" ? "fa-IR" : "en-GB",
-                    )}
+                    <LocalDateTime
+                      value={row.kickoffAt}
+                      locale={language === "fa" ? "fa-IR" : "en-GB"}
+                    />
                   </span>
                   {row.actualHome !== null && (
                     <span className="flex items-center gap-1 text-brand">

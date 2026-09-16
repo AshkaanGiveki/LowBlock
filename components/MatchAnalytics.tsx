@@ -21,6 +21,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
+import { LocalDateTime } from "@/components/LocalDateTime";
 
 type AnalyticsData = {
   match: any;
@@ -219,10 +220,10 @@ function MatchHero({ match, language, number, score, t }: any) {
       </div>
       <div className="mt-8 flex items-center justify-center gap-2 text-xs text-white/50">
         <CalendarDays size={14} className="text-brand" />{" "}
-        {new Date(match.kickoffAt).toLocaleString(
-          language === "fa" ? "fa-IR" : "en-GB",
-          { dateStyle: "medium", timeStyle: "short" },
-        )}
+        <LocalDateTime
+          value={match.kickoffAt}
+          locale={language === "fa" ? "fa-IR" : "en-GB"}
+        />
       </div>
     </div>
   );

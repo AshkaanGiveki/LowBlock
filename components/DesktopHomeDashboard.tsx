@@ -13,6 +13,7 @@ import { HomeFixtureSlider } from "@/components/HomeFixtureSlider";
 import { T } from "@/components/LanguageProvider";
 import { FEATURED_COMPETITION_CODES, LEAGUES } from "@/lib/football/leagues";
 import type { MatchRecord } from "@/lib/football/data";
+import { LocalTime } from "@/components/LocalDateTime";
 
 type Row = {
   userId: string;
@@ -260,10 +261,7 @@ export function DesktopHomeDashboard({
                     <span className="desktop-fixture-dot" />
                     <span className="truncate">{match.homeTeam.name}</span>
                     <time>
-                      {new Date(match.kickoffAt).toLocaleTimeString("fa-IR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      <LocalTime value={match.kickoffAt} locale="fa-IR" />
                     </time>
                     <span className="truncate">{match.awayTeam.name}</span>
                     <ChevronLeft size={13} />
