@@ -5,6 +5,7 @@ import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { consumeLinkToken } from "@/lib/platform/identity";
 import { ObjectId } from "mongodb";
 import { syncFootballApi } from "@/lib/football/api-sports/sync";
+import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 
 export const runtime = "nodejs";
 
@@ -149,9 +150,10 @@ async function handleAdminSync(chatId: string) {
   );
   try {
     const result = await syncFootballApi();
+    const notifications = await scheduleFootballNotifications();
     await send(
       chatId,
-      `✅ Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}.`,
+      `✅ Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
     );
   } catch (error) {
     console.error("telegram_admin_sync_failed", {

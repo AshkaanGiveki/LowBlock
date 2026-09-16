@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { syncFootballApi } from "@/lib/football/api-sports/sync";
 import { getDb } from "@/lib/db/mongo";
-import { scheduleUpcomingReminders } from "@/lib/notifications/reminders";
-import {
-  scheduleFirstMatchChannelReminder,
-  scheduleChannelDailyPosts,
-} from "@/lib/notifications/channel";
+import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { Client } from "@upstash/qstash";
 import { qstashConfigStatus } from "@/lib/notifications/qstash";
 
@@ -25,14 +21,10 @@ async function run(request: Request) {
     let channelDailyPostsScheduled = 0;
     let notificationError: string | null = null;
     try {
-      const db = await getDb();
-      remindersScheduled = await scheduleUpcomingReminders();
-      for (const day of [new Date(), new Date(Date.now() + 86400000)]) {
-        channelReminderScheduled += Number(
-          await scheduleFirstMatchChannelReminder(db, day),
-        );
-        channelDailyPostsScheduled += await scheduleChannelDailyPosts(day);
-      }
+      const scheduled = await scheduleFootballNotifications();
+      remindersScheduled = scheduled.remindersScheduled;
+      channelReminderScheduled = scheduled.channelReminderScheduled;
+      channelDailyPostsScheduled = scheduled.channelDailyPostsScheduled;
     } catch (error) {
       notificationError = error instanceof Error ? error.message : "unknown";
       console.error("notification_scheduling_failed", {
