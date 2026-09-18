@@ -125,19 +125,19 @@ export async function runScoreEngine(
     })
     .toArray();
   const now = new Date();
+  const predictionIds = predictions.map((prediction) => String(prediction._id ?? `${prediction.userId}:${prediction.matchId}`));
+  const existingSnapshots = await db.collection<any>("predictionLockSnapshots").find({ predictionId: { $in: predictionIds } }).toArray();
+  const existingByPredictionId = new Map(existingSnapshots.map((snapshot) => [String(snapshot.predictionId), snapshot]));
   const snapshots = new Map<
     string,
     Awaited<ReturnType<typeof createLockSnapshot>>
   >();
   for (const prediction of predictions) {
     if (!isPredictionLocked(byMatch.get(prediction.matchId)!)) continue;
+    const predictionId = String(prediction._id ?? `${prediction.userId}:${prediction.matchId}`);
     snapshots.set(
       `${prediction.userId}:${prediction.matchId}`,
-      await createLockSnapshot(
-        db,
-        prediction,
-        new Date(byMatch.get(prediction.matchId)!.kickoffAt),
-      ),
+      existingByPredictionId.get(predictionId) ?? await createLockSnapshot(db, prediction, new Date(byMatch.get(prediction.matchId)!.kickoffAt)),
     );
   }
   const clubIds = [
@@ -318,19 +318,14 @@ export async function runScoreEngine(
   // Scores and the materialized rows are one consistency unit. This prevents a
   // correction from exposing new scores with old leaderboard totals (or vice
   // versa) during a sync or concurrent request.
+  const chunks = <T,>(items: T[], size = 100) => Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, (index + 1) * size));
   await withMongoTransaction(async (transactionDb, session) => {
-    if (scoreOps.length)
-      await transactionDb
-        .collection("predictionScores")
-        .bulkWrite(scoreOps, { ordered: false, session });
+    for (const chunk of chunks(scoreOps)) await transactionDb.collection("predictionScores").bulkWrite(chunk, { ordered: false, session });
     if (rebuildLeaderboards && touchedUsers.length)
       await transactionDb
         .collection("leaderboardStats")
         .deleteMany({ userId: { $in: touchedUsers } }, { session });
-    if (rebuildLeaderboards && statOps.length)
-      await transactionDb
-        .collection("leaderboardStats")
-        .bulkWrite(statOps, { ordered: false, session });
+    for (const chunk of rebuildLeaderboards ? chunks(statOps) : []) await transactionDb.collection("leaderboardStats").bulkWrite(chunk, { ordered: false, session });
   });
   if (!rebuildLeaderboards)
     return {

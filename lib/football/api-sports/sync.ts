@@ -47,7 +47,7 @@ function normalized(f: Fixture, leagueCode: string) {
           : /final/i.test(round)
             ? 103
             : 0;
-  const status = /FT|AET|PEN/.test(f.fixture.status.short)
+  const status = /FT|AET|PEN|AWD|WO/.test(f.fixture.status.short)
     ? "FINISHED"
     : /^PST$/.test(f.fixture.status.short)
       ? "POSTPONED"
@@ -212,6 +212,23 @@ export async function syncFootballApiDate(dateKey: string) {
   return { ...result, scoreEngine, leaderboardEngine };
 }
 
+async function refreshStaleFixtures(db: Awaited<ReturnType<typeof getDb>>) {
+  const cutoff = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const oldest = new Date(Date.now() - 3 * 86400000);
+  const stale = await db.collection<any>("matches").find({ provider: "football-api", kickoffAt: { $gte: oldest, $lt: cutoff }, status: { $nin: ["FINISHED", "POSTPONED", "VOID", "CANCELLED"] } }, { projection: { providerMatchId: 1 } }).limit(100).toArray();
+  let requests = 0, updated = 0;
+  for (const match of stale) {
+    if ((await remainingApiRequests()) <= 0) break;
+    const result = await apiRequest<Fixture>({ id: String(match.providerMatchId), timezone: "UTC" });
+    requests++;
+    for (const fixture of result.response) {
+      const league = LEAGUES.find((item) => item.apiLeagueId === fixture.league.id);
+      if (league) updated += await saveFixtures(db, league.code, [fixture], true);
+    }
+  }
+  return { requests, updated };
+}
+
 export async function syncFootballApi() {
   if (!env.MONGODB_URI) throw new Error("MONGODB_URI is required");
   const db = await getDb();
@@ -320,6 +337,7 @@ export async function syncFootballApi() {
           total += await saveFixtures(db, league.code, [fixture], true);
       }
     }
+  if (env.FOOTBALL_API_MODE === "current") { const stale = await refreshStaleFixtures(db); detailRequests += stale.requests; total += stale.updated; }
   const shouldSyncInsights = env.FOOTBALL_API_MODE === "season";
   const insights = shouldSyncInsights
     ? await syncMatchInsights(db)

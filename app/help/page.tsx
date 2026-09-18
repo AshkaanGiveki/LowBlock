@@ -113,10 +113,10 @@ const items: HelpItem[] = [
     icon: Trophy,
     question: "How many points is each prediction worth?",
     answer:
-      "The current scoring table is: Exact score = 10 points; correct non-draw outcome plus the correct goal difference = 7 points; correct winner or draw without the correct difference = 5 points; every other valid prediction = 2 participation points; no prediction = 0 points.",
+      "The current scoring table is: Exact score = 10 points; correct non-draw outcome plus the correct goal difference = 7 points; correct draw outcome with a different score = 7 points; correct non-draw winner without the correct difference = 5 points; every other valid prediction = 2 participation points; no prediction = 0 points.",
     questionFa: "هر نوع پیش‌بینی چند امتیاز دارد؟",
     answerFa:
-      "جدول امتیاز فعلی این است: نتیجه دقیق = ۱۰ امتیاز؛ برنده صحیح، به‌جز مساوی، همراه با اختلاف گل صحیح = ۷ امتیاز؛ برنده یا مساوی صحیح بدون اختلاف گل صحیح = ۵ امتیاز؛ هر پیش‌بینی معتبر دیگر = ۲ امتیاز مشارکت؛ بدون پیش‌بینی = صفر امتیاز.",
+      "جدول امتیاز فعلی این است: نتیجه دقیق = ۱۰ امتیاز؛ برنده صحیح، به‌جز مساوی، همراه با اختلاف گل صحیح = ۷ امتیاز؛ مساوی صحیح با نتیجه‌ای متفاوت = ۷ امتیاز؛ برنده صحیحِ غیرمساوی بدون اختلاف گل صحیح = ۵ امتیاز؛ هر پیش‌بینی معتبر دیگر = ۲ امتیاز مشارکت؛ بدون پیش‌بینی = صفر امتیاز.",
   },
   {
     category: "Scoring",
