@@ -8,7 +8,7 @@ describe("authoritative score", () => {
     >,
   ] = [
     [2, 1, 2, 1, 10],
-    [0, 0, 1, 1, 5],
+    [0, 0, 1, 1, 7],
     [1, 3, 0, 2, 7],
     [1, 0, 3, 0, 5],
     [3, 0, 0, 2, 2],
@@ -21,5 +21,10 @@ describe("authoritative score", () => {
     expect(calculatePredictionScore(2, 1, 2, 1)).toEqual({
       points: 10,
       category: "EXACT_SCORE",
+    }));
+  it("awards seven points for a non-exact draw prediction", () =>
+    expect(calculatePredictionScore(2, 2, 1, 1)).toEqual({
+      points: 7,
+      category: "CORRECT_OUTCOME",
     }));
 });

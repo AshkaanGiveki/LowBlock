@@ -28,6 +28,6 @@ export function calculatePredictionScore(
     predictedHomeGoals - predictedAwayGoals === homeGoals - awayGoals
   )
     return { points: 7, category: "CORRECT_GOAL_DIFFERENCE" };
-  if (po === ro) return { points: 5, category: "CORRECT_OUTCOME" };
+  if (po === ro) return { points: ro === "D" ? 7 : 5, category: "CORRECT_OUTCOME" };
   return { points: 2, category: "PARTICIPATION" };
 }
