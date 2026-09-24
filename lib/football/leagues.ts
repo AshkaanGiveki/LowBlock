@@ -102,7 +102,7 @@ export const LEAGUES = [
     globalLeaderboard: true,
     h2h: true,
     defaultClubLeaderboard: true,
-    kind: "TOURNAMENT",
+    kind: "INTERNATIONAL",
   },
   {
     code: "EURO",
@@ -115,7 +115,7 @@ export const LEAGUES = [
     globalLeaderboard: true,
     h2h: true,
     defaultClubLeaderboard: true,
-    kind: "TOURNAMENT",
+    kind: "INTERNATIONAL",
   },
   {
     code: "COPA",
@@ -128,7 +128,7 @@ export const LEAGUES = [
     globalLeaderboard: true,
     h2h: true,
     defaultClubLeaderboard: true,
-    kind: "TOURNAMENT",
+    kind: "INTERNATIONAL",
   },
   {
     code: "WCQ_EU",
