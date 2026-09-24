@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Check, Globe2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { LEAGUES } from "@/lib/football/leagues";
+import { isFeaturedFixture, LEAGUES } from "@/lib/football/leagues";
 import { MatchAnalyticsCard } from "@/components/MatchAnalyticsCard";
 import { useLanguage, T } from "@/components/LanguageProvider";
 
@@ -95,7 +95,13 @@ export function MatchesView({
     return matches
       .filter(
         (match) =>
-          (showAllMatches || selected.includes(match.leagueCode)) &&
+          (showAllMatches ||
+            selected.includes(match.leagueCode) ||
+            isFeaturedFixture(
+              match.leagueCode,
+              match.homeTeam.name,
+              match.awayTeam.name,
+            )) &&
           (tab === "open"
             ? !stateOf(match, now).started
             : stateOf(match, now).started),
