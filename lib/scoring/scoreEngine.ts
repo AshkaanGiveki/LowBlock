@@ -9,7 +9,9 @@ import {
 import { grantAutomaticAwards } from "@/lib/awards/service";
 import {
   DEFAULT_CLUB_LEAGUE_CODES,
+  getLeague,
   isGlobalCompetition,
+  isFeaturedFixture,
 } from "@/lib/football/leagues";
 import { writeRankSnapshots } from "@/lib/domain/rankSnapshots";
 
@@ -24,6 +26,8 @@ type Match = {
   kickoffAt: Date;
   homeGoals: number | null;
   awayGoals: number | null;
+  homeTeam: { name: string };
+  awayTeam: { name: string };
 };
 type Prediction = {
   _id?: unknown;
@@ -172,6 +176,14 @@ export async function runScoreEngine(
   );
   const scoreOps = predictions.map((prediction) => {
     const match = byMatch.get(prediction.matchId)!;
+    const globalEligible =
+      isGlobalCompetition(match.leagueCode) &&
+      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
+        isFeaturedFixture(
+          match.leagueCode,
+          match.homeTeam.name,
+          match.awayTeam.name,
+        ));
     const score = calculatePredictionScore(
       prediction.homeGoals,
       prediction.awayGoals,
@@ -210,6 +222,7 @@ export async function runScoreEngine(
             predictedAwayGoals: prediction.awayGoals,
             actualHomeGoals: match.homeGoals,
             actualAwayGoals: match.awayGoals,
+            globalEligible,
             clubIdAtLock: snapshot?.clubIdAtLock ?? null,
             scoringVersion: SCORING_VERSION,
             calculatedAt: now,
@@ -235,6 +248,14 @@ export async function runScoreEngine(
   >();
   for (const prediction of predictions) {
     const match = byMatch.get(prediction.matchId)!;
+    const globalEligible =
+      isGlobalCompetition(match.leagueCode) &&
+      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
+        isFeaturedFixture(
+          match.leagueCode,
+          match.homeTeam.name,
+          match.awayTeam.name,
+        ));
     const score = calculatePredictionScore(
       prediction.homeGoals,
       prediction.awayGoals,
@@ -249,7 +270,8 @@ export async function runScoreEngine(
       `ROUND:${match.leagueCode}:${match.seasonStartYear}:${match.matchday}`,
       `SEASON:${match.seasonStartYear}`,
     ];
-    if (isGlobalCompetition(match.leagueCode)) scopes.push("GLOBAL");
+    if (globalEligible)
+      scopes.push("GLOBAL");
     if (
       snapshot?.clubIdAtLock &&
       (

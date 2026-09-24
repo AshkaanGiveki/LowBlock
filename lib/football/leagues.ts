@@ -138,7 +138,7 @@ export const LEAGUES = [
     faName: "انتخابی جام جهانی اروپا",
     enName: "World Cup Qualifiers Europe",
     short: "WCQ Europe",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -151,7 +151,7 @@ export const LEAGUES = [
     faName: "انتخابی جام جهانی آسیا",
     enName: "World Cup Qualifiers Asia",
     short: "WCQ Asia",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -164,7 +164,7 @@ export const LEAGUES = [
     faName: "انتخابی جام جهانی آفریقا",
     enName: "World Cup Qualifiers Africa",
     short: "WCQ Africa",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -177,7 +177,7 @@ export const LEAGUES = [
     faName: "انتخابی جام جهانی آمریکای جنوبی",
     enName: "World Cup Qualifiers South America",
     short: "WCQ South America",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -190,7 +190,7 @@ export const LEAGUES = [
     faName: "انتخابی جام جهانی کونکاکاف",
     enName: "World Cup Qualifiers CONCACAF",
     short: "WCQ CONCACAF",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -203,7 +203,7 @@ export const LEAGUES = [
     faName: "انتخابی جام جهانی اقیانوسیه",
     enName: "World Cup Qualifiers Oceania",
     short: "WCQ Oceania",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -216,7 +216,7 @@ export const LEAGUES = [
     faName: "انتخابی یورو",
     enName: "UEFA Euro Qualifiers",
     short: "Euro Qualifiers",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -229,7 +229,46 @@ export const LEAGUES = [
     faName: "لیگ ملت‌های اروپا",
     enName: "UEFA Nations League",
     short: "Nations League",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
+    h2h: false,
+    defaultClubLeaderboard: false,
+    kind: "INTERNATIONAL",
+  },
+  {
+    code: "AFCON",
+    apiLeagueId: 6,
+    slug: "africa-cup-of-nations",
+    logo: "/leagues/world-cup.png",
+    faName: "جام ملت‌های آفریقا",
+    enName: "Africa Cup of Nations",
+    short: "AFCON",
+    globalLeaderboard: true,
+    h2h: false,
+    defaultClubLeaderboard: false,
+    kind: "INTERNATIONAL",
+  },
+  {
+    code: "AFC_ASIAN_CUP",
+    apiLeagueId: 7,
+    slug: "afc-asian-cup",
+    logo: "/leagues/world-cup.png",
+    faName: "جام ملت‌های آسیا",
+    enName: "AFC Asian Cup",
+    short: "Asian Cup",
+    globalLeaderboard: true,
+    h2h: false,
+    defaultClubLeaderboard: false,
+    kind: "INTERNATIONAL",
+  },
+  {
+    code: "GOLD_CUP",
+    apiLeagueId: 22,
+    slug: "concacaf-gold-cup",
+    logo: "/leagues/world-cup.png",
+    faName: "جام طلایی کونکاکاف",
+    enName: "CONCACAF Gold Cup",
+    short: "Gold Cup",
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -294,7 +333,7 @@ export const LEAGUES = [
     faName: "دوستانه ملی",
     enName: "International Friendlies",
     short: "Friendlies",
-    globalLeaderboard: false,
+    globalLeaderboard: true,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "INTERNATIONAL",
@@ -601,7 +640,7 @@ export function isH2HCompetition(code: string) {
   return Boolean(LEAGUES.find((league) => league.code === code)?.h2h);
 }
 
-const IMPORTANT_NATIONAL_TEAMS = new Set([
+export const IMPORTANT_NATIONAL_TEAM_NAMES = [
   "Argentina",
   "Australia",
   "Belgium",
@@ -637,9 +676,18 @@ const IMPORTANT_NATIONAL_TEAMS = new Set([
   "Turkey",
   "Uruguay",
   "USA",
-]);
+ ] as const;
+const IMPORTANT_NATIONAL_TEAMS = new Set<string>(IMPORTANT_NATIONAL_TEAM_NAMES);
+export function isImportantNationalTeam(name: string) {
+  return IMPORTANT_NATIONAL_TEAMS.has(name);
+}
 export function isQualityInternationalFriendly(home: string, away: string) {
-  return (
-    IMPORTANT_NATIONAL_TEAMS.has(home) && IMPORTANT_NATIONAL_TEAMS.has(away)
-  );
+  return isImportantNationalTeam(home) && isImportantNationalTeam(away);
+}
+export function isFeaturedFixture(
+  _leagueCode: string,
+  home: string,
+  away: string,
+) {
+  return isImportantNationalTeam(home) || isImportantNationalTeam(away);
 }

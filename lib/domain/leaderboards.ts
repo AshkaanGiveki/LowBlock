@@ -230,6 +230,9 @@ export async function getCanonicalLeaderboard(
       },
     );
   pipeline.push(
+    ...(!scope.clubId && !scope.leagueCode && scope.matchday == null
+      ? [{ $match: { globalEligible: true } }]
+      : []),
     ...(allowedClubCodes
       ? [{ $match: { leagueCode: { $in: allowedClubCodes } } }]
       : !scope.clubId && !scope.leagueCode && !scope.matchday

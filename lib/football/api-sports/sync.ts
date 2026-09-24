@@ -1,9 +1,6 @@
 import { env } from "@/lib/env";
 import { ensureIndexes, ensurePerformanceIndexes, getDb } from "@/lib/db/mongo";
-import {
-  LEAGUES,
-  isQualityInternationalFriendly,
-} from "@/lib/football/leagues";
+import { LEAGUES, isFeaturedFixture } from "@/lib/football/leagues";
 import { apiRequest, remainingApiRequests } from "./client";
 import {
   runLeaderboardEngine,
@@ -165,8 +162,9 @@ async function saveDailyFixtures(
     );
     if (
       !league ||
-      (league.code === "FRIENDLY" &&
-        !isQualityInternationalFriendly(
+      (league.kind === "INTERNATIONAL" &&
+        !isFeaturedFixture(
+          league.code,
           fixture.teams.home.name,
           fixture.teams.away.name,
         ))
@@ -250,8 +248,9 @@ export async function syncFootballApi() {
       listRequests++;
       for (const fixture of result.response)
         if (
-          league.code !== "FRIENDLY" ||
-          isQualityInternationalFriendly(
+          league.kind !== "INTERNATIONAL" ||
+          isFeaturedFixture(
+            league.code,
             fixture.teams.home.name,
             fixture.teams.away.name,
           )
@@ -273,8 +272,9 @@ export async function syncFootballApi() {
         );
         if (
           !league ||
-          (league.code === "FRIENDLY" &&
-            !isQualityInternationalFriendly(
+          (league.kind === "INTERNATIONAL" &&
+            !isFeaturedFixture(
+              league.code,
               fixture.teams.home.name,
               fixture.teams.away.name,
             ))

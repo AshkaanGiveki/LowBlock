@@ -1,6 +1,10 @@
 import { getDb } from "@/lib/db/mongo";
 import { unstable_cache } from "next/cache";
-import { GLOBAL_LEAGUE_CODES } from "@/lib/football/leagues";
+import {
+  GLOBAL_LEAGUE_CODES,
+  IMPORTANT_NATIONAL_TEAM_NAMES,
+  isFeaturedFixture,
+} from "@/lib/football/leagues";
 
 export type MatchRecord = {
   _id?: unknown;
@@ -120,7 +124,28 @@ export async function getMatchesPage(
     {
       $addFields: {
         globalPriority: {
-          $cond: [{ $in: ["$leagueCode", GLOBAL_LEAGUE_CODES] }, 0, 1],
+          $cond: [
+            {
+              $or: [
+                { $in: ["$leagueCode", GLOBAL_LEAGUE_CODES] },
+                { $eq: ["$leagueCode", "FRIENDLY"] },
+                {
+                  $in: [
+                    "$rawApiResponse.teams.home.name",
+                    IMPORTANT_NATIONAL_TEAM_NAMES,
+                  ],
+                },
+                {
+                  $in: [
+                    "$rawApiResponse.teams.away.name",
+                    IMPORTANT_NATIONAL_TEAM_NAMES,
+                  ],
+                },
+              ],
+            },
+            0,
+            1,
+          ],
         },
       },
     },
@@ -174,8 +199,10 @@ export async function getMatchesPage(
     hasMore,
     nextCursor: last
       ? {
-          globalPriority: (GLOBAL_LEAGUE_CODES.includes(
-            last.leagueCode as never,
+          globalPriority: (isFeaturedFixture(
+            last.leagueCode,
+            last.homeTeam.name,
+            last.awayTeam.name,
           )
             ? 0
             : 1) as 0 | 1,
