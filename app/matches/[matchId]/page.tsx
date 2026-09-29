@@ -5,6 +5,8 @@ import { getMatch, getPredictions } from "@/lib/football/data";
 import { getLeague } from "@/lib/football/leagues";
 import { teamName } from "@/lib/football/team-names";
 import { PredictionCard } from "@/components/PredictionCard";
+import { LiveMatchCenter } from "@/components/LiveMatchCenter";
+import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,9 @@ export default async function MatchPage({ params }: Props) {
     ],
     url: `https://lowblock.ir/matches/${encodeURIComponent(match.providerMatchId)}`,
   };
+
+  const initialSnapshot = getMatchMonitorService().getSnapshot(match.providerMatchId);
+
   return (
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-3xl">
@@ -74,23 +79,28 @@ export default async function MatchPage({ params }: Props) {
           {league?.enName ?? "FOOTBALL MATCH"}
         </p>
         <h1 className="mt-2 text-3xl font-black md:text-5xl">
-          {home} vs {away} Predictions
+          {home} vs {away}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
           Predict the final score, save your pick, and compete across LowBlock
           football leaderboards.
         </p>
+
+        <div className="mt-8">
+          <LiveMatchCenter match={match as any} initialSnapshot={initialSnapshot} />
+        </div>
+
         <div className="mt-8">
           <PredictionCard
             match={match}
             initial={predictions.get(match.providerMatchId)}
-            openOnMount
+            openOnMount={match.status === "SCHEDULED"}
             index={0}
           />
         </div>
         <section className="mt-6 rounded-2xl border border-white/[.08] bg-white/[.03] p-5 text-sm leading-7 text-[var(--muted)]">
           <h2 className="text-base font-black text-white">
-            {home} vs {away}
+            {home} vs {away} Prediction
           </h2>
           <p className="mt-2">
             Official {league?.enName ?? "football"} match prediction page on

@@ -1,6 +1,5 @@
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
-import { unstable_cache } from "next/cache";
 
 export type SportsApiRestResponse<T> = {
   success?: boolean;
@@ -114,41 +113,66 @@ export async function fetchSportsApi<T>(
   return { success: false, events: [], error: { code: 500, message: lastError?.message || "Failed request" } };
 }
 
+// In-memory cache for daily discovery to support all execution environments
+const dailyFixturesCache = new Map<
+  string,
+  { data: SportsApiRestResponse<any>; expiresAt: number }
+>();
+
 /**
- * Fetches daily fixtures. Cached aggressively to prevent quota consumption.
+ * Fetches daily fixtures. Cached in-memory to prevent quota consumption.
  */
-export const getSportsApiDailyFixtures = unstable_cache(
-  async (dateString: string) => {
-    // 1. Try /schedule/{dateString} as primary
+export async function getSportsApiDailyFixtures(
+  dateString: string,
+): Promise<SportsApiRestResponse<any>> {
+  const now = Date.now();
+  const cached = dailyFixturesCache.get(dateString);
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+
+  // 1. Try /schedule/{dateString} as primary
+  try {
+    const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
+    const events =
+      res.events || res.data || (Array.isArray(res) ? res : null);
+    if (Array.isArray(events) && events.length > 0) {
+      const result = { success: true, events };
+      dailyFixturesCache.set(dateString, {
+        data: result,
+        expiresAt: now + CACHE_TTL * 1000,
+      });
+      return result;
+    }
+  } catch (err) {
+    console.warn(
+      `[SportsAPI] /schedule/${dateString} failed, falling back:`,
+      err,
+    );
+  }
+
+  // 2. If it's today, try /today fallback
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (dateString === todayStr) {
     try {
-      const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
-      const events = res.events || res.data || (Array.isArray(res) ? res : null);
+      const res = await fetchSportsApi<any>("/today");
+      const events =
+        res.events || res.data || (Array.isArray(res) ? res : null);
       if (Array.isArray(events) && events.length > 0) {
-        return { success: true, events };
+        const result = { success: true, events };
+        dailyFixturesCache.set(dateString, {
+          data: result,
+          expiresAt: now + CACHE_TTL * 1000,
+        });
+        return result;
       }
     } catch (err) {
-      console.warn(`[SportsAPI] /schedule/${dateString} failed, falling back:`, err);
+      console.warn("[SportsAPI] /today fallback failed:", err);
     }
+  }
 
-    // 2. If it's today, try /today fallback
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (dateString === todayStr) {
-      try {
-        const res = await fetchSportsApi<any>("/today");
-        const events = res.events || res.data || (Array.isArray(res) ? res : null);
-        if (Array.isArray(events) && events.length > 0) {
-          return { success: true, events };
-        }
-      } catch (err) {
-        console.warn("[SportsAPI] /today fallback failed:", err);
-      }
-    }
-
-    return { success: false, events: [] };
-  },
-  ["sportsapi-daily-fixtures"],
-  { revalidate: CACHE_TTL, tags: ["sportsapi"] }
-);
+  return { success: false, events: [] };
+}
 
 /**
  * Fetches specific match details (controlled recovery).

@@ -50,22 +50,25 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     const matches = await this.getDailyMatches([dateKey]);
 
     if (matches.length > 0) {
-      const ops = matches.map((match) => ({
-        updateOne: {
-          filter: {
-            provider: this.name,
-            providerMatchId: match.providerMatchId,
-          },
-          update: {
-            $set: {
-              ...match,
-              updatedAt: new Date(),
+      const ops = matches.map((match) => {
+        const { createdAt, _id, ...matchData } = match as any;
+        return {
+          updateOne: {
+            filter: {
+              provider: this.name,
+              providerMatchId: match.providerMatchId,
             },
-            $setOnInsert: { createdAt: new Date() },
+            update: {
+              $set: {
+                ...matchData,
+                updatedAt: new Date(),
+              },
+              $setOnInsert: { createdAt: createdAt || new Date() },
+            },
+            upsert: true,
           },
-          upsert: true,
-        },
-      }));
+        };
+      });
 
       const result = await db.collection("matches").bulkWrite(ops, { ordered: false });
       total = result.upsertedCount + result.modifiedCount;
