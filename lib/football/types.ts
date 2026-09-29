@@ -18,6 +18,7 @@ export type CanonicalStatus =
 export type CanonicalTeam = {
   id: number;
   name: string;
+  faName?: string;
   logoUrl: string | null;
   shortName?: string;
   code?: string;

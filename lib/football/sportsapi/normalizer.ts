@@ -1,4 +1,5 @@
 import { getLeagueCodeFromSportsApi } from "../competitionMapping";
+import { getCanonicalTeamSync } from "../teams";
 import type {
   CanonicalMatch,
   CanonicalIncident,
@@ -28,6 +29,36 @@ function extractGoals(scoreObj: any): number | null {
   if (typeof scoreObj.display === "number") return scoreObj.display;
   if (typeof scoreObj.current === "number") return scoreObj.current;
   if (typeof scoreObj.normaltime === "number") return scoreObj.normaltime;
+  return null;
+}
+
+function resolveTeamLogo(team: any): string | null {
+  if (!team) return null;
+  const name = String(team.name || "").toLowerCase();
+  const alpha2 = team.country?.alpha2?.toLowerCase();
+  const isNational = Boolean(team.national);
+
+  // 1. National teams: High-speed FlagCDN (zero API quota)
+  if (
+    isNational ||
+    name.includes("england") ||
+    name.includes("scotland") ||
+    name.includes("wales") ||
+    name.includes("northern ireland")
+  ) {
+    if (name.includes("england")) return "https://flagcdn.com/w160/gb-eng.png";
+    if (name.includes("scotland")) return "https://flagcdn.com/w160/gb-sct.png";
+    if (name.includes("wales")) return "https://flagcdn.com/w160/gb-wls.png";
+    if (name.includes("northern ireland")) return "https://flagcdn.com/w160/gb-nir.png";
+    if (alpha2 && alpha2.length === 2) return `https://flagcdn.com/w160/${alpha2}.png`;
+  }
+
+  // 2. Clubs & others: Cached secure proxy (30 days cache)
+  const teamId = team.id || team.eventId;
+  if (teamId) {
+    return `/api/team-image/${teamId}`;
+  }
+
   return null;
 }
 
@@ -90,6 +121,22 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
     penalties: rawEvent.awayScore?.penalties ?? null,
   };
 
+  const homeCanonical = getCanonicalTeamSync({
+    provider: "sportsapi",
+    providerTeamId: rawEvent.homeTeam?.id || 0,
+    name: rawEvent.homeTeam?.name || "Unknown",
+    country: rawEvent.homeTeam?.country,
+    isNational: Boolean(rawEvent.homeTeam?.national),
+  });
+
+  const awayCanonical = getCanonicalTeamSync({
+    provider: "sportsapi",
+    providerTeamId: rawEvent.awayTeam?.id || 0,
+    name: rawEvent.awayTeam?.name || "Unknown",
+    country: rawEvent.awayTeam?.country,
+    isNational: Boolean(rawEvent.awayTeam?.national),
+  });
+
   return {
     provider: "sportsapi",
     providerMatchId: String(rawId),
@@ -102,15 +149,17 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
     awayTeamProviderId: String(rawEvent.awayTeam?.id || "0"),
     homeTeam: {
       id: Number(rawEvent.homeTeam?.id || 0),
-      name: rawEvent.homeTeam?.name || "Unknown",
-      logoUrl: null,
+      name: homeCanonical.name,
+      faName: homeCanonical.faName,
+      logoUrl: homeCanonical.logoUrl || resolveTeamLogo(rawEvent.homeTeam),
       shortName: rawEvent.homeTeam?.shortName,
       code: rawEvent.homeTeam?.nameCode,
     },
     awayTeam: {
       id: Number(rawEvent.awayTeam?.id || 0),
-      name: rawEvent.awayTeam?.name || "Unknown",
-      logoUrl: null,
+      name: awayCanonical.name,
+      faName: awayCanonical.faName,
+      logoUrl: awayCanonical.logoUrl || resolveTeamLogo(rawEvent.awayTeam),
       shortName: rawEvent.awayTeam?.shortName,
       code: rawEvent.awayTeam?.nameCode,
     },
