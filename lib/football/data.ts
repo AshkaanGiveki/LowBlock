@@ -1,5 +1,7 @@
+import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { unstable_cache } from "next/cache";
+import type { ProviderName } from "./types";
 import {
   GLOBAL_LEAGUE_CODES,
   IMPORTANT_NATIONAL_TEAM_NAMES,
@@ -8,7 +10,7 @@ import {
 
 export type MatchRecord = {
   _id?: unknown;
-  provider: "football-api";
+  provider: ProviderName;
   providerMatchId: string;
   leagueCode: string;
   matchday: number;
@@ -32,8 +34,9 @@ const getCachedMatches = unstable_cache(
     to: number,
   ) => {
     const db = await getDb();
+    const activeProvider = getFootballProvider().name;
     const query = {
-      provider: "football-api" as const,
+      provider: activeProvider,
       // Only expose records written from a verified Football API response.
       rawApiResponse: { $exists: true },
       // 207 is Switzerland's Super League, not Turkey's Super Cup (551).
@@ -101,7 +104,7 @@ export async function getMatchesPage(
   const db = await getDb();
   const bounds = todayBounds();
   const query: any = {
-    provider: "football-api",
+    provider: getFootballProvider().name,
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
@@ -216,7 +219,7 @@ export async function getMatchesPage(
 export async function getMatch(providerMatchId: string) {
   const db = await getDb();
   return db.collection<MatchRecord>("matches").findOne({
-    provider: "football-api",
+    provider: getFootballProvider().name,
     providerMatchId,
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],

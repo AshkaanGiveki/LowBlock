@@ -8,17 +8,17 @@ if (typeof process !== "undefined" && existsSync(".env.local")) {
   }
 }
 const safeSecret = (value: string | undefined, fallback: string) =>
-  process.env.NODE_ENV === "production"
-    ? value
-    : value && value.length >= 16
-      ? value
-      : fallback;
-const safeUrl = (value: string | undefined) =>
-  process.env.NODE_ENV === "production"
-    ? value
-    : value && /^https?:\/\//.test(value)
-      ? value
-      : "http://localhost:3000";
+  value && value.length >= 16 ? value : fallback;
+const safeUrl = (value: string | undefined) => {
+  if (!value) return "http://localhost:3000";
+  try {
+    const target = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    const parsed = new URL(target);
+    return parsed.href.replace(/\/$/, "");
+  } catch {
+    return "http://localhost:3000";
+  }
+};
 const schema = z.object({
   MONGODB_URI: z.string().optional(),
   MONGODB_DIRECT_HOSTS: z.string().optional(),
@@ -41,6 +41,8 @@ const schema = z.object({
   QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
   APP_TIMEZONE: z.string().default("UTC"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  FOOTBALL_DATA_PROVIDER: z.enum(["current", "sportsapi"]).default("current"),
+  FOOTBALL_DATA_PROVIDER_SHADOW: z.enum(["none", "sportsapi"]).default("none"),
   FOOTBALL_API_KEY: z.string().optional(),
   FOOTBALL_API_BASE_URL: z
     .string()
@@ -67,6 +69,37 @@ const schema = z.object({
     .string()
     .url()
     .default("https://www.transfermarkt.com"),
+  SPORTSAPI_API_KEY: z.string().optional(),
+  SPORTSAPI_BASE_URL: z
+    .string()
+    .url()
+    .default("https://api.sportsapipro.com/v2/football"),
+  SPORTSAPI_WS_URL: z
+    .string()
+    .default("wss://api.sportsapipro.com/v2/football/ws"),
+  SPORTSAPI_WS_ENABLED: z
+    .preprocess((value) => value === "true" || value === true || value === undefined, z.boolean())
+    .default(true),
+  SPORTSAPI_STALE_MATCH_THRESHOLD_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(90_000),
+  SPORTSAPI_RECONNECT_INITIAL_DELAY_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1_000),
+  SPORTSAPI_RECONNECT_MAX_DELAY_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30_000),
+  SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(300),
 });
 export const env = schema.parse({
   MONGODB_URI: process.env.MONGODB_URI,
@@ -93,6 +126,8 @@ export const env = schema.parse({
   QSTASH_NEXT_SIGNING_KEY: process.env.QSTASH_NEXT_SIGNING_KEY,
   APP_TIMEZONE: process.env.APP_TIMEZONE,
   NEXT_PUBLIC_APP_URL: safeUrl(process.env.NEXT_PUBLIC_APP_URL),
+  FOOTBALL_DATA_PROVIDER: process.env.FOOTBALL_DATA_PROVIDER,
+  FOOTBALL_DATA_PROVIDER_SHADOW: process.env.FOOTBALL_DATA_PROVIDER_SHADOW,
   FOOTBALL_API_KEY: process.env.FOOTBALL_API_KEY,
   FOOTBALL_API_BASE_URL: process.env.FOOTBALL_API_BASE_URL,
   FOOTBALL_API_DAILY_LIMIT: process.env.FOOTBALL_API_DAILY_LIMIT,
@@ -100,6 +135,18 @@ export const env = schema.parse({
   FOOTBALL_API_MODE: process.env.FOOTBALL_API_MODE,
   FOOTBALL_API_SEASON: process.env.FOOTBALL_API_SEASON,
   TRANSFERMARKT_BASE_URL: process.env.TRANSFERMARKT_BASE_URL,
+  SPORTSAPI_API_KEY: process.env.SPORTSAPI_API_KEY,
+  SPORTSAPI_BASE_URL: process.env.SPORTSAPI_BASE_URL,
+  SPORTSAPI_WS_URL: process.env.SPORTSAPI_WS_URL,
+  SPORTSAPI_WS_ENABLED: process.env.SPORTSAPI_WS_ENABLED,
+  SPORTSAPI_STALE_MATCH_THRESHOLD_MS:
+    process.env.SPORTSAPI_STALE_MATCH_THRESHOLD_MS,
+  SPORTSAPI_RECONNECT_INITIAL_DELAY_MS:
+    process.env.SPORTSAPI_RECONNECT_INITIAL_DELAY_MS,
+  SPORTSAPI_RECONNECT_MAX_DELAY_MS:
+    process.env.SPORTSAPI_RECONNECT_MAX_DELAY_MS,
+  SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL:
+    process.env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL,
 });
 export function validateProductionEnv() {
   if (process.env.NODE_ENV !== "production") return;

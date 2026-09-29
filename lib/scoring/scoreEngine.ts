@@ -105,7 +105,7 @@ export async function runScoreEngine(
   const matches = await db
     .collection<Match>("matches")
     .find({
-      provider: "football-api",
+      provider: { $in: ["football-api", "sportsapi"] },
       status: "FINISHED",
       homeGoals: { $ne: null },
       awayGoals: { $ne: null },

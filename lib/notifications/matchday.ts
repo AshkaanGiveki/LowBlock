@@ -3,7 +3,7 @@ import type { Db } from "mongodb";
 import { getDb } from "@/lib/db/mongo";
 import { env } from "@/lib/env";
 import { remainingApiRequests } from "@/lib/football/api-sports/client";
-import { syncFootballApiDate } from "@/lib/football/api-sports/sync";
+import { getFootballProvider } from "@/lib/football/providerRegistry";
 
 const RESERVED_REQUESTS = 30;
 const POLL_START_AFTER_MS = 15 * 60_000;
@@ -27,7 +27,7 @@ export async function scheduleMatchdayPolling(db: Db, dateKey: string) {
     .collection<any>("matches")
     .find(
       {
-        provider: "football-api",
+        provider: { $in: ["football-api", "sportsapi"] },
         kickoffAt: { $gte: start, $lt: end },
         status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
       },
@@ -99,7 +99,7 @@ export async function pollMatchday(dateKey: string) {
       .collection<any>("matches")
       .find(
         {
-          provider: "football-api",
+          provider: { $in: ["football-api", "sportsapi"] },
           kickoffAt: { $gte: start, $lt: end },
           status: { $nin: ["VOID", "CANCELLED", "POSTPONED", "FINISHED"] },
         },
@@ -145,7 +145,7 @@ export async function pollMatchday(dateKey: string) {
     const result = {
       synced: true,
       remainingBefore: remaining,
-      ...(await syncFootballApiDate(dateKey)),
+      ...(await getFootballProvider().syncDate(dateKey)),
     };
     await (
       await getDb()

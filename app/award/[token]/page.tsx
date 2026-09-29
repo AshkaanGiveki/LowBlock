@@ -81,7 +81,7 @@ async function load(token: string) {
       ).map((row) => row.matchId)
     : [];
   const query = {
-    provider: "football-api",
+    provider: { $in: ["football-api", "sportsapi"] },
     rawApiResponse: { $exists: true },
     status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
     kickoffAt: { $gt: now },

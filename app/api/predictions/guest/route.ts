@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   )
     .collection<any>("matches")
     .findOne({
-      provider: "football-api",
+      provider: { $in: ["football-api", "sportsapi"] },
       providerMatchId: parsed.data.matchId,
       rawApiResponse: { $exists: true },
     });

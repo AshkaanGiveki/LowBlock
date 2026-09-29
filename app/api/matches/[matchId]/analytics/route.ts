@@ -18,7 +18,10 @@ export async function GET(
   const viewer = await currentUserId();
   const match = await db
     .collection<any>("matches")
-    .findOne({ provider: "football-api", providerMatchId: matchId });
+    .findOne({
+      provider: { $in: ["football-api", "sportsapi"] },
+      providerMatchId: matchId,
+    });
   if (!match)
     return NextResponse.json({ error: "match not found" }, { status: 404 });
   if (clubId) {

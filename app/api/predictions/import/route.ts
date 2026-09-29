@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const match = await db
       .collection<any>("matches")
       .findOne({
-        provider: "football-api",
+        provider: { $in: ["football-api", "sportsapi"] },
         providerMatchId: payload.matchId,
         rawApiResponse: { $exists: true },
       });

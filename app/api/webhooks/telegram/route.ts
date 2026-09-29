@@ -4,7 +4,7 @@ import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { consumeLinkToken } from "@/lib/platform/identity";
 import { ObjectId } from "mongodb";
-import { syncFootballApi } from "@/lib/football/api-sports/sync";
+import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 
 export const runtime = "nodejs";
@@ -149,7 +149,7 @@ async function handleAdminSync(chatId: string) {
     "⏳ Sync started. I’ll refresh football results and rebuild the leaderboards when it finishes.",
   );
   try {
-    const result = await syncFootballApi();
+    const result = await getFootballProvider().sync();
     const notifications = await scheduleFootballNotifications();
     await send(
       chatId,

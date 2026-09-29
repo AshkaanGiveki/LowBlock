@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { syncFootballApi } from "@/lib/football/api-sports/sync";
+import { getFootballProvider, getProviderRegistry } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { Client } from "@upstash/qstash";
@@ -15,7 +15,19 @@ async function run(request: Request) {
   const startedAt = new Date();
   const attempt = Number(new URL(request.url).searchParams.get("retry") ?? "0");
   try {
-    const result = await syncFootballApi();
+    const provider = getFootballProvider();
+    const result = await provider.sync();
+    
+    // Shadow execution
+    const shadow = getProviderRegistry().getShadow();
+    if (shadow) {
+      try {
+        await shadow.sync();
+      } catch (shadowError) {
+        console.error("shadow_sync_failed", shadowError);
+      }
+    }
+    
     let remindersScheduled = 0;
     let channelReminderScheduled = 0;
     let channelDailyPostsScheduled = 0;
