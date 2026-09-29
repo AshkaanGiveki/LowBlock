@@ -15,7 +15,8 @@ import {
   Trophy,
   Users,
   X,
-  Radio,
+  Timer,
+  Target,
 } from "lucide-react";
 import { useLanguage, T } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -28,10 +29,9 @@ import type {
   LiveIncident,
   LiveStatGroup,
   LiveLineups,
-  LiveOddsMarket,
 } from "@/lib/football/sportsapi/matchMonitor";
 
-type TabType = "predictions" | "timeline" | "stats" | "lineups" | "odds";
+type TabType = "predictions" | "timeline" | "stats" | "lineups";
 
 type AnalyticsData = {
   match: any;
@@ -225,22 +225,24 @@ export function MatchAnalytics({
                   t={t}
                 />
 
-                {/* 2. TAB SELECTOR (Identical to Leaderboard timeframe selector) */}
-                <div className="mt-6 flex gap-1 rounded-2xl border border-white/[.07] bg-black/20 p-1 overflow-x-auto [scrollbar-width:none]">
+                {/* 2. ICON-ONLY TAB SELECTOR */}
+                <div className="mt-6 mx-auto grid max-w-sm grid-cols-4 gap-2 rounded-2xl border border-white/[.08] bg-black/40 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,.06)] backdrop-blur-xl">
                   {/* Predictions Tab */}
                   <button
                     type="button"
                     onClick={() => setTab("predictions")}
-                    className={`relative flex-1 min-w-[75px] rounded-xl py-2.5 px-3 text-center text-xs md:text-sm font-black transition-colors ${
+                    title={t("پیش‌بینی‌ها", "Predictions")}
+                    aria-label={t("پیش‌بینی‌ها", "Predictions")}
+                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
                       tab === "predictions"
                         ? "text-[#07100b]"
-                        : "text-[var(--muted)] hover:text-white"
+                        : "text-white/45 hover:text-white"
                     }`}
                   >
                     {tab === "predictions" && (
                       <motion.span
                         layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand"
+                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
                         transition={{
                           type: "spring",
                           stiffness: 500,
@@ -248,25 +250,25 @@ export function MatchAnalytics({
                         }}
                       />
                     )}
-                    <span className="relative z-10">
-                      {t("پیش‌بینی‌ها", "Predictions")}
-                    </span>
+                    <Target size={20} className="relative z-10 transition-transform duration-200" />
                   </button>
 
                   {/* Timeline Tab */}
                   <button
                     type="button"
                     onClick={() => setTab("timeline")}
-                    className={`relative flex-1 min-w-[75px] rounded-xl py-2.5 px-3 text-center text-xs md:text-sm font-black transition-colors ${
+                    title={t("رویدادها", "Timeline")}
+                    aria-label={t("رویدادها", "Timeline")}
+                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
                       tab === "timeline"
                         ? "text-[#07100b]"
-                        : "text-[var(--muted)] hover:text-white"
+                        : "text-white/45 hover:text-white"
                     }`}
                   >
                     {tab === "timeline" && (
                       <motion.span
                         layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand"
+                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
                         transition={{
                           type: "spring",
                           stiffness: 500,
@@ -274,36 +276,25 @@ export function MatchAnalytics({
                         }}
                       />
                     )}
-                    <span className="relative z-10 flex items-center justify-center gap-1">
-                      {t("رویدادها", "Timeline")}
-                      {incidents.length > 0 && (
-                        <span
-                          className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                            tab === "timeline"
-                              ? "bg-black/20 text-[#07100b]"
-                              : "bg-white/10 text-white"
-                          }`}
-                        >
-                          {incidents.length}
-                        </span>
-                      )}
-                    </span>
+                    <Timer size={20} className="relative z-10 transition-transform duration-200" />
                   </button>
 
                   {/* Stats Tab */}
                   <button
                     type="button"
                     onClick={() => setTab("stats")}
-                    className={`relative flex-1 min-w-[75px] rounded-xl py-2.5 px-3 text-center text-xs md:text-sm font-black transition-colors ${
+                    title={t("آمار بازی", "Stats")}
+                    aria-label={t("آمار بازی", "Stats")}
+                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
                       tab === "stats"
                         ? "text-[#07100b]"
-                        : "text-[var(--muted)] hover:text-white"
+                        : "text-white/45 hover:text-white"
                     }`}
                   >
                     {tab === "stats" && (
                       <motion.span
                         layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand"
+                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
                         transition={{
                           type: "spring",
                           stiffness: 500,
@@ -311,25 +302,25 @@ export function MatchAnalytics({
                         }}
                       />
                     )}
-                    <span className="relative z-10">
-                      {t("آمار بازی", "Stats")}
-                    </span>
+                    <BarChart3 size={20} className="relative z-10 transition-transform duration-200" />
                   </button>
 
                   {/* Lineups Tab */}
                   <button
                     type="button"
                     onClick={() => setTab("lineups")}
-                    className={`relative flex-1 min-w-[75px] rounded-xl py-2.5 px-3 text-center text-xs md:text-sm font-black transition-colors ${
+                    title={t("ترکیب", "Lineups")}
+                    aria-label={t("ترکیب", "Lineups")}
+                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
                       tab === "lineups"
                         ? "text-[#07100b]"
-                        : "text-[var(--muted)] hover:text-white"
+                        : "text-white/45 hover:text-white"
                     }`}
                   >
                     {tab === "lineups" && (
                       <motion.span
                         layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand"
+                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
                         transition={{
                           type: "spring",
                           stiffness: 500,
@@ -337,44 +328,7 @@ export function MatchAnalytics({
                         }}
                       />
                     )}
-                    <span className="relative z-10 flex items-center justify-center gap-1">
-                      {t("ترکیب", "Lineups")}
-                      {lineups?.confirmed && (
-                        <span
-                          className={`rounded-full px-1.5 py-0.2 text-[9px] ${
-                            tab === "lineups"
-                              ? "bg-black/20 text-[#07100b]"
-                              : "bg-emerald-500/20 text-emerald-400"
-                          }`}
-                        >
-                          ✓
-                        </span>
-                      )}
-                    </span>
-                  </button>
-
-                  {/* Odds Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setTab("odds")}
-                    className={`relative flex-1 min-w-[75px] rounded-xl py-2.5 px-3 text-center text-xs md:text-sm font-black transition-colors ${
-                      tab === "odds"
-                        ? "text-[#07100b]"
-                        : "text-[var(--muted)] hover:text-white"
-                    }`}
-                  >
-                    {tab === "odds" && (
-                      <motion.span
-                        layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 35,
-                        }}
-                      />
-                    )}
-                    <span className="relative z-10">{t("ضرایب", "Odds")}</span>
+                    <Users size={20} className="relative z-10 transition-transform duration-200" />
                   </button>
                 </div>
 
@@ -433,11 +387,6 @@ export function MatchAnalytics({
                       language={language}
                       t={t}
                     />
-                  )}
-
-                  {/* TAB: ODDS */}
-                  {tab === "odds" && (
-                    <OddsPanel odds={odds} match={data.match} t={t} />
                   )}
                 </div>
               </div>
@@ -820,57 +769,7 @@ function LineupsPanel({ lineups, match, language, t }: any) {
 }
 
 /* =========================================================================
- * 5. ODDS PANEL
- * ========================================================================= */
-function OddsPanel({ odds, match, t }: any) {
-  if (!odds || odds.length === 0) {
-    return (
-      <div className="rounded-[2rem] border border-dashed border-white/10 p-12 text-center text-sm text-white/40">
-        {t("ضرایب برای این مسابقه فعال نیست.", "Live odds are currently not active for this event.")}
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {odds.map((market: LiveOddsMarket, mIdx: number) => (
-        <div
-          key={mIdx}
-          className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-6"
-        >
-          <h4 className="text-xs font-black text-white/70 uppercase tracking-widest mb-4">
-            {market.name}
-          </h4>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {market.choices.map((choice: any, cIdx: number) => (
-              <div
-                key={cIdx}
-                className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-black/20 p-3.5 hover:border-brand/40 transition-all"
-              >
-                <span className="text-xs text-white/50 font-bold mb-1">
-                  {choice.name === "1"
-                    ? (match.homeTeam as any).shortName || match.homeTeam.name
-                    : choice.name === "2"
-                      ? (match.awayTeam as any).shortName || match.awayTeam.name
-                      : choice.name === "X"
-                        ? t("مساوی", "Draw")
-                        : choice.name}
-                </span>
-                <span className="text-base font-black text-brand tracking-wide">
-                  {choice.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* =========================================================================
- * 6. PREDICTIONS SUB-COMPONENTS
+ * 5. PREDICTIONS SUB-COMPONENTS
  * ========================================================================= */
 function InsightCard({ data, topPrediction, maxCount, number, t }: any) {
   const share = topPrediction
