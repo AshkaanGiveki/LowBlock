@@ -120,9 +120,18 @@ export interface FootballDataProvider {
   - Max delay: `SPORTSAPI_RECONNECT_MAX_DELAY_MS` (default: 30,000ms)
 * **Automatic Resubscription:** Subscribed channels (`live-scores`, `match:{id}`, `match:{id}:incidents`, etc.) are tracked in memory and automatically re-registered upon reconnect.
 
-### State Reconciliation & Deduplication (`lib/football/sportsapi/state.ts`)
-* **Partial Delta Merging:** SportsAPI sends partial update frames (e.g. `{ "homeScore.current": 3, "changes.changeTimestamp": 1790164606 }`). `applyDeltaUpdate()` surgically merges new score and elapsed fields without corrupting or discarding existing match attributes.
-* **Deduplication:** Updates with a `changes.changeTimestamp` older than the match's last recorded timestamp are rejected to prevent duplicate processing.
+### State Reconciliation, Storage & Drawer Integration
+* **MongoDB Match Details Persistence:** Live details (timeline incidents, statistics, confirmed Starting XI/substitutes lineups, and odds) are stored in the `matchDetails` collection in MongoDB.
+* **Zero Delay on Open:** Opening the Match Intelligence drawer returns data instantly from MongoDB in <10ms without waiting for WebSocket roundtrips or cold starts.
+* **Match Analytics Drawer Tabs:**
+  - Integrated directly into the match drawer (`components/MatchAnalytics.tsx`) below the top hero banner.
+  - Tab selector designed with `motion.span` layout animations matching the Leaderboard timeframe filters:
+    1. **🎯 Predictions (پیش‌بینی‌ها)**: Community score distribution, top pick, and player predictions.
+    2. **⏱ Timeline (رویدادها)**: Goals (⚽), Cards (🟨 🟥), Substitutions (🔄 with In/Out players), VAR decisions (🖥️), and period markers.
+    3. **📊 Stats (آمار بازی)**: Possession %, Shots, Shots on Target, Passes, Fouls, Corners, Cards with comparative progress bars.
+    4. **👥 Lineups (ترکیب)**: Formations, confirmed Starting XI with jersey numbers and positions, and substitutes bench.
+    5. **📈 Odds (ضرایب)**: Live match market odds.
+* **Real-time Live Sync:** When a match is live, the drawer connects via Server-Sent Events (`/api/matches/[matchId]/live?stream=true`) to stream WebSocket deltas straight to the UI with zero polling.
 
 ### Competition Mapping (`lib/football/competitionMapping.ts`)
 * Automatically resolves 36+ supported competitions (Premier League, La Liga, UCL, World Cup, Iran Pro League, Hazfi Cup, etc.).

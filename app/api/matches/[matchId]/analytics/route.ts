@@ -4,6 +4,7 @@ import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { isPredictionLocked } from "@/lib/domain/predictionLock";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
+import { getOrFetchMatchDetails } from "@/lib/football/sportsapi/matchDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export async function GET(
     });
   if (!match)
     return NextResponse.json({ error: "match not found" }, { status: 404 });
+
   if (clubId) {
     if (!viewer || !ObjectId.isValid(clubId))
       return NextResponse.json(
@@ -39,92 +41,100 @@ export async function GET(
         { status: 403 },
       );
   }
+
+  // Fetch or retrieve latest match live details from MongoDB / SportsAPI
+  const liveDetails = await getOrFetchMatchDetails(matchId);
+
   const started =
     ["LIVE", "FINISHED", "SUSPENDED"].includes(String(match.status)) ||
     (match.status === "SCHEDULED" &&
       new Date(match.kickoffAt).getTime() <= Date.now());
-  if (!started)
-    return NextResponse.json(
-      { error: "analytics unavailable before kick-off" },
-      { status: 403 },
-    );
+
   const locked = isPredictionLocked(match);
-  if (!locked && !clubId)
-    return NextResponse.json(
-      { error: "analytics unavailable" },
-      { status: 403 },
-    );
-  const predictions = await db
-    .collection<any>("predictions")
-    .find({ matchId, userId: { $ne: "guest" } })
-    .toArray();
-  const scoreRows = await db
-    .collection<any>("predictionScores")
-    .find({ matchId })
-    .toArray();
-  const scoreByUser = new Map(scoreRows.map((score) => [score.userId, score]));
-  const eligibleUserIds = clubId
-    ? new Set(
-        scoreRows
-          .filter((score) => score.clubIdAtLock === clubId)
-          .map((score) => String(score.userId)),
-      )
-    : null;
-  const visiblePredictions =
-    clubId && locked
-      ? predictions.filter((prediction) =>
-          eligibleUserIds?.has(String(prediction.userId)),
-        )
-      : predictions;
-  const ids = visiblePredictions
-    .map((prediction) => prediction.userId)
-    .filter((id: string) => ObjectId.isValid(id))
-    .map((id: string) => new ObjectId(id));
-  const users = ids.length
-    ? await db
-        .collection<any>("users")
-        .find(
-          { _id: { $in: ids } },
-          { projection: { username: 1, avatarUrl: 1 } },
-        )
-        .toArray()
-    : [];
-  const names = new Map(users.map((user) => [String(user._id), user]));
-  // Once the fixture has kicked off, predictions are safe to reveal. Do not
-  // wait for the scoring snapshot: the provider can briefly lag behind the
-  // real kick-off time, which used to leave the drawer full of dashes.
+
+  let visiblePredictions: any[] = [];
+  let userRows: any[] = [];
   const distribution = new Map<string, number>();
-  for (const prediction of visiblePredictions) {
-    const key = `${prediction.homeGoals}-${prediction.awayGoals}`;
-    distribution.set(key, (distribution.get(key) ?? 0) + 1);
+
+  // Only reveal community predictions once the match has kicked off (or in clubs if locked)
+  if (started && (locked || clubId)) {
+    const predictions = await db
+      .collection<any>("predictions")
+      .find({ matchId, userId: { $ne: "guest" } })
+      .toArray();
+    const scoreRows = await db
+      .collection<any>("predictionScores")
+      .find({ matchId })
+      .toArray();
+    const scoreByUser = new Map(scoreRows.map((score) => [score.userId, score]));
+    const eligibleUserIds = clubId
+      ? new Set(
+          scoreRows
+            .filter((score) => score.clubIdAtLock === clubId)
+            .map((score) => String(score.userId)),
+        )
+      : null;
+    visiblePredictions =
+      clubId && locked
+        ? predictions.filter((prediction) =>
+            eligibleUserIds?.has(String(prediction.userId)),
+          )
+        : predictions;
+    const ids = visiblePredictions
+      .map((prediction) => prediction.userId)
+      .filter((id: string) => ObjectId.isValid(id))
+      .map((id: string) => new ObjectId(id));
+    const users = ids.length
+      ? await db
+          .collection<any>("users")
+          .find(
+            { _id: { $in: ids } },
+            { projection: { username: 1, avatarUrl: 1 } },
+          )
+          .toArray()
+      : [];
+    const names = new Map(users.map((user) => [String(user._id), user]));
+
+    for (const prediction of visiblePredictions) {
+      const key = `${prediction.homeGoals}-${prediction.awayGoals}`;
+      distribution.set(key, (distribution.get(key) ?? 0) + 1);
+    }
+    const championId = await getDefendingChampionUserId(db);
+    userRows = visiblePredictions.map((prediction) => {
+      const score = scoreByUser.get(prediction.userId);
+      return {
+        userId: prediction.userId,
+        username: names.get(prediction.userId)?.username ?? "LowBlock Player",
+        avatarUrl: names.get(prediction.userId)?.avatarUrl ?? null,
+        isDefendingChampion: prediction.userId === championId,
+        submitted: true,
+        homeGoals: prediction.homeGoals,
+        awayGoals: prediction.awayGoals,
+        points: locked ? Number(score?.points ?? 0) : null,
+      };
+    });
   }
-  const championId = await getDefendingChampionUserId(db);
-  const userRows = visiblePredictions.map((prediction) => {
-    const score = scoreByUser.get(prediction.userId);
-    return {
-      userId: prediction.userId,
-      username: names.get(prediction.userId)?.username ?? "LowBlock Player",
-      avatarUrl: names.get(prediction.userId)?.avatarUrl ?? null,
-      isDefendingChampion: prediction.userId === championId,
-      submitted: true,
-      homeGoals: prediction.homeGoals,
-      awayGoals: prediction.awayGoals,
-      points: locked ? Number(score?.points ?? 0) : null,
-    };
-  });
+
+  const latestHomeGoals = liveDetails?.score?.home ?? match.homeGoals;
+  const latestAwayGoals = liveDetails?.score?.away ?? match.awayGoals;
+  const latestStatus = liveDetails?.score?.status ?? match.status;
+  const latestElapsed = liveDetails?.score?.elapsed ?? match.elapsed;
+
   return NextResponse.json({
     match: {
       homeTeam: match.homeTeam,
       awayTeam: match.awayTeam,
-      homeGoals: match.homeGoals,
-      awayGoals: match.awayGoals,
+      homeGoals: latestHomeGoals,
+      awayGoals: latestAwayGoals,
       leagueCode: match.leagueCode,
       matchday: match.matchday,
-      status: match.status,
-      elapsed: match.elapsed ?? null,
+      status: latestStatus,
+      elapsed: latestElapsed ?? null,
       kickoffAt: new Date(match.kickoffAt).toISOString(),
     },
     locked,
+    started,
+    liveDetails,
     total: visiblePredictions.length,
     averagePoints: userRows.length
       ? userRows.reduce((sum, row) => sum + Number(row.points ?? 0), 0) /

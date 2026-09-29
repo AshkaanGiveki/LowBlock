@@ -5,8 +5,6 @@ import { getMatch, getPredictions } from "@/lib/football/data";
 import { getLeague } from "@/lib/football/leagues";
 import { teamName } from "@/lib/football/team-names";
 import { PredictionCard } from "@/components/PredictionCard";
-import { LiveMatchCenter } from "@/components/LiveMatchCenter";
-import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
 
 export const dynamic = "force-dynamic";
 
@@ -70,8 +68,6 @@ export default async function MatchPage({ params }: Props) {
     url: `https://lowblock.ir/matches/${encodeURIComponent(match.providerMatchId)}`,
   };
 
-  const initialSnapshot = getMatchMonitorService().getSnapshot(match.providerMatchId);
-
   return (
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-3xl">
@@ -85,10 +81,6 @@ export default async function MatchPage({ params }: Props) {
           Predict the final score, save your pick, and compete across LowBlock
           football leaderboards.
         </p>
-
-        <div className="mt-8">
-          <LiveMatchCenter match={match as any} initialSnapshot={initialSnapshot} />
-        </div>
 
         <div className="mt-8">
           <PredictionCard
