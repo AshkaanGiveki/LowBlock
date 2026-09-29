@@ -46,12 +46,29 @@ const getCachedMatches = unstable_cache(
       ...(leagueCode ? { leagueCode } : {}),
       ...(matchday !== null ? { matchday } : {}),
     };
-    return db
+    let rows = await db
       .collection<MatchRecord>("matches")
       .find(query)
       .sort({ kickoffAt: 1 })
       .limit(limit)
       .toArray();
+
+    if (rows.length === 0 && activeProvider === "sportsapi") {
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        await getFootballProvider().syncDate(todayStr);
+        rows = await db
+          .collection<MatchRecord>("matches")
+          .find(query)
+          .sort({ kickoffAt: 1 })
+          .limit(limit)
+          .toArray();
+      } catch (err) {
+        console.error("[SportsAPI] Discovery on empty cached matches failed:", err);
+      }
+    }
+
+    return rows;
   },
   ["lowblock-matches"],
   { revalidate: 60, tags: ["matches"] },
@@ -176,10 +193,28 @@ export async function getMatchesPage(
     { $limit: pageSize + 1 },
     { $project: { globalPriority: 0 } },
   );
-  const matches = await db
+  let matches = await db
     .collection<MatchRecord>("matches")
     .aggregate<MatchRecord>(pipeline)
     .toArray();
+
+  if (
+    matches.length === 0 &&
+    !cursor &&
+    getFootballProvider().name === "sportsapi"
+  ) {
+    try {
+      const dateKey = bounds.start.toISOString().slice(0, 10);
+      await getFootballProvider().syncDate(dateKey);
+      matches = await db
+        .collection<MatchRecord>("matches")
+        .aggregate<MatchRecord>(pipeline)
+        .toArray();
+    } catch (err) {
+      console.error("[SportsAPI] Discovery on empty page matches failed:", err);
+    }
+  }
+
   const hasMore = matches.length > pageSize;
   const page = hasMore ? matches.slice(0, -1) : matches;
   const publicPage = page.map((match) => ({

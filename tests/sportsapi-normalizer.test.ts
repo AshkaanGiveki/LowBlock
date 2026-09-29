@@ -72,8 +72,8 @@ describe("sportsapi normalizer", () => {
     expect(match.sportsApiId).toBe(17166285);
     expect(match.leagueCode).toBe("GB1");
     expect(match.matchday).toBe(6);
-    expect(match.seasonStartYear).toBe(24);
-    expect(match.roundId).toBe("GB1:24:6");
+    expect(match.seasonStartYear).toBe(2024);
+    expect(match.roundId).toBe("GB1:2024:6");
     expect(match.homeTeam.id).toBe(44);
     expect(match.homeTeam.name).toBe("Liverpool");
     expect(match.awayTeam.id).toBe(14);

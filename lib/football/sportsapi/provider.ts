@@ -22,9 +22,16 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     for (const date of dates) {
       try {
         const response = await getSportsApiDailyFixtures(date);
-        if (response.success && Array.isArray(response.events)) {
-          for (const rawEvent of response.events) {
-            const normalized = normalizeSportsApiMatch(rawEvent);
+        const resAny = response as any;
+        const rawList =
+          resAny.events ||
+          resAny.data ||
+          (Array.isArray(response) ? response : null) ||
+          [];
+
+        if (Array.isArray(rawList)) {
+          for (const item of rawList) {
+            const normalized = normalizeSportsApiMatch(item);
             if (normalized) {
               matches.push(normalized);
             }

@@ -2,9 +2,10 @@ import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
 import { unstable_cache } from "next/cache";
 
-type SportsApiRestResponse<T> = {
-  success: boolean;
+export type SportsApiRestResponse<T> = {
+  success?: boolean;
   events?: T[];
+  data?: T[];
   tournaments?: number;
   totalTournamentsOnDate?: number;
   error?: { code: number; message: string };
@@ -33,51 +34,84 @@ async function trackRequest(
       timestamp: new Date(),
     });
   } catch (err) {
-    console.error("Failed to track SportsAPI request:", err);
+    console.error("[SportsAPI] Failed to track request:", err);
   }
 }
 
 /**
- * Core REST fetcher with timeout and logging.
+ * Core REST fetcher with multi-endpoint fallback, timeout, and quota logging.
  */
-async function fetchSportsApi<T>(
+export async function fetchSportsApi<T>(
   path: string,
   params: Record<string, string> = {},
 ): Promise<SportsApiRestResponse<T>> {
-  if (!env.SPORTSAPI_API_KEY) {
-    throw new Error("SPORTSAPI_API_KEY is not configured");
+  const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
+  if (!apiKey) {
+    console.error("[SportsAPI] CRITICAL: SPORTSAPI_API_KEY is not configured in environment variables!");
+    return {
+      success: false,
+      events: [],
+      error: { code: 401, message: "SPORTSAPI_API_KEY is not configured" },
+    };
   }
 
-  const url = new URL(`${env.SPORTSAPI_BASE_URL}${path}`);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
-  }
+  const candidatePaths = [
+    path,
+    path.startsWith("/api/") ? path.replace("/api/", "/") : `/api${path}`,
+  ];
 
+  let lastError: Error | null = null;
   const start = performance.now();
-  try {
-    const response = await fetch(url.toString(), {
-      headers: { "x-api-key": env.SPORTSAPI_API_KEY },
-      // Use no-store here because we'll handle caching explicitly via unstable_cache or DB
-      cache: "no-store",
-      next: { revalidate: 0 },
-    });
 
-    const duration = performance.now() - start;
-    const body = await response.json();
-
-    if (!response.ok || !body.success) {
-      await trackRequest(path, params, duration, "FAILED", JSON.stringify(body.error || body));
-      throw new Error(`SportsAPI Error ${response.status}: ${JSON.stringify(body.error || body)}`);
+  for (const candidatePath of candidatePaths) {
+    const url = new URL(`${env.SPORTSAPI_BASE_URL}${candidatePath}`);
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
     }
 
-    await trackRequest(path, params, duration, "OK");
-    return body as SportsApiRestResponse<T>;
-  } catch (error) {
-    const duration = performance.now() - start;
-    const msg = error instanceof Error ? error.message : String(error);
-    await trackRequest(path, params, duration, "FAILED", msg);
-    throw error;
+    try {
+      const response = await fetch(url.toString(), {
+        headers: {
+          "x-api-key": apiKey,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+        next: { revalidate: 0 },
+      });
+
+      const duration = performance.now() - start;
+
+      if (response.status === 404 && candidatePath !== candidatePaths.at(-1)) {
+        // Try the alternative path
+        continue;
+      }
+
+      if (!response.ok) {
+        const text = await response.text();
+        await trackRequest(candidatePath, params, duration, "FAILED", `HTTP ${response.status}: ${text}`);
+        if (response.status === 404) continue;
+        throw new Error(`SportsAPI HTTP ${response.status}: ${text}`);
+      }
+
+      const body = await response.json();
+
+      // Check if body represents an explicit error
+      if (body && body.success === false && body.error && !body.events && !body.data) {
+        await trackRequest(candidatePath, params, duration, "FAILED", JSON.stringify(body.error));
+        throw new Error(`SportsAPI Error: ${JSON.stringify(body.error)}`);
+      }
+
+      await trackRequest(candidatePath, params, duration, "OK");
+      return body as SportsApiRestResponse<T>;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
   }
+
+  const totalDuration = performance.now() - start;
+  await trackRequest(path, params, totalDuration, "FAILED", lastError?.message || "Unknown error");
+  console.error(`[SportsAPI] All endpoint variants failed for ${path}:`, lastError?.message);
+  return { success: false, events: [], error: { code: 500, message: lastError?.message || "Failed request" } };
 }
 
 /**
@@ -85,10 +119,32 @@ async function fetchSportsApi<T>(
  */
 export const getSportsApiDailyFixtures = unstable_cache(
   async (dateString: string) => {
-    // Check if it's today
+    // 1. Try /schedule/{dateString} as primary
+    try {
+      const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
+      const events = res.events || res.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(events) && events.length > 0) {
+        return { success: true, events };
+      }
+    } catch (err) {
+      console.warn(`[SportsAPI] /schedule/${dateString} failed, falling back:`, err);
+    }
+
+    // 2. If it's today, try /today fallback
     const todayStr = new Date().toISOString().slice(0, 10);
-    const path = dateString === todayStr ? "/today" : `/schedule/${dateString}`;
-    return fetchSportsApi<any>(path);
+    if (dateString === todayStr) {
+      try {
+        const res = await fetchSportsApi<any>("/today");
+        const events = res.events || res.data || (Array.isArray(res) ? res : null);
+        if (Array.isArray(events) && events.length > 0) {
+          return { success: true, events };
+        }
+      } catch (err) {
+        console.warn("[SportsAPI] /today fallback failed:", err);
+      }
+    }
+
+    return { success: false, events: [] };
   },
   ["sportsapi-daily-fixtures"],
   { revalidate: CACHE_TTL, tags: ["sportsapi"] }
