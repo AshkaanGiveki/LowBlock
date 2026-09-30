@@ -586,33 +586,113 @@ function PitchPlayers({ players, formation, incidents, isHome, isPersian }: any)
   );
 }
 
-function PlayerNode({ player, incidents, isPersian }: any) {
-  const name = player.shortName || player.name;
-  const truncName = name.length > 12 ? name.substring(0, 10) + ".." : name;
+function PlayerAvatar({
+  player,
+  size = "md",
+  className,
+}: {
+  player: { id?: number | string; name?: string; number?: string | number };
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const playerId = player.id ? String(player.id) : null;
+  const showImage = Boolean(playerId && playerId !== "0" && !imgError);
 
-  const goals = incidents.filter((i: any) => i.type === "goal" && (i.playerName === player.name || i.playerName === player.shortName));
-  const cards = incidents.filter((i: any) => i.type === "card" && (i.playerName === player.name || i.playerName === player.shortName));
-  const subOut = incidents.find((i: any) => i.type === "substitution" && (i.playerOutName === player.name || i.playerOutName === player.shortName));
+  const sizeClasses = {
+    sm: "w-8 h-8",
+    md: "w-10 h-10",
+    lg: "w-12 h-12",
+  }[size];
 
   return (
-    <div className="flex flex-col items-center pointer-events-auto w-14">
-      <div className="relative">
-        <div className="w-9 h-9 rounded-full border-[1.5px] border-[#10b981] bg-[#07100c] flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-           <span className="text-xs font-black text-white">{player.number || ""}</span>
+    <div
+      className={cn(
+        "relative rounded-full overflow-hidden border-[1.5px] border-[#10b981] bg-gradient-to-b from-[#162e22] to-[#07130c] shadow-[0_2px_8px_rgba(16,185,129,0.3)] flex items-center justify-center select-none",
+        sizeClasses,
+        className
+      )}
+    >
+      {showImage ? (
+        <img
+          src={`https://img.sofascore.com/api/v1/player/${playerId}/image`}
+          alt={player.name || "Player"}
+          loading="lazy"
+          className="w-full h-full object-cover object-top"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center font-black text-white/90 text-xs bg-[#0b1912]">
+          {player.number ? player.number : player.name ? player.name[0]?.toUpperCase() : "-"}
         </div>
+      )}
+    </div>
+  );
+}
+
+function PlayerNode({ player, incidents, isPersian }: any) {
+  const name = player.shortName || player.name;
+  const truncName = name.length > 13 ? name.substring(0, 11) + ".." : name;
+
+  const goals = incidents.filter(
+    (i: any) =>
+      i.type === "goal" &&
+      (i.playerName === player.name || i.playerName === player.shortName)
+  );
+  const cards = incidents.filter(
+    (i: any) =>
+      i.type === "card" &&
+      (i.playerName === player.name || i.playerName === player.shortName)
+  );
+  const subOut = incidents.find(
+    (i: any) =>
+      i.type === "substitution" &&
+      (i.playerOutName === player.name || i.playerOutName === player.shortName)
+  );
+
+  return (
+    <div className="flex flex-col items-center pointer-events-auto w-16 group transition-transform duration-150 hover:scale-105">
+      <div className="relative">
+        <PlayerAvatar player={player} size="md" />
+
+        {/* Jersey Number Badge (bottom corner) */}
+        {player.number && (
+          <span className="absolute -bottom-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-black/90 border border-[#10b981]/50 text-[9px] font-black text-[#10b981] flex items-center justify-center shadow-md">
+            {player.number}
+          </span>
+        )}
+
         {/* Badges container */}
-        <div className="absolute -top-2 -right-3 flex gap-0.5 z-10">
+        <div className="absolute -top-2 -right-2 flex gap-0.5 z-10">
           {goals.map((_: any, i: number) => (
-            <span key={`g-${i}`} className="text-sm drop-shadow-md">⚽</span>
+            <span key={`g-${i}`} className="text-xs drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              ⚽
+            </span>
           ))}
           {cards.map((c: any, i: number) => (
-            <span key={`c-${i}`} className="w-2.5 h-3.5 rounded-[1px] shadow-sm border border-black/20" style={{ backgroundColor: c.cardType === 'red' ? '#ef4444' : '#eab308' }} />
+            <span
+              key={`c-${i}`}
+              className="w-2.5 h-3.5 rounded-[1px] shadow-sm border border-black/40 inline-block"
+              style={{ backgroundColor: c.cardType === "red" ? "#ef4444" : "#eab308" }}
+            />
           ))}
-          {subOut && <span className="text-[10px] bg-black/60 rounded p-0.5" title="Substituted Out">🔻</span>}
+          {subOut && (
+            <span
+              className="text-[10px] bg-black/80 rounded-full px-0.5 shadow border border-white/10"
+              title="Substituted Out"
+            >
+              🔻
+            </span>
+          )}
         </div>
       </div>
-      <div className="mt-1 px-1.5 py-0.5 rounded bg-black/50 border border-white/5 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-[64px] text-center">
-         <span className="text-[9px] font-bold text-white/90 drop-shadow-md block truncate" dir={isPersian ? "rtl" : "ltr"}>{truncName}</span>
+      <div className="mt-1 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 shadow-lg whitespace-nowrap overflow-hidden text-ellipsis max-w-[68px] text-center">
+        <span
+          className="text-[10px] font-bold text-white/95 drop-shadow block truncate"
+          dir={isPersian ? "rtl" : "ltr"}
+        >
+          {truncName}
+        </span>
       </div>
     </div>
   );
@@ -621,24 +701,55 @@ function PlayerNode({ player, incidents, isPersian }: any) {
 function SubPlayerCard({ player, incidents, isHome }: any) {
   const name = player.shortName || player.name;
   const pIncidents = incidents.filter(
-    (i: any) => i.isHome === isHome && (i.playerName === player.name || i.playerName === player.shortName || i.playerInName === player.name || i.playerOutName === player.name)
+    (i: any) =>
+      i.isHome === isHome &&
+      (i.playerName === player.name ||
+        i.playerName === player.shortName ||
+        i.playerInName === player.name ||
+        i.playerOutName === player.name)
   );
-  const subIn = pIncidents.find((i: any) => i.type === "substitution" && (i.playerInName === player.name || i.playerInName === player.shortName));
-  const goals = pIncidents.filter((i: any) => i.type === "goal" && (i.playerName === player.name || i.playerName === player.shortName));
-  const cards = pIncidents.filter((i: any) => i.type === "card" && (i.playerName === player.name || i.playerName === player.shortName));
+  const subIn = pIncidents.find(
+    (i: any) =>
+      i.type === "substitution" &&
+      (i.playerInName === player.name || i.playerInName === player.shortName)
+  );
+  const goals = pIncidents.filter(
+    (i: any) =>
+      i.type === "goal" &&
+      (i.playerName === player.name || i.playerName === player.shortName)
+  );
+  const cards = pIncidents.filter(
+    (i: any) =>
+      i.type === "card" &&
+      (i.playerName === player.name || i.playerName === player.shortName)
+  );
 
   return (
-    <div className="flex-shrink-0 w-[100px] rounded-xl border border-[#1a382d] bg-[#07100c] p-2 flex flex-col items-center text-center snap-center relative">
-      <div className="w-8 h-8 rounded-full border border-white/10 bg-black/40 flex items-center justify-center mb-1.5">
-        <span className="text-[10px] font-bold text-white/50">{player.number || "-"}</span>
+    <div className="flex-shrink-0 w-[84px] rounded-2xl border border-white/10 bg-[#07130c]/90 hover:bg-[#0c1f14] transition-colors p-2.5 flex flex-col items-center text-center snap-center relative shadow-sm">
+      <div className="relative mb-1.5">
+        <PlayerAvatar player={player} size="md" />
+        {player.number && (
+          <span className="absolute -bottom-1 -left-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-black/90 border border-white/20 text-[8px] font-black text-white/70 flex items-center justify-center">
+            {player.number}
+          </span>
+        )}
       </div>
       <span className="text-[10px] font-bold text-white truncate w-full">{name}</span>
-      <span className="text-[8px] text-white/40 uppercase">{player.position || "SUB"}</span>
-      
+      <span className="text-[8px] font-semibold text-[#10b981] uppercase tracking-wider mt-0.5">
+        {player.position || "SUB"}
+      </span>
+
       {(subIn || goals.length > 0 || cards.length > 0) && (
-        <div className="absolute -top-1 -right-1 flex gap-0.5 z-10 bg-black/60 rounded-full px-1 py-0.5 border border-white/5">
-           {subIn && <span className="text-[10px]">🔺</span>}
-           {goals.length > 0 && <span className="text-[10px]">⚽</span>}
+        <div className="absolute top-1.5 right-1.5 flex gap-0.5 z-10 bg-black/80 rounded-full px-1 py-0.5 border border-white/10 shadow">
+          {subIn && <span className="text-[9px]">🔺</span>}
+          {goals.length > 0 && <span className="text-[9px]">⚽</span>}
+          {cards.map((c: any, i: number) => (
+            <span
+              key={`sc-${i}`}
+              className="w-2 h-3 rounded-[1px] inline-block"
+              style={{ backgroundColor: c.cardType === "red" ? "#ef4444" : "#eab308" }}
+            />
+          ))}
         </div>
       )}
     </div>
