@@ -126,6 +126,56 @@ class MatchMonitorService {
     return snapshot;
   }
 
+  public async loadSnapshotFromDb(matchId: string): Promise<LiveMatchSnapshot> {
+    this.ensureInitialized();
+    let snapshot = this.snapshots.get(matchId);
+    if (!snapshot) {
+      snapshot = {
+        matchId,
+        score: {
+          home: null,
+          away: null,
+          status: "SCHEDULED",
+          elapsed: null,
+        },
+        incidents: [],
+        stats: [],
+        lineups: null,
+        odds: [],
+        lastUpdateAt: Date.now(),
+      };
+      this.snapshots.set(matchId, snapshot);
+    }
+
+    try {
+      const db = await getDb();
+      const existing = await db.collection<any>("matchDetails").findOne({ matchId });
+      if (existing) {
+        if (existing.score) snapshot.score = { ...snapshot.score, ...existing.score };
+        if (existing.incidents && existing.incidents.length > 0) snapshot.incidents = existing.incidents;
+        if (existing.stats && existing.stats.length > 0) snapshot.stats = existing.stats;
+        if (existing.lineups) snapshot.lineups = existing.lineups;
+        if (existing.odds && existing.odds.length > 0) snapshot.odds = existing.odds;
+        if (existing.updatedAt) snapshot.lastUpdateAt = new Date(existing.updatedAt).getTime();
+      } else {
+        const matchRecord = await db.collection<any>("matches").findOne({
+          provider: "sportsapi",
+          providerMatchId: matchId,
+        });
+        if (matchRecord) {
+          snapshot.score.home = matchRecord.homeGoals ?? null;
+          snapshot.score.away = matchRecord.awayGoals ?? null;
+          snapshot.score.status = matchRecord.status || "SCHEDULED";
+          snapshot.score.elapsed = matchRecord.elapsed ?? null;
+        }
+      }
+    } catch (err) {
+      console.error("[MatchMonitor] Error loading snapshot from DB:", err);
+    }
+
+    return snapshot;
+  }
+
   public subscribeToMatch(matchId: string, listener: StateListener): () => void {
     this.ensureInitialized();
     if (!this.listeners.has(matchId)) {
@@ -145,13 +195,12 @@ class MatchMonitorService {
         set.delete(listener);
         if (set.size === 0) {
           this.listeners.delete(matchId);
-          // Optional: unsubscribe from match channels after timeout
         }
       }
     };
   }
 
-  private subscribeMatchChannels(matchId: string) {
+  public subscribeMatchChannels(matchId: string) {
     const ws = getSportsApiWsManager();
     ws.subscribeToChannel(`match:${matchId}`);
     ws.subscribeToChannel(`match:${matchId}:incidents`);
@@ -160,9 +209,16 @@ class MatchMonitorService {
     ws.subscribeToChannel(`match:${matchId}:odds`);
   }
 
-  private handleWsMessage(channel: string, payload: any) {
+  public handleWsMessage(channel: string, payload: any) {
+    if (!payload) return;
     const data = payload?.data || payload;
     if (!data) return;
+
+    // Handle global live-scores feed
+    if (channel === "live-scores") {
+      this.handleLiveScoresMessage(data);
+      return;
+    }
 
     // Check if channel belongs to a match
     const matchMatch = channel.match(/^match:(\d+)(?::(incidents|stats|lineups|odds))?$/);
@@ -176,7 +232,7 @@ class MatchMonitorService {
 
     if (!subType) {
       // Main match update (score, status, time)
-      const ev = data.event || data;
+      const ev = data.event || data.match || data.data?.event || data.data?.match || data;
       if (ev.status) {
         const type = String(ev.status.type || "").toLowerCase();
         if (type === "inprogress") snapshot.score.status = "LIVE";
@@ -188,12 +244,12 @@ class MatchMonitorService {
       if (ev.homeScore) {
         snapshot.score.home = ev.homeScore.display ?? ev.homeScore.current ?? snapshot.score.home;
         snapshot.score.period1 = {
-          home: ev.homeScore.period1 ?? null,
-          away: ev.awayScore?.period1 ?? null,
+          home: ev.homeScore.period1 ?? snapshot.score.period1?.home ?? null,
+          away: ev.awayScore?.period1 ?? snapshot.score.period1?.away ?? null,
         };
         snapshot.score.period2 = {
-          home: ev.homeScore.period2 ?? null,
-          away: ev.awayScore?.period2 ?? null,
+          home: ev.homeScore.period2 ?? snapshot.score.period2?.home ?? null,
+          away: ev.awayScore?.period2 ?? snapshot.score.period2?.away ?? null,
         };
       }
       if (ev.awayScore) {
@@ -205,7 +261,7 @@ class MatchMonitorService {
         );
       }
     } else if (subType === "incidents") {
-      const rawIncidents = data.incidents || (Array.isArray(data) ? data : []);
+      const rawIncidents = data.incidents || data.data?.incidents || (Array.isArray(data) ? data : []);
       const parsed: LiveIncident[] = [];
       for (const inc of rawIncidents) {
         let type: LiveIncident["type"] = "other";
@@ -241,11 +297,13 @@ class MatchMonitorService {
           detail: inc.text || inc.incidentClass || inc.description,
         });
       }
-      snapshot.incidents = parsed;
+      if (parsed.length > 0) {
+        snapshot.incidents = parsed;
+      }
     } else if (subType === "stats") {
-      const statsList = data.statistics || [];
+      const statsObj = data.statistics || data.data?.statistics || (Array.isArray(data) ? data : []);
       const groups: LiveStatGroup[] = [];
-      for (const periodGroup of statsList) {
+      for (const periodGroup of statsObj) {
         if (periodGroup.groups) {
           for (const g of periodGroup.groups) {
             groups.push({
@@ -265,37 +323,40 @@ class MatchMonitorService {
         snapshot.stats = groups;
       }
     } else if (subType === "lineups") {
-      const homeRaw = data.home || {};
-      const awayRaw = data.away || {};
+      const lineupsObj = data.home || data.away ? data : data.data || data;
+      const homeRaw = lineupsObj.home || {};
+      const awayRaw = lineupsObj.away || {};
 
       const parsePlayers = (list: any[]) =>
         (list || []).map((item: any) => ({
           id: item.player?.id || 0,
-          name: item.player?.name || "Player",
-          shortName: item.player?.shortName,
-          number: item.player?.jerseyNumber || "",
-          position: item.player?.position,
+          name: item.player?.name || item.name || "Player",
+          shortName: item.player?.shortName || item.shortName,
+          number: item.player?.jerseyNumber || item.jerseyNumber || "",
+          position: item.player?.position || item.position,
           substitute: Boolean(item.substitute),
         }));
 
       const homePlayers = parsePlayers(homeRaw.players);
       const awayPlayers = parsePlayers(awayRaw.players);
 
-      snapshot.lineups = {
-        confirmed: Boolean(data.confirmed),
-        home: {
-          formation: homeRaw.formation,
-          players: homePlayers.filter((p) => !p.substitute),
-          substitutes: homePlayers.filter((p) => p.substitute),
-        },
-        away: {
-          formation: awayRaw.formation,
-          players: awayPlayers.filter((p) => !p.substitute),
-          substitutes: awayPlayers.filter((p) => p.substitute),
-        },
-      };
+      if (homePlayers.length > 0 || awayPlayers.length > 0) {
+        snapshot.lineups = {
+          confirmed: Boolean(lineupsObj.confirmed),
+          home: {
+            formation: homeRaw.formation,
+            players: homePlayers.filter((p) => !p.substitute),
+            substitutes: homePlayers.filter((p) => p.substitute),
+          },
+          away: {
+            formation: awayRaw.formation,
+            players: awayPlayers.filter((p) => !p.substitute),
+            substitutes: awayPlayers.filter((p) => p.substitute),
+          },
+        };
+      }
     } else if (subType === "odds") {
-      const marketsRaw = data.markets || [];
+      const marketsRaw = data.markets || data.data?.markets || [];
       const parsedMarkets: LiveOddsMarket[] = [];
       for (const m of marketsRaw) {
         parsedMarkets.push({
@@ -308,14 +369,69 @@ class MatchMonitorService {
           })),
         });
       }
-      snapshot.odds = parsedMarkets;
+      if (parsedMarkets.length > 0) {
+        snapshot.odds = parsedMarkets;
+      }
     }
 
-    // Notify listeners
+    // Notify listeners (UI drawers)
     this.broadcast(matchId, snapshot);
 
-    // Persist to DB debounced
+    // Persist to MongoDB debounced
     this.persistMatchState(matchId, snapshot);
+  }
+
+  private handleLiveScoresMessage(data: any) {
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data.events)
+        ? data.events
+        : [data.event || data];
+
+    for (const item of list) {
+      if (!item) continue;
+      const ev = item.event || item;
+      const matchId = String(ev.id || ev.matchId || "");
+      if (!matchId || matchId === "undefined") continue;
+
+      const snapshot = this.snapshots.get(matchId);
+      if (snapshot || ev.homeScore || ev.status) {
+        const snap = this.getSnapshot(matchId);
+        snap.lastUpdateAt = Date.now();
+
+        if (ev.status) {
+          const type = String(ev.status.type || "").toLowerCase();
+          if (type === "inprogress") snap.score.status = "LIVE";
+          else if (type === "finished") snap.score.status = "FINISHED";
+          else if (type === "notstarted") snap.score.status = "SCHEDULED";
+          else snap.score.status = ev.status.description?.toUpperCase() || snap.score.status;
+          snap.score.statusDescription = ev.status.description;
+        }
+
+        if (ev.homeScore) {
+          snap.score.home = ev.homeScore.display ?? ev.homeScore.current ?? snap.score.home;
+          snap.score.period1 = {
+            home: ev.homeScore.period1 ?? snap.score.period1?.home ?? null,
+            away: ev.awayScore?.period1 ?? snap.score.period1?.away ?? null,
+          };
+          snap.score.period2 = {
+            home: ev.homeScore.period2 ?? snap.score.period2?.home ?? null,
+            away: ev.awayScore?.period2 ?? snap.score.period2?.away ?? null,
+          };
+        }
+        if (ev.awayScore) {
+          snap.score.away = ev.awayScore.display ?? ev.awayScore.current ?? snap.score.away;
+        }
+        if (ev.time?.currentPeriodStartTimestamp) {
+          snap.score.elapsed = Math.floor(
+            (Date.now() / 1000 - ev.time.currentPeriodStartTimestamp) / 60,
+          );
+        }
+
+        this.broadcast(matchId, snap);
+        this.persistMatchState(matchId, snap);
+      }
+    }
   }
 
   private broadcast(matchId: string, snapshot: LiveMatchSnapshot) {
@@ -336,23 +452,73 @@ class MatchMonitorService {
   private async persistMatchState(matchId: string, snapshot: LiveMatchSnapshot) {
     const now = Date.now();
     const last = this.lastDbSync.get(matchId) || 0;
-    if (now - last < 10_000) return; // Debounce 10s
+    if (now - last < 5_000) return; // Debounce 5s
     this.lastDbSync.set(matchId, now);
 
     try {
       const db = await getDb();
+
+      // 1. Update matches collection with latest score/status
       const updateFields: any = {
         updatedAt: new Date(),
       };
       if (snapshot.score.status) updateFields.status = snapshot.score.status;
-      if (snapshot.score.home !== null) updateFields.homeGoals = snapshot.score.home;
-      if (snapshot.score.away !== null) updateFields.awayGoals = snapshot.score.away;
-      if (snapshot.score.elapsed !== null) updateFields.elapsed = snapshot.score.elapsed;
+      if (snapshot.score.home !== null && snapshot.score.home !== undefined) {
+        updateFields.homeGoals = snapshot.score.home;
+      }
+      if (snapshot.score.away !== null && snapshot.score.away !== undefined) {
+        updateFields.awayGoals = snapshot.score.away;
+      }
+      if (snapshot.score.elapsed !== null && snapshot.score.elapsed !== undefined) {
+        updateFields.elapsed = snapshot.score.elapsed;
+      }
 
       await db.collection("matches").updateOne(
         { provider: "sportsapi", providerMatchId: matchId },
         { $set: updateFields },
       );
+
+      // 2. Persist to matchDetails collection
+      const detailsUpdate: any = {
+        matchId,
+        provider: "sportsapi",
+        score: snapshot.score,
+        updatedAt: new Date(),
+      };
+      if (snapshot.incidents && snapshot.incidents.length > 0) {
+        detailsUpdate.incidents = snapshot.incidents;
+      }
+      if (snapshot.stats && snapshot.stats.length > 0) {
+        detailsUpdate.stats = snapshot.stats;
+      }
+      if (
+        snapshot.lineups &&
+        (snapshot.lineups.home.players.length > 0 || snapshot.lineups.away.players.length > 0)
+      ) {
+        detailsUpdate.lineups = snapshot.lineups;
+      }
+      if (snapshot.odds && snapshot.odds.length > 0) {
+        detailsUpdate.odds = snapshot.odds;
+      }
+
+      await db.collection("matchDetails").updateOne(
+        { matchId },
+        {
+          $set: detailsUpdate,
+          $setOnInsert: { createdAt: new Date() },
+        },
+        { upsert: true },
+      );
+
+      // 3. Trigger score engine if match is newly finished
+      if (snapshot.score.status === "FINISHED") {
+        try {
+          const { runScoreEngine } = await import("@/lib/scoring/scoreEngine");
+          await runScoreEngine();
+        } catch (scoreErr) {
+          console.error("[MatchMonitor] Error running scoreEngine on match finish:", scoreErr);
+        }
+      }
     } catch (err) {
       console.error("[MatchMonitor] Failed to persist state to MongoDB:", err);
     }

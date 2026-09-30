@@ -2,6 +2,7 @@ import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { unstable_cache } from "next/cache";
 import type { ProviderName } from "./types";
+import { ensureSportsApiBackgroundService } from "./sportsapi/backgroundService";
 import {
   GLOBAL_LEAGUE_CODES,
   IMPORTANT_NATIONAL_TEAM_NAMES,
@@ -35,6 +36,9 @@ const getCachedMatches = unstable_cache(
   ) => {
     const db = await getDb();
     const activeProvider = getFootballProvider().name;
+    if (activeProvider === "sportsapi") {
+      ensureSportsApiBackgroundService();
+    }
     const query = {
       provider: activeProvider,
       // Only expose records written from a verified Football API response.

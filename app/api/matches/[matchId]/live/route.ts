@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
+import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backgroundService";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,6 +14,7 @@ export async function GET(
     return NextResponse.json({ error: "Missing matchId" }, { status: 400 });
   }
 
+  ensureSportsApiBackgroundService();
   const monitor = getMatchMonitorService();
   const acceptHeader = request.headers.get("accept") || "";
   const url = new URL(request.url);
@@ -21,10 +23,13 @@ export async function GET(
     url.searchParams.get("stream") === "true";
 
   if (!wantsStream) {
-    // Return instant snapshot JSON
-    const snapshot = monitor.getSnapshot(matchId);
+    // Return instant snapshot JSON populated from DB / in-memory cache
+    const snapshot = await monitor.loadSnapshotFromDb(matchId);
     return NextResponse.json(snapshot);
   }
+
+  // Pre-load from DB so the initial frame contains full lineups, stats, and incidents
+  const initial = await monitor.loadSnapshotFromDb(matchId);
 
   // Server-Sent Events (SSE) Stream
   const encoder = new TextEncoder();
@@ -33,7 +38,6 @@ export async function GET(
   const stream = new ReadableStream({
     start(controller) {
       // Send initial snapshot
-      const initial = monitor.getSnapshot(matchId);
       controller.enqueue(
         encoder.encode(`event: snapshot\ndata: ${JSON.stringify(initial)}\n\n`),
       );

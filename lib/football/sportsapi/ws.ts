@@ -79,7 +79,14 @@ export class SportsApiWebSocketManager {
       this.ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (payload.action === "pong") return;
+          if (
+            payload.action === "pong" ||
+            payload.event === "pong" ||
+            payload.type === "welcome" ||
+            payload.type === "subscribed"
+          ) {
+            return;
+          }
 
           const channel = payload.channel || "live-scores";
 

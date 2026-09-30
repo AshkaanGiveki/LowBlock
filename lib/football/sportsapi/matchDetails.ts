@@ -7,6 +7,7 @@ import type {
   LiveLineups,
   LiveOddsMarket,
 } from "./matchMonitor";
+import { ensureSportsApiBackgroundService } from "./backgroundService";
 
 const inFlight = new Map<string, Promise<LiveMatchSnapshot | null>>();
 
@@ -14,30 +15,37 @@ export async function getOrFetchMatchDetails(
   matchId: string,
   forceRefresh = false,
 ): Promise<LiveMatchSnapshot | null> {
+  // Ensure the automated background WS daemon is running
+  ensureSportsApiBackgroundService();
+
   const db = await getDb();
 
   // 1. Check MongoDB first for instant return
-  if (!forceRefresh) {
-    const existing = await db
-      .collection<any>("matchDetails")
-      .findOne({ matchId });
+  const existing = await db
+    .collection<any>("matchDetails")
+    .findOne({ matchId });
 
-    if (existing) {
-      const ageMs = Date.now() - new Date(existing.updatedAt).getTime();
-      const isFinished = existing.score?.status === "FINISHED";
+  if (!forceRefresh && existing) {
+    const ageMs = Date.now() - new Date(existing.updatedAt).getTime();
+    const isFinished = existing.score?.status === "FINISHED";
+    const hasContent = Boolean(
+      existing.lineups?.home?.players?.length ||
+      existing.lineups?.away?.players?.length ||
+      (existing.stats && existing.stats.length > 0) ||
+      (existing.incidents && existing.incidents.length > 0),
+    );
 
-      // If finished, data is immutable; if live/scheduled and fresh (< 45s), return cached
-      if (isFinished || ageMs < 45_000) {
-        return {
-          matchId: existing.matchId,
-          score: existing.score,
-          incidents: existing.incidents || [],
-          stats: existing.stats || [],
-          lineups: existing.lineups || null,
-          odds: existing.odds || [],
-          lastUpdateAt: new Date(existing.updatedAt).getTime(),
-        };
-      }
+    // Only return cached if it has real content, or if recently refreshed
+    if ((isFinished && hasContent) || (!isFinished && ageMs < 45_000 && hasContent)) {
+      return {
+        matchId: existing.matchId,
+        score: existing.score,
+        incidents: existing.incidents || [],
+        stats: existing.stats || [],
+        lineups: existing.lineups || null,
+        odds: existing.odds || [],
+        lastUpdateAt: new Date(existing.updatedAt).getTime(),
+      };
     }
   }
 
@@ -49,22 +57,103 @@ export async function getOrFetchMatchDetails(
   const promise = (async () => {
     try {
       const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
-      if (!apiKey) return null;
+      if (!apiKey) {
+        if (existing) {
+          return {
+            matchId: existing.matchId,
+            score: existing.score,
+            incidents: existing.incidents || [],
+            stats: existing.stats || [],
+            lineups: existing.lineups || null,
+            odds: existing.odds || [],
+            lastUpdateAt: new Date(existing.updatedAt).getTime(),
+          };
+        }
+        return null;
+      }
 
       const baseUrl = env.SPORTSAPI_BASE_URL || "https://api.sportsapipro.com/v2/football";
       const headers = { "x-api-key": apiKey, Accept: "application/json" };
 
+      // Helper to safely fetch endpoint with error & rate-limit handling
+      const fetchJson = async (endpoint: string) => {
+        try {
+          const res = await fetch(`${baseUrl}${endpoint}`, {
+            headers,
+            cache: "no-store",
+          });
+          if (res.status === 429) {
+            console.warn(`[SportsAPI] Rate limit reached (429) on ${endpoint}`);
+            return null;
+          }
+          if (!res.ok) return null;
+          return await res.json();
+        } catch (fetchErr) {
+          console.warn(`[SportsAPI] Fetch error on ${endpoint}:`, fetchErr);
+          return null;
+        }
+      };
+
       // Fetch all sub-resources in parallel
       const [matchRes, incidentsRes, statsRes, lineupsRes, oddsRes] = await Promise.allSettled([
-        fetch(`${baseUrl}/match/${matchId}`, { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${baseUrl}/match/${matchId}/incidents`, { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${baseUrl}/match/${matchId}/statistics`, { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${baseUrl}/match/${matchId}/lineups`, { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${baseUrl}/match/${matchId}/odds`, { headers }).then((r) => (r.ok ? r.json() : null)),
+        fetchJson(`/match/${matchId}`),
+        fetchJson(`/match/${matchId}/incidents`),
+        fetchJson(`/match/${matchId}/statistics`),
+        fetchJson(`/match/${matchId}/lineups`),
+        fetchJson(`/match/${matchId}/odds`),
       ]);
 
-      const matchData = matchRes.status === "fulfilled" ? matchRes.value?.data || matchRes.value : null;
-      const ev = matchData?.event || matchData || {};
+      const matchRaw = matchRes.status === "fulfilled" ? matchRes.value : null;
+      const ev =
+        matchRaw?.match ||
+        matchRaw?.event ||
+        matchRaw?.data?.match ||
+        matchRaw?.data?.event ||
+        matchRaw?.data ||
+        matchRaw;
+
+      // Verify that we received valid match information
+      const hasValidMatchInfo = Boolean(
+        ev && (ev.status || ev.homeScore || ev.homeTeam || ev.awayTeam),
+      );
+
+      // If REST call failed completely (e.g. rate limit 429 or 503), NEVER overwrite DB with blank data
+      if (!hasValidMatchInfo) {
+        if (existing) {
+          return {
+            matchId: existing.matchId,
+            score: existing.score,
+            incidents: existing.incidents || [],
+            stats: existing.stats || [],
+            lineups: existing.lineups || null,
+            odds: existing.odds || [],
+            lastUpdateAt: new Date(existing.updatedAt).getTime(),
+          };
+        }
+
+        const matchRecord = await db.collection<any>("matches").findOne({
+          provider: "sportsapi",
+          providerMatchId: matchId,
+        });
+
+        if (matchRecord) {
+          return {
+            matchId,
+            score: {
+              home: matchRecord.homeGoals ?? null,
+              away: matchRecord.awayGoals ?? null,
+              status: matchRecord.status || "SCHEDULED",
+              elapsed: matchRecord.elapsed ?? null,
+            },
+            incidents: [],
+            stats: [],
+            lineups: null,
+            odds: [],
+            lastUpdateAt: Date.now(),
+          };
+        }
+        return null;
+      }
 
       // 1. Parse Score & Status
       let status = "SCHEDULED";
@@ -95,10 +184,17 @@ export async function getOrFetchMatchDetails(
       };
 
       // 2. Parse Incidents
-      const incidentsData = incidentsRes.status === "fulfilled" ? incidentsRes.value?.data || incidentsRes.value : null;
-      const rawIncidents = incidentsData?.incidents || (Array.isArray(incidentsData) ? incidentsData : []);
-      const incidents: LiveIncident[] = [];
+      const incidentsRaw = incidentsRes.status === "fulfilled" ? incidentsRes.value : null;
+      const rawIncidents =
+        incidentsRaw?.incidents ||
+        incidentsRaw?.data?.incidents ||
+        (Array.isArray(incidentsRaw?.data)
+          ? incidentsRaw.data
+          : Array.isArray(incidentsRaw)
+            ? incidentsRaw
+            : []);
 
+      const incidents: LiveIncident[] = [];
       for (const inc of rawIncidents) {
         let type: LiveIncident["type"] = "other";
         const rawType = String(inc.incidentType || "").toLowerCase();
@@ -135,10 +231,17 @@ export async function getOrFetchMatchDetails(
       }
 
       // 3. Parse Statistics
-      const statsData = statsRes.status === "fulfilled" ? statsRes.value?.data || statsRes.value : null;
-      const rawStats = statsData?.statistics || (Array.isArray(statsData) ? statsData : []);
-      const stats: LiveStatGroup[] = [];
+      const statsRaw = statsRes.status === "fulfilled" ? statsRes.value : null;
+      const rawStats =
+        statsRaw?.statistics ||
+        statsRaw?.data?.statistics ||
+        (Array.isArray(statsRaw?.data)
+          ? statsRaw.data
+          : Array.isArray(statsRaw)
+            ? statsRaw
+            : []);
 
+      const stats: LiveStatGroup[] = [];
       for (const periodGroup of rawStats) {
         if (periodGroup.groups) {
           for (const g of periodGroup.groups) {
@@ -157,40 +260,45 @@ export async function getOrFetchMatchDetails(
       }
 
       // 4. Parse Lineups
-      const lineupsData = lineupsRes.status === "fulfilled" ? lineupsRes.value?.data || lineupsRes.value : null;
-      let lineups: LiveLineups | null = null;
+      const lineupsRaw = lineupsRes.status === "fulfilled" ? lineupsRes.value : null;
+      const lineupsData =
+        lineupsRaw?.home || lineupsRaw?.away ? lineupsRaw : lineupsRaw?.data || null;
 
+      let lineups: LiveLineups | null = null;
       if (lineupsData?.home || lineupsData?.away) {
         const parsePlayers = (list: any[]) =>
           (list || []).map((item: any) => ({
             id: item.player?.id || 0,
-            name: item.player?.name || "Player",
-            shortName: item.player?.shortName,
-            number: item.player?.jerseyNumber || "",
-            position: item.player?.position,
+            name: item.player?.name || item.name || "Player",
+            shortName: item.player?.shortName || item.shortName,
+            number: item.player?.jerseyNumber || item.jerseyNumber || "",
+            position: item.player?.position || item.position,
             substitute: Boolean(item.substitute),
           }));
 
         const homePlayers = parsePlayers(lineupsData.home?.players);
         const awayPlayers = parsePlayers(lineupsData.away?.players);
 
-        lineups = {
-          confirmed: Boolean(lineupsData.confirmed),
-          home: {
-            formation: lineupsData.home?.formation,
-            players: homePlayers.filter((p) => !p.substitute),
-            substitutes: homePlayers.filter((p) => p.substitute),
-          },
-          away: {
-            formation: lineupsData.away?.formation,
-            players: awayPlayers.filter((p) => !p.substitute),
-            substitutes: awayPlayers.filter((p) => p.substitute),
-          },
-        };
+        if (homePlayers.length > 0 || awayPlayers.length > 0) {
+          lineups = {
+            confirmed: Boolean(lineupsData.confirmed),
+            home: {
+              formation: lineupsData.home?.formation,
+              players: homePlayers.filter((p) => !p.substitute),
+              substitutes: homePlayers.filter((p) => p.substitute),
+            },
+            away: {
+              formation: lineupsData.away?.formation,
+              players: awayPlayers.filter((p) => !p.substitute),
+              substitutes: awayPlayers.filter((p) => p.substitute),
+            },
+          };
+        }
       }
 
       // 5. Parse Odds
-      const oddsData = oddsRes.status === "fulfilled" ? oddsRes.value?.data || oddsRes.value : null;
+      const oddsRaw = oddsRes.status === "fulfilled" ? oddsRes.value : null;
+      const oddsData = oddsRaw?.data || oddsRaw;
       const odds: LiveOddsMarket[] = [];
 
       if (oddsData?.featured?.default) {
@@ -218,50 +326,80 @@ export async function getOrFetchMatchDetails(
         }
       }
 
+      // Merge with any existing fields in MongoDB to avoid wiping valid data on partial failure
+      const finalIncidents =
+        incidents.length > 0 ? incidents : existing?.incidents || [];
+      const finalStats = stats.length > 0 ? stats : existing?.stats || [];
+      const finalLineups = lineups || existing?.lineups || null;
+      const finalOdds = odds.length > 0 ? odds : existing?.odds || [];
+
       const snapshot: LiveMatchSnapshot = {
         matchId,
         score,
-        incidents,
-        stats,
-        lineups,
-        odds,
+        incidents: finalIncidents,
+        stats: finalStats,
+        lineups: finalLineups,
+        odds: finalOdds,
         lastUpdateAt: Date.now(),
       };
 
       // 6. Save directly to MongoDB matchDetails collection
+      const detailsUpdate: any = {
+        matchId,
+        provider: "sportsapi",
+        score,
+        updatedAt: new Date(),
+      };
+      if (finalIncidents.length > 0) detailsUpdate.incidents = finalIncidents;
+      if (finalStats.length > 0) detailsUpdate.stats = finalStats;
+      if (finalLineups) detailsUpdate.lineups = finalLineups;
+      if (finalOdds.length > 0) detailsUpdate.odds = finalOdds;
+
       await db.collection("matchDetails").updateOne(
         { matchId },
         {
-          $set: {
-            matchId,
-            provider: "sportsapi",
-            score,
-            incidents,
-            stats,
-            lineups,
-            odds,
-            updatedAt: new Date(),
-          },
+          $set: detailsUpdate,
           $setOnInsert: { createdAt: new Date() },
         },
         { upsert: true },
       );
 
-      // Also keep the main matches collection in sync with latest score/status
+      // Keep the main matches collection in sync with latest score/status
       const updateFields: any = { updatedAt: new Date() };
       if (score.status) updateFields.status = score.status;
-      if (score.home !== null) updateFields.homeGoals = score.home;
-      if (score.away !== null) updateFields.awayGoals = score.away;
-      if (score.elapsed !== null) updateFields.elapsed = score.elapsed;
+      if (score.home !== null && score.home !== undefined) updateFields.homeGoals = score.home;
+      if (score.away !== null && score.away !== undefined) updateFields.awayGoals = score.away;
+      if (score.elapsed !== null && score.elapsed !== undefined) updateFields.elapsed = score.elapsed;
 
       await db.collection("matches").updateOne(
         { provider: "sportsapi", providerMatchId: matchId },
         { $set: updateFields },
       );
 
+      // Trigger score engine if match is now FINISHED
+      if (score.status === "FINISHED") {
+        try {
+          const { runScoreEngine } = await import("@/lib/scoring/scoreEngine");
+          await runScoreEngine();
+        } catch (scoreErr) {
+          console.error("[MatchDetails] Error running scoreEngine:", scoreErr);
+        }
+      }
+
       return snapshot;
     } catch (err) {
       console.error(`[MatchDetails] Failed to fetch details for ${matchId}:`, err);
+      if (existing) {
+        return {
+          matchId: existing.matchId,
+          score: existing.score,
+          incidents: existing.incidents || [],
+          stats: existing.stats || [],
+          lineups: existing.lineups || null,
+          odds: existing.odds || [],
+          lastUpdateAt: new Date(existing.updatedAt).getTime(),
+        };
+      }
       return null;
     } finally {
       inFlight.delete(matchId);

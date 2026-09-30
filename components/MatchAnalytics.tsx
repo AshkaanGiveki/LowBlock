@@ -101,8 +101,11 @@ export function MatchAnalytics({
   }, [matchId, query]);
 
   useEffect(() => {
-    const isLive = ["LIVE", "SUSPENDED"].includes(String(data?.match?.status));
-    if (!isLive) return;
+    const status = String(data?.match?.status || "");
+    const shouldStream =
+      Boolean(status) &&
+      !["FINISHED", "CANCELLED", "POSTPONED", "VOID"].includes(status);
+    if (!shouldStream) return;
 
     let eventSource: EventSource | null = null;
     try {
@@ -110,24 +113,33 @@ export function MatchAnalytics({
 
       eventSource.onopen = () => setIsLiveConnected(true);
 
+      const applySnapshot = (snapshot: LiveMatchSnapshot) => {
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            match: {
+              ...prev.match,
+              homeGoals: snapshot.score.home ?? prev.match.homeGoals,
+              awayGoals: snapshot.score.away ?? prev.match.awayGoals,
+              status: snapshot.score.status ?? prev.match.status,
+              elapsed: snapshot.score.elapsed ?? prev.match.elapsed,
+            },
+            liveDetails: snapshot,
+          };
+        });
+        setIsLiveConnected(true);
+      };
+
+      eventSource.addEventListener("snapshot", (e) => {
+        try {
+          applySnapshot(JSON.parse(e.data));
+        } catch {}
+      });
+
       eventSource.addEventListener("update", (e) => {
         try {
-          const snapshot: LiveMatchSnapshot = JSON.parse(e.data);
-          setData((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              match: {
-                ...prev.match,
-                homeGoals: snapshot.score.home ?? prev.match.homeGoals,
-                awayGoals: snapshot.score.away ?? prev.match.awayGoals,
-                status: snapshot.score.status ?? prev.match.status,
-                elapsed: snapshot.score.elapsed ?? prev.match.elapsed,
-              },
-              liveDetails: snapshot,
-            };
-          });
-          setIsLiveConnected(true);
+          applySnapshot(JSON.parse(e.data));
         } catch {}
       });
 

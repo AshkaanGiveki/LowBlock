@@ -13,6 +13,10 @@ import { normalizeSportsApiMatch } from "./normalizer";
 import { getSportsApiWsManager } from "./ws";
 import { rebuildRoundRecords } from "../roundLifecycle";
 import { runScoreEngine } from "@/lib/scoring/scoreEngine";
+import {
+  startSportsApiBackgroundService,
+  ensureSportsApiBackgroundService,
+} from "./backgroundService";
 
 export class SportsApiFootballProvider implements FootballDataProvider {
   readonly name: ProviderName = "sportsapi";
@@ -114,6 +118,8 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     const rounds = await rebuildRoundRecords(db);
     const scoreEngine = await runScoreEngine();
 
+    ensureSportsApiBackgroundService();
+
     return {
       total,
       listRequests,
@@ -130,9 +136,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
   }
 
   startRealtime(): void {
-    const ws = getSportsApiWsManager();
-    ws.connect();
-    ws.subscribeToChannel("live-scores");
+    startSportsApiBackgroundService();
   }
 
   stopRealtime(): void {
