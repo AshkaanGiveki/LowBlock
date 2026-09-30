@@ -157,18 +157,6 @@ export function MatchAnalytics({
     window.setTimeout(onClose, 280);
   };
 
-  const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
-    touchStartY.current = event.touches[0]?.clientY ?? null;
-  };
-
-  const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
-    const start = touchStartY.current;
-    touchStartY.current = null;
-    if (start === null || !drawerRef.current || drawerRef.current.scrollTop > 2)
-      return;
-    if ((event.changedTouches[0]?.clientY ?? start) - start > 110) close();
-  };
-
   const liveDetails = data?.liveDetails;
   const incidents = liveDetails?.incidents ?? [];
   const statsGroups = liveDetails?.stats ?? [];
@@ -189,8 +177,6 @@ export function MatchAnalytics({
           />
           <motion.section
             ref={drawerRef}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -238,17 +224,17 @@ export function MatchAnalytics({
                     <TabButton
                       active={tab === "lineups"}
                       onClick={() => setTab("lineups")}
-                      label={t("Lineup", "Lineup")}
+                      label={t("ترکیب", "Lineup")}
                     />
                     <TabButton
                       active={tab === "stats"}
                       onClick={() => setTab("stats")}
-                      label={t("Stats", "Stats")}
+                      label={t("آمار بازی", "Stats")}
                     />
                     <TabButton
                       active={tab === "timeline"}
                       onClick={() => setTab("timeline")}
-                      label={t("Commentary", "Commentary")}
+                      label={t("رویدادها", "Events")}
                     />
                   </div>
 
@@ -329,7 +315,7 @@ function MatchHeader({ match, language, number, score, t }: any) {
   const finished = ["FINISHED", "FT"].includes(String(match.status));
   const live =
     !finished &&
-    (["LIVE", "SUSPENDED"].includes(String(match.status)) ||
+    (["LIVE", "SUSPENDED", "IN_PLAY"].includes(String(match.status)) ||
       (match.status === "SCHEDULED" &&
         new Date(match.kickoffAt).getTime() <= Date.now()));
 
@@ -338,7 +324,7 @@ function MatchHeader({ match, language, number, score, t }: any) {
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-widest text-[#10b981] uppercase">
           <TrendingUp size={12} />
-          {t("MATCH INTELLIGENCE", "MATCH INTELLIGENCE")}
+          {t("تحلیل و آمار بازی", "MATCH INTELLIGENCE")}
         </span>
         <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-white/60">
           {match.leagueCode ?? "FRIENDLY"}
@@ -392,16 +378,16 @@ function MatchHeader({ match, language, number, score, t }: any) {
 }
 
 function Status({ match, live, finished, number }: any) {
-  if (live)
-    return (
-      <div className="text-xs font-bold text-[#10b981] flex items-center gap-1 animate-pulse">
-        {match.elapsed != null && `${number(match.elapsed)}'`}
-      </div>
-    );
-  if (finished)
+  if (finished || (match.elapsed != null && match.elapsed > 130))
     return (
       <div className="text-[11px] font-bold text-white/40">
         FT
+      </div>
+    );
+  if (live)
+    return (
+      <div className="text-xs font-bold text-[#10b981] flex items-center gap-1 animate-pulse">
+        {match.elapsed != null && match.elapsed > 0 && match.elapsed <= 130 ? `${number(match.elapsed)}'` : "LIVE"}
       </div>
     );
   return (
@@ -420,7 +406,7 @@ function LineupsView({ lineups, match, language, t, incidents }: any) {
   if (!lineups || (!lineups.home.players.length && !lineups.away.players.length)) {
     return (
       <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
-        {t("Lineups are not available yet.", "Lineups are not available yet.")}
+        {t("ترکیب تیم‌ها هنوز اعلام نشده است.", "Lineups are not available yet.")}
       </div>
     );
   }
@@ -459,7 +445,9 @@ function LineupsView({ lineups, match, language, t, incidents }: any) {
       </div>
 
       <div className="flex justify-between items-center px-2">
-        <span className="text-xs font-bold text-white/40 uppercase tracking-wider">Formation</span>
+        <span className="text-xs font-bold text-white/40 uppercase tracking-wider">
+          {t("آرایش تیمی", "Formation")}
+        </span>
         <span className="text-xs font-bold text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">
           {formationStr}
         </span>
@@ -516,7 +504,7 @@ function LineupsView({ lineups, match, language, t, incidents }: any) {
       {activeLineup.substitutes.length > 0 && (
         <div className="mt-6">
           <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 px-2">
-            {t("Substitutes", "Substitutes")}
+            {t("بازیکنان تعویضی", "Substitutes")}
           </h4>
           <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar px-2">
             {activeLineup.substitutes.map((sub: any) => (
@@ -764,11 +752,36 @@ function SubPlayerCard({ player, incidents, isHome }: any) {
 /* =========================================================================
  * 3. STATS VIEW
  * ========================================================================= */
+function translateStatName(name: string, language: "fa" | "en") {
+  if (language !== "fa") return name;
+  const map: Record<string, string> = {
+    "Ball Possession": "مالکیت توپ",
+    "Total Shots": "مجموع شوت‌ها",
+    "Shots On Goal": "شوت در چارچوب",
+    "Shots on target": "شوت در چارچوب",
+    "Shots Off Goal": "شوت خارج از چارچوب",
+    "Shots off target": "شوت خارج از چارچوب",
+    "Blocked Shots": "شوت‌های مسدود شده",
+    "Corner Kicks": "کرنرها",
+    "Offsides": "آفسایدها",
+    "Fouls": "خطاها",
+    "Yellow Cards": "کارت‌های زرد",
+    "Red Cards": "کارت‌های قرمز",
+    "Goalkeeper Saves": "مهار دروازه‌بان",
+    "Total passes": "مجموع پاس‌ها",
+    "Accurate Passes": "پاس‌های صحیح",
+    "Passes %": "دقت پاس",
+    "Free Kicks": "ضربات آزاد",
+    "Throw-ins": "پرتاب‌های اوت",
+  };
+  return map[name] || name;
+}
+
 function StatsView({ statsGroups, match, language, t, data, number, score }: any) {
   if (!statsGroups || statsGroups.length === 0) {
     return (
       <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
-        {t("Detailed statistics are not available.", "Detailed statistics are not available.")}
+        {t("آمار دقیق بازی هنوز ثبت نشده است.", "Detailed statistics are not available.")}
       </div>
     );
   }
@@ -779,10 +792,9 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
   // Flatten for simple view if preferred, or group
   const allStats = statsGroups.flatMap((g: any) => g.items);
 
-  // Filter out some key stats to show at top
-  const keyStatNames = ["Ball Possession", "Total Shots", "Shots On Goal"];
-  const possessionStat = allStats.find((s: any) => s.name.includes("Possession"));
-  const otherStats = allStats.filter((s: any) => !s.name.includes("Possession"));
+  // Filter out key stats
+  const possessionStat = allStats.find((s: any) => s.name?.includes("Possession"));
+  const otherStats = allStats.filter((s: any) => !s.name?.includes("Possession"));
 
   return (
     <div className="space-y-6 pb-6">
@@ -793,20 +805,20 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
 
       {possessionStat && (
         <div className="px-2">
-          <StatComparison stat={possessionStat} isHighlight={true} />
+          <StatComparison stat={possessionStat} isHighlight={true} language={language} />
         </div>
       )}
 
       <div className="bg-[#07100c] border border-[#1a382d] rounded-[24px] p-4 space-y-5">
         {otherStats.slice(0, 10).map((stat: any, idx: number) => (
-          <StatComparison key={idx} stat={stat} />
+          <StatComparison key={idx} stat={stat} language={language} />
         ))}
       </div>
     </div>
   );
 }
 
-function StatComparison({ stat, isHighlight }: any) {
+function StatComparison({ stat, isHighlight, language }: any) {
   // Attempt to parse values
   const homeStr = String(stat.home || "0").replace("%", "");
   const awayStr = String(stat.away || "0").replace("%", "");
@@ -821,7 +833,9 @@ function StatComparison({ stat, isHighlight }: any) {
     <div className={cn("flex flex-col gap-2", isHighlight && "p-4 bg-[#07100c] border border-[#1a382d] rounded-[24px]")}>
       <div className="flex justify-between items-end">
         <span className="text-base font-bold text-white w-12">{stat.home}</span>
-        <span className={cn("text-[11px] font-bold text-white/50 uppercase tracking-wide", isHighlight && "text-[#10b981]")}>{stat.name}</span>
+        <span className={cn("text-[11px] font-bold text-white/50 uppercase tracking-wide", isHighlight && "text-[#10b981]")}>
+          {translateStatName(stat.name, language)}
+        </span>
         <span className="text-base font-bold text-white w-12 text-right">{stat.away}</span>
       </div>
       <div className="flex h-1.5 w-full rounded-full bg-white/5 overflow-hidden gap-1">
@@ -836,11 +850,23 @@ function StatComparison({ stat, isHighlight }: any) {
 /* =========================================================================
  * 4. COMMENTARY / TIMELINE VIEW
  * ========================================================================= */
+function formatPeriodLabel(label: string, language: "fa" | "en") {
+  if (language !== "fa") return label;
+  const l = String(label || "").toLowerCase();
+  if (l.includes("1st half")) return "نیمه اول";
+  if (l.includes("2nd half")) return "نیمه دوم";
+  if (l.includes("halftime") || l.includes("half time")) return "پایان نیمه اول";
+  if (l.includes("ended") || l.includes("full time") || l.includes("ft")) return "پایان بازی";
+  if (l.includes("extra time")) return "وقت اضافه";
+  if (l.includes("injury")) return "وقت تلف‌شده";
+  return label;
+}
+
 function CommentaryView({ incidents, match, language, t }: any) {
   if (!incidents || incidents.length === 0) {
     return (
       <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
-        {t("No events recorded yet.", "No events recorded yet.")}
+        {t("هنوز رویدادی ثبت نشده است.", "No events recorded yet.")}
       </div>
     );
   }
@@ -861,7 +887,7 @@ function CommentaryView({ incidents, match, language, t }: any) {
              return (
                <div key={inc.id || idx} className="flex justify-center relative z-10 my-6">
                  <span className="bg-[#07100c] border border-[#1a382d] text-white/60 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
-                   {inc.detail || inc.type} {inc.time ? `${inc.time}'` : ''}
+                   {formatPeriodLabel(inc.detail || inc.type, language)} {inc.time ? `${inc.time}'` : ''}
                  </span>
                </div>
              );
@@ -880,13 +906,13 @@ function CommentaryView({ incidents, match, language, t }: any) {
                   <div className={cn("flex items-center gap-2", isHome ? "flex-row-reverse" : "flex-row")}>
                      <IncidentIcon type={inc.type} cardType={inc.cardType} />
                      <span className="text-[13px] font-bold text-white truncate max-w-[120px]">
-                       {inc.type === "substitution" ? inc.playerInName : (inc.playerName || "Unknown")}
+                       {inc.type === "substitution" ? inc.playerInName : (inc.playerName || t("نامشخص", "Unknown"))}
                      </span>
                   </div>
                   
                   {inc.type === "substitution" && (
                     <div className={cn("flex items-center gap-1 text-[11px] text-white/40", isHome ? "flex-row-reverse" : "flex-row")}>
-                       <span>Out:</span> <span>{inc.playerOutName}</span>
+                       <span>{t("خروج:", "Out:")}</span> <span>{inc.playerOutName}</span>
                     </div>
                   )}
 

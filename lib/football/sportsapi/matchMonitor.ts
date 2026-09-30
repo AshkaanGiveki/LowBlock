@@ -235,10 +235,18 @@ class MatchMonitorService {
       const ev = data.event || data.match || data.data?.event || data.data?.match || data;
       if (ev.status) {
         const type = String(ev.status.type || "").toLowerCase();
-        if (type === "inprogress") snapshot.score.status = "LIVE";
-        else if (type === "finished") snapshot.score.status = "FINISHED";
-        else if (type === "notstarted") snapshot.score.status = "SCHEDULED";
-        else snapshot.score.status = ev.status.description?.toUpperCase() || snapshot.score.status;
+        const desc = String(ev.status.description || "").toUpperCase();
+        if (type === "finished" || desc === "ENDED" || desc === "FT" || desc === "AET" || desc === "AFTER ET" || ev.status.code === 100) {
+          snapshot.score.status = "FINISHED";
+          snapshot.score.elapsed = 90;
+        } else if (type === "inprogress" || desc === "INPROGRESS" || desc === "1ST HALF" || desc === "2ND HALF" || desc === "HALFTIME") {
+          snapshot.score.status = "LIVE";
+        } else if (type === "notstarted" || desc === "NOT STARTED" || ev.status.code === 0) {
+          snapshot.score.status = "SCHEDULED";
+          snapshot.score.elapsed = null;
+        } else {
+          snapshot.score.status = desc || snapshot.score.status;
+        }
         snapshot.score.statusDescription = ev.status.description;
       }
       if (ev.homeScore) {
@@ -255,10 +263,15 @@ class MatchMonitorService {
       if (ev.awayScore) {
         snapshot.score.away = ev.awayScore.display ?? ev.awayScore.current ?? snapshot.score.away;
       }
-      if (ev.time?.currentPeriodStartTimestamp) {
-        snapshot.score.elapsed = Math.floor(
+      if (snapshot.score.status === "FINISHED") {
+        snapshot.score.elapsed = 90;
+      } else if (snapshot.score.status === "SCHEDULED") {
+        snapshot.score.elapsed = null;
+      } else if (ev.time?.currentPeriodStartTimestamp) {
+        const calc = Math.floor(
           (Date.now() / 1000 - ev.time.currentPeriodStartTimestamp) / 60,
         );
+        snapshot.score.elapsed = Math.min(130, Math.max(1, calc));
       }
     } else if (subType === "incidents") {
       const rawIncidents = data.incidents || data.data?.incidents || (Array.isArray(data) ? data : []);
@@ -401,10 +414,18 @@ class MatchMonitorService {
 
         if (ev.status) {
           const type = String(ev.status.type || "").toLowerCase();
-          if (type === "inprogress") snap.score.status = "LIVE";
-          else if (type === "finished") snap.score.status = "FINISHED";
-          else if (type === "notstarted") snap.score.status = "SCHEDULED";
-          else snap.score.status = ev.status.description?.toUpperCase() || snap.score.status;
+          const desc = String(ev.status.description || "").toUpperCase();
+          if (type === "finished" || desc === "ENDED" || desc === "FT" || desc === "AET" || desc === "AFTER ET" || ev.status.code === 100) {
+            snap.score.status = "FINISHED";
+            snap.score.elapsed = 90;
+          } else if (type === "inprogress" || desc === "INPROGRESS" || desc === "1ST HALF" || desc === "2ND HALF" || desc === "HALFTIME") {
+            snap.score.status = "LIVE";
+          } else if (type === "notstarted" || desc === "NOT STARTED" || ev.status.code === 0) {
+            snap.score.status = "SCHEDULED";
+            snap.score.elapsed = null;
+          } else {
+            snap.score.status = desc || snap.score.status;
+          }
           snap.score.statusDescription = ev.status.description;
         }
 
@@ -422,10 +443,15 @@ class MatchMonitorService {
         if (ev.awayScore) {
           snap.score.away = ev.awayScore.display ?? ev.awayScore.current ?? snap.score.away;
         }
-        if (ev.time?.currentPeriodStartTimestamp) {
-          snap.score.elapsed = Math.floor(
+        if (snap.score.status === "FINISHED") {
+          snap.score.elapsed = 90;
+        } else if (snap.score.status === "SCHEDULED") {
+          snap.score.elapsed = null;
+        } else if (ev.time?.currentPeriodStartTimestamp) {
+          const calc = Math.floor(
             (Date.now() / 1000 - ev.time.currentPeriodStartTimestamp) / 60,
           );
+          snap.score.elapsed = Math.min(130, Math.max(1, calc));
         }
 
         this.broadcast(matchId, snap);

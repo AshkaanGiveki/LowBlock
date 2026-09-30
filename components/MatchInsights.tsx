@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { BarChart3, History, RefreshCw, Sparkles, X } from "lucide-react";
+import { History, Shield, Users, X, Info } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
@@ -18,119 +18,243 @@ type H2HMeeting = {
   awayGoals: number;
   league: string;
 };
-type InsightTeam = { id: number; name: string; logoUrl: string | null };
-export type MatchInsightsData = {
-  home: InsightTeam | null;
-  away: InsightTeam | null;
-  h2h: H2HMeeting[];
+
+type LineupPlayer = {
+  id: number;
+  name: string;
+  shortName?: string;
+  number?: string | number;
+  position?: string;
+};
+
+type LineupsData = {
+  confirmed: boolean;
+  home: {
+    formation?: string;
+    players: LineupPlayer[];
+    substitutes: LineupPlayer[];
+  };
+  away: {
+    formation?: string;
+    players: LineupPlayer[];
+    substitutes: LineupPlayer[];
+  };
 };
 
 export function MatchInsightsPanel({ matchId }: { matchId: string }) {
   const { language, t } = useLanguage();
-  const [data, setData] = useState<MatchInsightsData | null>(null);
+  const [lineups, setLineups] = useState<LineupsData | null>(null);
+  const [matchData, setMatchData] = useState<any>(null);
+  const [h2hData, setH2hData] = useState<H2HMeeting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+
   useEffect(() => {
     let mounted = true;
-    fetch(`/api/matches/${encodeURIComponent(matchId)}/insights`)
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((value) => {
-        if (mounted)
-          setData({
-            home: value?.home ?? null,
-            away: value?.away ?? null,
-            h2h: Array.isArray(value?.h2h) ? value.h2h : [],
-          });
-      })
-      .catch(() => {
-        if (mounted) setError(true);
+
+    Promise.all([
+      fetch(`/api/matches/${encodeURIComponent(matchId)}/analytics`)
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+      fetch(`/api/matches/${encodeURIComponent(matchId)}/insights`)
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([analytics, insights]) => {
+        if (!mounted) return;
+        if (analytics) {
+          setMatchData(analytics.match ?? null);
+          setLineups(analytics.liveDetails?.lineups ?? null);
+        }
+        if (insights && Array.isArray(insights.h2h)) {
+          setH2hData(insights.h2h);
+        }
       })
       .finally(() => {
         if (mounted) setLoading(false);
       });
+
     return () => {
       mounted = false;
     };
   }, [matchId]);
+
   const n = (value: number) => formatNumber(value, language);
+
   if (loading) return <InsightsSkeleton />;
-  if (error || !data)
-    return (
-      <div className="rounded-2xl border border-dashed border-white/10 p-7 text-center">
-        <RefreshCw className="mx-auto mb-2 text-brand" size={21} />
-        <p className="text-xs text-[var(--muted)]">
-          {t(
-            "اطلاعات رودررو هنوز آماده نیست.",
-            "Head-to-head data is not available yet.",
-          )}
-        </p>
-      </div>
-    );
+
+  const hasLineups = Boolean(
+    lineups &&
+      (lineups.home?.players?.length > 0 || lineups.away?.players?.length > 0),
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, height: 0 }}
       animate={{ opacity: 1, height: "auto" }}
-      className="overflow-hidden"
+      className="space-y-4 overflow-hidden"
     >
-      <H2HCard
-        data={data.h2h}
-        homeTeamId={data.home?.id ?? null}
-        awayTeamId={data.away?.id ?? null}
-        language={language}
-        n={n}
-        t={t}
-      />
+      {/* 1. LINEUPS SECTION */}
+      {hasLineups && matchData ? (
+        <LineupsCard
+          lineups={lineups!}
+          match={matchData}
+          language={language}
+          t={t}
+        />
+      ) : (
+        <div className="rounded-2xl border border-dashed border-[#1a382d] bg-[#07100c]/60 p-5 text-center">
+          <Users className="mx-auto mb-2 text-brand/70" size={24} />
+          <h4 className="text-xs font-bold text-white mb-1">
+            {t("ترکیب رسمی تیم‌ها", "Official Match Lineups")}
+          </h4>
+          <p className="text-[11px] text-white/50">
+            {t(
+              "ترکیب تیم‌ها معمولاً ۱ ساعت پیش از شروع مسابقه اعلام می‌شود.",
+              "Official lineups are usually announced ~1 hour before kickoff.",
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* 2. HEAD TO HEAD (IF AVAILABLE) */}
+      {h2hData.length > 0 && matchData && (
+        <H2HCard
+          data={h2hData}
+          homeTeamId={matchData.homeTeam?.id ?? null}
+          awayTeamId={matchData.awayTeam?.id ?? null}
+          language={language}
+          n={n}
+          t={t}
+        />
+      )}
     </motion.div>
   );
 }
 
-export function MatchInsights({
-  matchId,
-  onClose,
+function LineupsCard({
+  lineups,
+  match,
+  language,
+  t,
 }: {
-  matchId: string;
-  onClose: () => void;
+  lineups: LineupsData;
+  match: any;
+  language: "fa" | "en";
+  t: (fa: string, en: string) => string;
 }) {
-  const { t } = useLanguage();
+  const [side, setSide] = useState<"home" | "away">("home");
+  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name);
+  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name);
+  const activeLineup = side === "home" ? lineups.home : lineups.away;
+
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[95] flex items-end justify-center">
-        <motion.button
-          type="button"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/75 backdrop-blur-md"
-          aria-label={t("بستن", "Close")}
-        />
-        <motion.section
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-[2.25rem] border border-b-0 border-white/10 bg-[#0b100d] px-5 pb-10 pt-14 shadow-2xl"
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute left-5 top-5 grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[.06]"
-            aria-label={t("بستن", "Close")}
-          >
-            <X size={18} />
-          </button>
-          <div className="mb-5 text-center">
-            <span className="inline-flex items-center gap-2 text-[10px] font-black tracking-[.16em] text-brand">
-              <Sparkles size={13} />
-              {t("سابقه رودررو", "H2H HISTORY")}
-            </span>
-            <h2 className="mt-2 text-2xl font-black">
-              {t("پنج رویارویی آخر", "Last five meetings")}
-            </h2>
-          </div>
-          <MatchInsightsPanel matchId={matchId} />
-        </motion.section>
+    <div className="rounded-2xl border border-[#1a382d] bg-[#07100c] p-4 shadow-lg space-y-3">
+      <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <Shield size={16} className="text-brand" />
+          <span className="text-xs font-black text-white">
+            {t("ترکیب تایید شده", "Confirmed Lineup")}
+          </span>
+        </div>
+        {activeLineup.formation && (
+          <span className="text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
+            {activeLineup.formation}
+          </span>
+        )}
       </div>
-    </AnimatePresence>
+
+      {/* Team Tabs */}
+      <div className="flex rounded-xl border border-white/10 bg-black/40 p-1">
+        <button
+          type="button"
+          onClick={() => setSide("home")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+            side === "home"
+              ? "bg-brand text-black shadow"
+              : "text-white/50 hover:text-white"
+          }`}
+        >
+          {homeName}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSide("away")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+            side === "away"
+              ? "bg-brand text-black shadow"
+              : "text-white/50 hover:text-white"
+          }`}
+        >
+          {awayName}
+        </button>
+      </div>
+
+      {/* Starting XI */}
+      <div className="space-y-1.5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-brand block px-1">
+          {t("ترکیب اصلی", "Starting XI")}
+        </span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {activeLineup.players.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2.5 rounded-xl border border-white/[0.04] bg-white/[0.02] p-2 hover:bg-white/[0.04] transition-colors"
+            >
+              <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-brand/40 bg-[#0a1a12] text-xs font-black text-brand">
+                {p.id && String(p.id) !== "0" ? (
+                  <img
+                    src={`/api/player-image/${p.id}`}
+                    alt=""
+                    className="h-full w-full object-cover object-top"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                ) : null}
+                <span>{p.number || p.name?.[0]?.toUpperCase() || "-"}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-white">
+                  {p.shortName || p.name}
+                </p>
+                <p className="text-[9px] font-semibold text-white/40">
+                  {p.position || "FWD"}
+                </p>
+              </div>
+              {p.number && (
+                <span className="px-1 text-xs font-black text-white/30">
+                  #{p.number}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Substitutes */}
+      {activeLineup.substitutes?.length > 0 && (
+        <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40 block px-1">
+            {t("بازیکنان تعویضی", "Substitutes")}
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {activeLineup.substitutes.map((s) => (
+              <span
+                key={s.id}
+                className="inline-flex items-center gap-1 rounded-lg border border-white/5 bg-white/[0.02] px-2 py-1 text-[11px] text-white/70"
+              >
+                {s.number && (
+                  <strong className="text-brand font-black text-[10px]">
+                    #{s.number}
+                  </strong>
+                )}
+                <span className="truncate max-w-[120px]">{s.shortName || s.name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -173,6 +297,7 @@ function H2HCard({
     },
     { home: 0, draw: 0, away: 0 },
   );
+
   return (
     <section className="overflow-hidden rounded-[1.35rem] border border-brand/20 bg-[radial-gradient(circle_at_90%_0%,rgba(32,184,121,.16),transparent_45%),rgba(0,0,0,.16)]">
       <div className="flex items-center gap-3 border-b border-white/[.07] p-3.5">
@@ -263,7 +388,7 @@ function InsightsSkeleton() {
   return (
     <div className="space-y-3">
       <div className="h-16 animate-pulse rounded-[1.35rem] bg-white/[.06]" />
-      <div className="h-56 animate-pulse rounded-[1.35rem] bg-white/[.06]" />
+      <div className="h-44 animate-pulse rounded-[1.35rem] bg-white/[.06]" />
     </div>
   );
 }

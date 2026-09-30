@@ -19,8 +19,8 @@ export async function syncActiveMatchesSubscriptions(): Promise<void> {
   try {
     const db = await getDb();
     const now = Date.now();
-    const fromTime = new Date(now - 12 * 60 * 60 * 1000); // 12 hours ago
-    const toTime = new Date(now + 36 * 60 * 60 * 1000); // 36 hours ahead
+    const fromTime = new Date(now - 24 * 60 * 60 * 1000); // 24 hours ago
+    const toTime = new Date(now + 48 * 60 * 60 * 1000); // 48 hours ahead
 
     const matches = await db
       .collection<any>("matches")
@@ -36,6 +36,10 @@ export async function syncActiveMatchesSubscriptions(): Promise<void> {
 
     const monitor = getMatchMonitorService();
     const ws = getSportsApiWsManager();
+
+    // Ensure connection is active
+    ws.connect();
+    ws.subscribeToChannel("live-scores");
 
     for (const m of matches) {
       const matchId = String(m.providerMatchId);
@@ -78,13 +82,13 @@ export function startSportsApiBackgroundService(): void {
     console.error("[SportsApiBackground] Initial syncActiveMatchesSubscriptions failed:", err),
   );
 
-  // 3. Periodic refresh of active match subscriptions every 3 minutes
+  // 3. Periodic refresh of active match subscriptions every 60 seconds
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
     syncActiveMatchesSubscriptions().catch((err) =>
       console.error("[SportsApiBackground] syncSubscriptions error:", err),
     );
-  }, 180_000);
+  }, 60_000);
 }
 
 /**

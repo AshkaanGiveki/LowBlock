@@ -34,30 +34,21 @@ function extractGoals(scoreObj: any): number | null {
 
 function resolveTeamLogo(team: any): string | null {
   if (!team) return null;
-  const name = String(team.name || "").toLowerCase();
-  const alpha2 = team.country?.alpha2?.toLowerCase();
-  const isNational = Boolean(team.national);
-
-  // 1. National teams: High-speed FlagCDN (zero API quota)
-  if (
-    isNational ||
-    name.includes("england") ||
-    name.includes("scotland") ||
-    name.includes("wales") ||
-    name.includes("northern ireland")
-  ) {
-    if (name.includes("england")) return "https://flagcdn.com/w160/gb-eng.png";
-    if (name.includes("scotland")) return "https://flagcdn.com/w160/gb-sct.png";
-    if (name.includes("wales")) return "https://flagcdn.com/w160/gb-wls.png";
-    if (name.includes("northern ireland")) return "https://flagcdn.com/w160/gb-nir.png";
-    if (alpha2 && alpha2.length === 2) return `https://flagcdn.com/w160/${alpha2}.png`;
-  }
-
-  // 2. Clubs & others: Cached secure proxy (30 days cache)
   const teamId = team.id || team.eventId;
+  // 1. All teams with an ID: Cached secure proxy (30 days cache)
   if (teamId) {
     return `/api/team-image/${teamId}`;
   }
+
+  // 2. Fallback to country flag if no team ID is present
+  const name = String(team.name || "").toLowerCase();
+  const alpha2 = team.country?.alpha2?.toLowerCase();
+
+  if (name.includes("england")) return "https://flagcdn.com/w160/gb-eng.png";
+  if (name.includes("scotland")) return "https://flagcdn.com/w160/gb-sct.png";
+  if (name.includes("wales")) return "https://flagcdn.com/w160/gb-wls.png";
+  if (name.includes("northern ireland")) return "https://flagcdn.com/w160/gb-nir.png";
+  if (alpha2 && alpha2.length === 2) return `https://flagcdn.com/w160/${alpha2}.png`;
 
   return null;
 }
@@ -137,6 +128,15 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
     isNational: Boolean(rawEvent.awayTeam?.national),
   });
 
+  const canonicalStatus = normalizeStatus(rawEvent.status);
+  let canonicalElapsed: number | null = null;
+  if (canonicalStatus === "FINISHED") {
+    canonicalElapsed = 90;
+  } else if (canonicalStatus === "LIVE" && rawEvent.time?.currentPeriodStartTimestamp) {
+    const calc = Math.floor((Date.now() / 1000 - rawEvent.time.currentPeriodStartTimestamp) / 60);
+    canonicalElapsed = Math.min(130, Math.max(1, calc));
+  }
+
   return {
     provider: "sportsapi",
     providerMatchId: String(rawId),
@@ -164,10 +164,8 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
       code: rawEvent.awayTeam?.nameCode,
     },
     kickoffAt: kickoff,
-    status: normalizeStatus(rawEvent.status),
-    elapsed: rawEvent.time?.currentPeriodStartTimestamp
-      ? Math.floor((Date.now() / 1000 - rawEvent.time.currentPeriodStartTimestamp) / 60)
-      : null,
+    status: canonicalStatus,
+    elapsed: canonicalElapsed,
     homeGoals: extractGoals(rawEvent.homeScore),
     awayGoals: extractGoals(rawEvent.awayScore),
     homeScore,
