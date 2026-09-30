@@ -17,8 +17,13 @@ import {
   X,
   Timer,
   Target,
+  MessageSquare,
+  RectangleHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
 } from "lucide-react";
-import { useLanguage, T } from "@/components/LanguageProvider";
+import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
@@ -30,8 +35,14 @@ import type {
   LiveStatGroup,
   LiveLineups,
 } from "@/lib/football/sportsapi/matchMonitor";
+import clsx from "clsx";
+import { twMerge } from "tailwind-merge";
 
-type TabType = "predictions" | "timeline" | "stats" | "lineups";
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
+
+type TabType = "lineups" | "stats" | "timeline";
 
 type AnalyticsData = {
   match: any;
@@ -55,7 +66,7 @@ export function MatchAnalytics({
 }) {
   const { language, t } = useLanguage();
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [tab, setTab] = useState<TabType>("predictions");
+  const [tab, setTab] = useState<TabType>("lineups");
   const [visible, setVisible] = useState(true);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -65,9 +76,8 @@ export function MatchAnalytics({
   const number = (value: number | null | undefined) =>
     formatNumber(Number(value ?? 0), language, { maximumFractionDigits: 1 });
   const score = (home: number | null, away: number | null) =>
-    home == null || away == null ? "—" : `${number(home)} – ${number(away)}`;
+    home == null || away == null ? "—" : `${number(home)} - ${number(away)}`;
 
-  // 1. Initial Load: Fetch from MongoDB via analytics route (instant, cached)
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/matches/${matchId}/analytics${query}`, { cache: "no-store" })
@@ -75,7 +85,6 @@ export function MatchAnalytics({
       .then((next) => {
         if (!cancelled && next) {
           setData(next);
-          // If match is LIVE, default to timeline or stats if incidents exist
           if (["LIVE", "SUSPENDED"].includes(String(next.match?.status))) {
             if (next.liveDetails?.incidents?.length) {
               setTab("timeline");
@@ -91,7 +100,6 @@ export function MatchAnalytics({
     };
   }, [matchId, query]);
 
-  // 2. Real-time WebSocket / SSE connection for live updates
   useEffect(() => {
     const isLive = ["LIVE", "SUSPENDED"].includes(String(data?.match?.status));
     if (!isLive) return;
@@ -149,24 +157,11 @@ export function MatchAnalytics({
     if ((event.changedTouches[0]?.clientY ?? start) - start > 110) close();
   };
 
-  const maxCount = Math.max(
-    1,
-    ...(data?.distribution ?? []).map((item) => item.count),
-  );
-  const topPrediction = data?.distribution[0];
-  const sortedUsers = useMemo(
-    () =>
-      [...(data?.users ?? [])].sort(
-        (a, b) => Number(b.points ?? -1) - Number(a.points ?? -1),
-      ),
-    [data?.users],
-  );
-
   const liveDetails = data?.liveDetails;
   const incidents = liveDetails?.incidents ?? [];
   const statsGroups = liveDetails?.stats ?? [];
   const lineups = liveDetails?.lineups ?? null;
-  const odds = liveDetails?.odds ?? [];
+  const match = data?.match;
 
   return (
     <AnimatePresence>
@@ -177,7 +172,7 @@ export function MatchAnalytics({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={close}
-            className="absolute inset-0 bg-[#020705]/80 backdrop-blur-md"
+            className="absolute inset-0 bg-[#020705]/90 backdrop-blur-sm"
             aria-label={t("بستن", "Close")}
           />
           <motion.section
@@ -188,16 +183,16 @@ export function MatchAnalytics({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
-            className="relative max-h-[94dvh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-t-[2.4rem] border border-b-0 border-brand/20 bg-[#07100c] text-white shadow-[0_-32px_120px_rgba(0,0,0,.8)]"
+            className="relative flex flex-col h-[94dvh] w-full max-w-[600px] overflow-hidden rounded-t-[32px] border border-[#1a382d] bg-[#050b09] text-white shadow-[0_-32px_120px_rgba(0,0,0,.8)]"
           >
-            {/* Drawer Top Handle */}
-            <div className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-white/[.06] bg-[#07100c]/85 px-5 backdrop-blur-xl md:px-8">
-              <div className="flex items-center gap-2">
-                <GripHorizontal className="text-white/25" size={27} />
+            {/* Drawer Header Handle */}
+            <div className="flex-shrink-0 z-30 flex h-14 items-center justify-between border-b border-white/[.04] bg-[#050b09]/80 px-6 backdrop-blur-xl">
+              <div className="flex items-center gap-3">
+                <div className="h-1 w-10 rounded-full bg-white/20" />
                 {isLiveConnected && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    {t("پخش زنده", "Live Feed")}
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#10b981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10b981] border border-[#10b981]/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#10b981] animate-pulse" />
+                    LIVE
                   </span>
                 )}
               </div>
@@ -205,193 +200,82 @@ export function MatchAnalytics({
                 type="button"
                 onClick={close}
                 aria-label={t("بستن", "Close")}
-                className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[.06] text-white/70 transition hover:border-brand/50 hover:text-brand"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[.06] text-white/60 transition hover:bg-white/[.1] hover:text-white"
               >
-                <X size={17} />
+                <X size={16} />
               </button>
             </div>
 
-            {data ? (
-              <div className="relative overflow-hidden px-4 pb-12 pt-5 md:px-8 md:pt-7">
-                <div className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-brand/15 blur-3xl" />
-                <div className="pointer-events-none absolute -left-40 top-24 h-72 w-72 rounded-full bg-cyan-400/[.07] blur-3xl" />
+            {data && match ? (
+              <div className="flex-1 overflow-y-auto overscroll-contain pb-12">
+                {/* Background glowing effects */}
+                <div className="pointer-events-none absolute -right-32 top-0 h-96 w-96 rounded-full bg-[#059669]/10 blur-[100px]" />
+                <div className="pointer-events-none absolute -left-32 top-32 h-96 w-96 rounded-full bg-[#0d9488]/5 blur-[100px]" />
 
-                {/* 1. MATCH HERO BANNER (On Top) */}
-                <MatchHero
-                  match={data.match}
-                  language={language}
-                  number={number}
-                  score={score}
-                  t={t}
-                />
+                <div className="px-5 pt-6 relative z-10">
+                  <MatchHeader
+                    match={match}
+                    language={language}
+                    number={number}
+                    score={score}
+                    t={t}
+                  />
 
-                {/* 2. ICON-ONLY TAB SELECTOR */}
-                <div className="mt-6 mx-auto grid max-w-sm grid-cols-4 gap-2 rounded-2xl border border-white/[.08] bg-black/40 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,.06)] backdrop-blur-xl">
-                  {/* Predictions Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setTab("predictions")}
-                    title={t("پیش‌بینی‌ها", "Predictions")}
-                    aria-label={t("پیش‌بینی‌ها", "Predictions")}
-                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
-                      tab === "predictions"
-                        ? "text-[#07100b]"
-                        : "text-white/45 hover:text-white"
-                    }`}
-                  >
-                    {tab === "predictions" && (
-                      <motion.span
-                        layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 35,
-                        }}
-                      />
-                    )}
-                    <Target size={20} className="relative z-10 transition-transform duration-200" />
-                  </button>
+                  {/* 3-Tab Navigation */}
+                  <div className="mt-6 flex rounded-2xl border border-[#1a382d] bg-[#07100c] p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,.02)]">
+                    <TabButton
+                      active={tab === "lineups"}
+                      onClick={() => setTab("lineups")}
+                      label={t("Lineup", "Lineup")}
+                    />
+                    <TabButton
+                      active={tab === "stats"}
+                      onClick={() => setTab("stats")}
+                      label={t("Stats", "Stats")}
+                    />
+                    <TabButton
+                      active={tab === "timeline"}
+                      onClick={() => setTab("timeline")}
+                      label={t("Commentary", "Commentary")}
+                    />
+                  </div>
 
-                  {/* Timeline Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setTab("timeline")}
-                    title={t("رویدادها", "Timeline")}
-                    aria-label={t("رویدادها", "Timeline")}
-                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
-                      tab === "timeline"
-                        ? "text-[#07100b]"
-                        : "text-white/45 hover:text-white"
-                    }`}
-                  >
-                    {tab === "timeline" && (
-                      <motion.span
-                        layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 35,
-                        }}
-                      />
-                    )}
-                    <Timer size={20} className="relative z-10 transition-transform duration-200" />
-                  </button>
-
-                  {/* Stats Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setTab("stats")}
-                    title={t("آمار بازی", "Stats")}
-                    aria-label={t("آمار بازی", "Stats")}
-                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
-                      tab === "stats"
-                        ? "text-[#07100b]"
-                        : "text-white/45 hover:text-white"
-                    }`}
-                  >
-                    {tab === "stats" && (
-                      <motion.span
-                        layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 35,
-                        }}
-                      />
-                    )}
-                    <BarChart3 size={20} className="relative z-10 transition-transform duration-200" />
-                  </button>
-
-                  {/* Lineups Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setTab("lineups")}
-                    title={t("ترکیب", "Lineups")}
-                    aria-label={t("ترکیب", "Lineups")}
-                    className={`relative flex items-center justify-center py-3 rounded-xl transition-colors ${
-                      tab === "lineups"
-                        ? "text-[#07100b]"
-                        : "text-white/45 hover:text-white"
-                    }`}
-                  >
+                  <div className="mt-6">
                     {tab === "lineups" && (
-                      <motion.span
-                        layoutId="match-drawer-tab"
-                        className="absolute inset-0 rounded-xl bg-brand shadow-[0_0_20px_rgba(32,184,121,.45)]"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 35,
-                        }}
+                      <LineupsView
+                        lineups={lineups}
+                        match={match}
+                        language={language}
+                        t={t}
+                        incidents={incidents}
                       />
                     )}
-                    <Users size={20} className="relative z-10 transition-transform duration-200" />
-                  </button>
-                </div>
 
-                {/* 3. TAB CONTENT PANELS */}
-                <div className="mt-6">
-                  {/* TAB: PREDICTIONS */}
-                  {tab === "predictions" && (
-                    <div className="space-y-5">
-                      <div className="grid gap-5 lg:grid-cols-[1.12fr_.88fr]">
-                        <InsightCard
-                          data={data}
-                          topPrediction={topPrediction}
-                          maxCount={maxCount}
-                          number={number}
-                          t={t}
-                        />
-                        <Distribution
-                          data={data}
-                          maxCount={maxCount}
-                          number={number}
-                          t={t}
-                        />
-                      </div>
-                      <UserPredictions
-                        users={sortedUsers}
+                    {tab === "stats" && (
+                      <StatsView
+                        statsGroups={statsGroups}
+                        match={match}
+                        language={language}
+                        t={t}
+                        data={data}
                         number={number}
                         score={score}
+                      />
+                    )}
+
+                    {tab === "timeline" && (
+                      <CommentaryView
+                        incidents={incidents}
+                        match={match}
+                        language={language}
                         t={t}
                       />
-                    </div>
-                  )}
-
-                  {/* TAB: TIMELINE (INCIDENTS) */}
-                  {tab === "timeline" && (
-                    <TimelinePanel
-                      incidents={incidents}
-                      match={data.match}
-                      t={t}
-                    />
-                  )}
-
-                  {/* TAB: STATS */}
-                  {tab === "stats" && (
-                    <StatsPanel
-                      statsGroups={statsGroups}
-                      match={data.match}
-                      t={t}
-                    />
-                  )}
-
-                  {/* TAB: LINEUPS */}
-                  {tab === "lineups" && (
-                    <LineupsPanel
-                      lineups={lineups}
-                      match={data.match}
-                      language={language}
-                      t={t}
-                    />
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="p-6 md:p-8">
+              <div className="p-6">
                 <AnalyticsSkeleton />
               </div>
             )}
@@ -402,10 +286,32 @@ export function MatchAnalytics({
   );
 }
 
+function TabButton({ active, onClick, label }: any) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "relative flex flex-1 items-center justify-center py-2.5 rounded-xl text-[13px] font-bold transition-all duration-300",
+        active ? "text-[#020705]" : "text-white/50 hover:text-white"
+      )}
+    >
+      {active && (
+        <motion.span
+          layoutId="nav-tab-bg"
+          className="absolute inset-0 rounded-xl bg-[#10b981] shadow-[0_0_24px_rgba(16,185,129,.3)]"
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
+      )}
+      <span className="relative z-10">{label}</span>
+    </button>
+  );
+}
+
 /* =========================================================================
- * 1. HERO BANNER
+ * 1. HEADER
  * ========================================================================= */
-function MatchHero({ match, language, number, score, t }: any) {
+function MatchHeader({ match, language, number, score, t }: any) {
   const home = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const away = teamName(language, match.awayTeam.id, match.awayTeam.name);
   const finished = ["FINISHED", "FT"].includes(String(match.status));
@@ -416,32 +322,54 @@ function MatchHero({ match, language, number, score, t }: any) {
         new Date(match.kickoffAt).getTime() <= Date.now()));
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-brand/20 bg-[radial-gradient(circle_at_50%_0%,rgba(32,184,121,.22),transparent_58%),linear-gradient(145deg,#123424,#09130e_65%)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,.1)] md:p-7">
-      <div className="flex items-center justify-between text-[10px] font-black tracking-[.18em] text-brand">
-        <span className="inline-flex items-center gap-2">
-          <BarChart3 size={14} /> {t("اطلاعات و آمار بازی", "MATCH INTELLIGENCE")}
+    <div className="relative overflow-hidden rounded-[24px] border border-[#1a382d] bg-gradient-to-b from-[#091610] to-[#050b09] p-5 md:p-6 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
+      <div className="flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-widest text-[#10b981] uppercase">
+          <TrendingUp size={12} />
+          {t("MATCH INTELLIGENCE", "MATCH INTELLIGENCE")}
         </span>
-        <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 tracking-normal text-white/55">
-          {match.leagueCode ?? "FOOTBALL"}
+        <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-white/60">
+          {match.leagueCode ?? "FRIENDLY"}
         </span>
       </div>
-      <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-        <Team team={match.homeTeam} name={home} />
-        <div>
-          <div className="text-[2.65rem] font-black leading-none tracking-[-.08em] md:text-5xl">
+
+      <div className="mt-6 flex items-center justify-between">
+        <div className="flex flex-col items-center flex-1">
+          <div className="h-14 w-14 rounded-full border border-white/10 bg-black/30 flex items-center justify-center p-2 mb-2 shadow-[0_4px_20px_rgba(0,0,0,.4)]">
+            <Image
+              src={match.homeTeam.logoUrl ?? "/icon.png"}
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <span className="text-xs font-bold text-white text-center">{home}</span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center px-4">
+          <div className="text-[32px] font-black tracking-tight text-white leading-none mb-1">
             {score(match.homeGoals, match.awayGoals)}
           </div>
-          <Status
-            match={match}
-            live={live}
-            finished={finished}
-            number={number}
-          />
+          <Status match={match} live={live} finished={finished} number={number} />
         </div>
-        <Team team={match.awayTeam} name={away} />
+
+        <div className="flex flex-col items-center flex-1">
+          <div className="h-14 w-14 rounded-full border border-white/10 bg-black/30 flex items-center justify-center p-2 mb-2 shadow-[0_4px_20px_rgba(0,0,0,.4)]">
+            <Image
+              src={match.awayTeam.logoUrl ?? "/icon.png"}
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <span className="text-xs font-bold text-white text-center">{away}</span>
+        </div>
       </div>
-      <div className="mt-8 flex items-center justify-center gap-2 text-xs text-white/50">
-        <CalendarDays size={14} className="text-brand" />{" "}
+      
+      <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] text-white/40 font-medium">
+        <CalendarDays size={12} className="text-white/30" />
         <LocalDateTime
           value={match.kickoffAt}
           locale={language === "fa" ? "fa-IR" : "en-GB"}
@@ -451,191 +379,269 @@ function MatchHero({ match, language, number, score, t }: any) {
   );
 }
 
-function Team({ team, name }: any) {
-  return (
-    <div className="min-w-0">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] border border-white/10 bg-black/20 p-2 shadow-[0_12px_30px_rgba(0,0,0,.2)] md:h-20 md:w-20">
-        <Image
-          src={team.logoUrl ?? "/icon.png"}
-          alt=""
-          width={80}
-          height={80}
-          className="h-full w-full object-contain"
-        />
-      </div>
-      <p className="mt-3 truncate text-sm font-black md:text-base">{name}</p>
-    </div>
-  );
-}
-
 function Status({ match, live, finished, number }: any) {
   if (live)
     return (
-      <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-black text-red-200">
-        <CircleDot size={11} className="animate-pulse" /> LIVE{" "}
-        {match.elapsed != null && `${number(match.elapsed)}′`}
+      <div className="text-xs font-bold text-[#10b981] flex items-center gap-1 animate-pulse">
+        {match.elapsed != null && `${number(match.elapsed)}'`}
       </div>
     );
   if (finished)
     return (
-      <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-[10px] font-black text-brand">
-        <Check size={11} /> FT
+      <div className="text-[11px] font-bold text-white/40">
+        FT
       </div>
     );
   return (
-    <div className="mt-3 text-[10px] font-bold text-white/40">
+    <div className="text-[11px] font-bold text-white/40">
       {match.status}
     </div>
   );
 }
 
 /* =========================================================================
- * 2. TIMELINE PANEL (Incidents)
+ * 2. LINEUPS VIEW
  * ========================================================================= */
-function TimelinePanel({ incidents, match, t }: any) {
-  if (!incidents || incidents.length === 0) {
+function LineupsView({ lineups, match, language, t, incidents }: any) {
+  const [selectedSide, setSelectedSide] = useState<"home" | "away">("home");
+
+  if (!lineups || (!lineups.home.players.length && !lineups.away.players.length)) {
     return (
-      <div className="rounded-[2rem] border border-dashed border-white/10 p-12 text-center text-sm text-white/40">
-        {t(
-          "هیچ رویدادی تاکنون ثبت نشده است. گل‌ها، کارت‌ها و تعویض‌ها پس از آغاز مسابقه نمایش داده می‌شوند.",
-          "No events recorded yet. Goals, cards, and substitutions will stream here.",
-        )}
+      <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
+        {t("Lineups are not available yet.", "Lineups are not available yet.")}
       </div>
     );
   }
 
+  const activeLineup = selectedSide === "home" ? lineups.home : lineups.away;
+  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
+  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
+  const formationStr = activeLineup.formation || "4-3-3";
+
   return (
-    <div className="max-w-2xl mx-auto rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-8">
-      <div className="relative border-l border-white/10 ml-4 pl-6 space-y-6">
-        {incidents.map((inc: LiveIncident) => (
-          <div key={inc.id} className="relative group">
-            {/* Minute Badge */}
-            <div className="absolute -left-[37px] top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#161b22] border border-white/20 text-[11px] font-black text-white group-hover:border-brand transition-colors">
-              {inc.time}′
-            </div>
-
-            <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-black/20 p-4 hover:border-white/15 transition-all">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">
-                  {inc.type === "goal" && "⚽"}
-                  {inc.type === "card" &&
-                    (inc.cardType === "red" ? "🟥" : "🟨")}
-                  {inc.type === "substitution" && "🔄"}
-                  {inc.type === "period" && "⏱"}
-                  {inc.type === "var" && "🖥️"}
-                  {inc.type === "injury_time" && "⏳"}
-                </span>
-
-                <div>
-                  <p className="text-sm font-black text-white">
-                    {inc.type === "goal" &&
-                      `${t("گل!", "Goal!")} ${inc.playerName || ""}`}
-                    {inc.type === "card" &&
-                      `${inc.cardType === "red" ? t("کارت قرمز", "Red Card") : t("کارت زرد", "Yellow Card")}: ${inc.playerName || ""}`}
-                    {inc.type === "substitution" && (
-                      <span>
-                        <strong className="text-emerald-400">
-                          {inc.playerInName}
-                        </strong>{" "}
-                        <span className="text-white/40">↓ {inc.playerOutName}</span>
-                      </span>
-                    )}
-                    {inc.type === "period" && inc.detail}
-                    {inc.type === "var" && `${t("بررسی داور ویدئویی", "VAR")}: ${inc.detail || ""}`}
-                    {inc.type === "injury_time" && `${t("وقت اضافه", "Added Time")}: +${inc.time}′`}
-                  </p>
-                  {inc.detail && inc.type !== "period" && inc.type !== "var" && (
-                    <p className="text-xs text-white/40 mt-0.5">{inc.detail}</p>
-                  )}
-                </div>
-              </div>
-
-              {inc.score && (
-                <div className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-black text-white">
-                  {inc.score.home} – {inc.score.away}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+    <div className="space-y-4">
+      {/* Team Selector */}
+      <div className="flex rounded-xl border border-[#1a382d] bg-[#07100c] p-1">
+        <button
+          onClick={() => setSelectedSide("home")}
+          className={cn(
+            "flex-1 py-2 text-xs font-bold rounded-lg transition-colors",
+            selectedSide === "home"
+              ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20"
+              : "text-white/40 hover:text-white/70"
+          )}
+        >
+          {homeName}
+        </button>
+        <button
+          onClick={() => setSelectedSide("away")}
+          className={cn(
+            "flex-1 py-2 text-xs font-bold rounded-lg transition-colors",
+            selectedSide === "away"
+              ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20"
+              : "text-white/40 hover:text-white/70"
+          )}
+        >
+          {awayName}
+        </button>
       </div>
+
+      <div className="flex justify-between items-center px-2">
+        <span className="text-xs font-bold text-white/40 uppercase tracking-wider">Formation</span>
+        <span className="text-xs font-bold text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">
+          {formationStr}
+        </span>
+      </div>
+
+      {/* Football Pitch */}
+      <div className="relative w-full aspect-[2/3] rounded-[24px] border border-[#1a382d] bg-[#0a1a12] overflow-hidden p-4">
+        {/* Pitch Lines (SVG overlay) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-20 pointer-events-none"
+          viewBox="0 0 100 150"
+          preserveAspectRatio="none"
+        >
+          {/* Outer line */}
+          <rect x="2" y="2" width="96" height="146" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Halfway line */}
+          <line x1="2" y1="75" x2="98" y2="75" stroke="#10b981" strokeWidth="0.5" />
+          {/* Center circle */}
+          <circle cx="50" cy="75" r="10" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          <circle cx="50" cy="75" r="0.5" fill="#10b981" />
+          
+          {/* Top Penalty Area */}
+          <rect x="20" y="2" width="60" height="20" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Top Goal Area */}
+          <rect x="35" y="2" width="30" height="8" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Top Penalty Arc */}
+          <path d="M 40 22 A 10 10 0 0 0 60 22" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Top Penalty Spot */}
+          <circle cx="50" cy="15" r="0.5" fill="#10b981" />
+
+          {/* Bottom Penalty Area */}
+          <rect x="20" y="128" width="60" height="20" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Bottom Goal Area */}
+          <rect x="35" y="140" width="30" height="8" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Bottom Penalty Arc */}
+          <path d="M 40 128 A 10 10 0 0 1 60 128" fill="none" stroke="#10b981" strokeWidth="0.5" />
+          {/* Bottom Penalty Spot */}
+          <circle cx="50" cy="135" r="0.5" fill="#10b981" />
+        </svg>
+
+        {/* Players on Pitch */}
+        <div className="absolute inset-0 p-4">
+          <PitchPlayers
+            players={activeLineup.players}
+            formation={formationStr}
+            incidents={incidents}
+            isHome={selectedSide === "home"}
+            isPersian={language === "fa"}
+          />
+        </div>
+      </div>
+
+      {/* Substitutes */}
+      {activeLineup.substitutes.length > 0 && (
+        <div className="mt-6">
+          <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 px-2">
+            {t("Substitutes", "Substitutes")}
+          </h4>
+          <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar px-2">
+            {activeLineup.substitutes.map((sub: any) => (
+              <SubPlayerCard key={sub.id} player={sub} incidents={incidents} isHome={selectedSide === "home"} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* =========================================================================
- * 3. STATS PANEL
- * ========================================================================= */
-function StatsPanel({ statsGroups, match, t }: any) {
-  if (!statsGroups || statsGroups.length === 0) {
-    return (
-      <div className="rounded-[2rem] border border-dashed border-white/10 p-12 text-center text-sm text-white/40">
-        {t(
-          "آمار دقیق بازی به زودی در دسترس قرار می‌گیرد.",
-          "Detailed match statistics are preparing or match has not begun.",
-        )}
-      </div>
-    );
+function parseFormation(formation: string) {
+  const parts = formation.split("-").map(Number);
+  if (parts.length === 3) return [1, parts[0], parts[1], parts[2]]; // e.g. 4-3-3 -> GK, DEF, MID, FWD
+  if (parts.length === 4) return [1, parts[0], parts[1], parts[2], parts[3]];
+  if (parts.length === 5) return [1, parts[0], parts[1], parts[2], parts[3], parts[4]];
+  return [1, 4, 3, 3]; // Default fallback
+}
+
+function PitchPlayers({ players, formation, incidents, isHome, isPersian }: any) {
+  // Simple heuristic to distribute players on grid rows
+  const rows = parseFormation(formation);
+  
+  // Try to use positions if available, otherwise fallback to formation count
+  let playersByRow: any[][] = Array.from({ length: rows.length }, () => []);
+  
+  if (players.length >= 11) {
+    let pIdx = 0;
+    // GK
+    playersByRow[0].push(players[0]);
+    pIdx++;
+    // Field players
+    for (let r = 1; r < rows.length; r++) {
+      for (let i = 0; i < rows[r]; i++) {
+        if (pIdx < players.length) {
+          playersByRow[r].push(players[pIdx]);
+          pIdx++;
+        }
+      }
+    }
+  } else {
+    // If not full lineup, just dump them all (fallback)
+    playersByRow = [players];
   }
 
+  // If away team, we might want to invert the rows so their GK is at top. 
+  // Wait, standard pitch view is home attacking top, away attacking bottom.
+  // We will always draw GK at bottom for the selected team, attacking top.
+  const displayRows = [...playersByRow].reverse();
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {statsGroups.map((group: LiveStatGroup, gIdx: number) => (
-        <div
-          key={gIdx}
-          className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-7"
-        >
-          <h4 className="text-xs font-black text-brand tracking-widest uppercase mb-6">
-            {group.groupName}
-          </h4>
-
-          <div className="space-y-5">
-            {group.items.map((stat, sIdx) => {
-              const hVal = Number((stat.homeValue ?? parseFloat(String(stat.home))) || 0);
-              const aVal = Number((stat.awayValue ?? parseFloat(String(stat.away))) || 0);
-              const total = hVal + aVal || 1;
-              const homePct = Math.round((hVal / total) * 100);
-
-              return (
-                <div key={sIdx} className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-white">{stat.home}</span>
-                    <span className="text-white/50">{stat.name}</span>
-                    <span className="text-white">{stat.away}</span>
-                  </div>
-
-                  {/* Comparative Progress Bar */}
-                  <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/10">
-                    <div
-                      style={{ width: `${homePct}%` }}
-                      className="bg-brand transition-all duration-500 rounded-l-full"
-                    />
-                    <div
-                      style={{ width: `${100 - homePct}%` }}
-                      className="bg-white/30 transition-all duration-500 rounded-r-full"
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+    <div className="w-full h-full flex flex-col justify-between items-center z-10 relative pointer-events-none">
+      {displayRows.map((rowPlayers, rIdx) => (
+        <div key={rIdx} className="w-full flex justify-around items-center">
+          {rowPlayers.map((p: any) => {
+            const pIncidents = incidents.filter(
+              (i: any) => i.isHome === isHome && (i.playerName === p.name || i.playerName === p.shortName || i.playerInName === p.name || i.playerOutName === p.name)
+            );
+            return (
+              <PlayerNode key={p.id} player={p} incidents={pIncidents} isPersian={isPersian} />
+            );
+          })}
         </div>
       ))}
     </div>
   );
 }
 
+function PlayerNode({ player, incidents, isPersian }: any) {
+  const name = player.shortName || player.name;
+  const truncName = name.length > 12 ? name.substring(0, 10) + ".." : name;
+
+  const goals = incidents.filter((i: any) => i.type === "goal" && (i.playerName === player.name || i.playerName === player.shortName));
+  const cards = incidents.filter((i: any) => i.type === "card" && (i.playerName === player.name || i.playerName === player.shortName));
+  const subOut = incidents.find((i: any) => i.type === "substitution" && (i.playerOutName === player.name || i.playerOutName === player.shortName));
+
+  return (
+    <div className="flex flex-col items-center pointer-events-auto w-14">
+      <div className="relative">
+        <div className="w-9 h-9 rounded-full border-[1.5px] border-[#10b981] bg-[#07100c] flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+           <span className="text-xs font-black text-white">{player.number || ""}</span>
+        </div>
+        {/* Badges container */}
+        <div className="absolute -top-2 -right-3 flex gap-0.5 z-10">
+          {goals.map((_: any, i: number) => (
+            <span key={`g-${i}`} className="text-sm drop-shadow-md">⚽</span>
+          ))}
+          {cards.map((c: any, i: number) => (
+            <span key={`c-${i}`} className="w-2.5 h-3.5 rounded-[1px] shadow-sm border border-black/20" style={{ backgroundColor: c.cardType === 'red' ? '#ef4444' : '#eab308' }} />
+          ))}
+          {subOut && <span className="text-[10px] bg-black/60 rounded p-0.5" title="Substituted Out">🔻</span>}
+        </div>
+      </div>
+      <div className="mt-1 px-1.5 py-0.5 rounded bg-black/50 border border-white/5 whitespace-nowrap overflow-hidden text-ellipsis w-full max-w-[64px] text-center">
+         <span className="text-[9px] font-bold text-white/90 drop-shadow-md block truncate" dir={isPersian ? "rtl" : "ltr"}>{truncName}</span>
+      </div>
+    </div>
+  );
+}
+
+function SubPlayerCard({ player, incidents, isHome }: any) {
+  const name = player.shortName || player.name;
+  const pIncidents = incidents.filter(
+    (i: any) => i.isHome === isHome && (i.playerName === player.name || i.playerName === player.shortName || i.playerInName === player.name || i.playerOutName === player.name)
+  );
+  const subIn = pIncidents.find((i: any) => i.type === "substitution" && (i.playerInName === player.name || i.playerInName === player.shortName));
+  const goals = pIncidents.filter((i: any) => i.type === "goal" && (i.playerName === player.name || i.playerName === player.shortName));
+  const cards = pIncidents.filter((i: any) => i.type === "card" && (i.playerName === player.name || i.playerName === player.shortName));
+
+  return (
+    <div className="flex-shrink-0 w-[100px] rounded-xl border border-[#1a382d] bg-[#07100c] p-2 flex flex-col items-center text-center snap-center relative">
+      <div className="w-8 h-8 rounded-full border border-white/10 bg-black/40 flex items-center justify-center mb-1.5">
+        <span className="text-[10px] font-bold text-white/50">{player.number || "-"}</span>
+      </div>
+      <span className="text-[10px] font-bold text-white truncate w-full">{name}</span>
+      <span className="text-[8px] text-white/40 uppercase">{player.position || "SUB"}</span>
+      
+      {(subIn || goals.length > 0 || cards.length > 0) && (
+        <div className="absolute -top-1 -right-1 flex gap-0.5 z-10 bg-black/60 rounded-full px-1 py-0.5 border border-white/5">
+           {subIn && <span className="text-[10px]">🔺</span>}
+           {goals.length > 0 && <span className="text-[10px]">⚽</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* =========================================================================
- * 4. LINEUPS PANEL
+ * 3. STATS VIEW
  * ========================================================================= */
-function LineupsPanel({ lineups, match, language, t }: any) {
-  if (!lineups) {
+function StatsView({ statsGroups, match, language, t, data, number, score }: any) {
+  if (!statsGroups || statsGroups.length === 0) {
     return (
-      <div className="rounded-[2rem] border border-dashed border-white/10 p-12 text-center text-sm text-white/40">
-        {t(
-          "ترکیب ابتدایی هنوز به صورت رسمی اعلام نشده است.",
-          "Starting lineups have not been announced yet.",
-        )}
+      <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
+        {t("Detailed statistics are not available.", "Detailed statistics are not available.")}
       </div>
     );
   }
@@ -643,352 +649,162 @@ function LineupsPanel({ lineups, match, language, t }: any) {
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
 
+  // Flatten for simple view if preferred, or group
+  const allStats = statsGroups.flatMap((g: any) => g.items);
+
+  // Filter out some key stats to show at top
+  const keyStatNames = ["Ball Possession", "Total Shots", "Shots On Goal"];
+  const possessionStat = allStats.find((s: any) => s.name.includes("Possession"));
+  const otherStats = allStats.filter((s: any) => !s.name.includes("Possession"));
+
   return (
-    <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Home Lineup */}
-      <div className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
-          <h4 className="font-black text-white text-base">{homeName}</h4>
-          {lineups.home.formation && (
-            <span className="text-xs font-bold text-brand bg-brand/10 px-2.5 py-1 rounded-md border border-brand/20">
-              {lineups.home.formation}
-            </span>
-          )}
-        </div>
-
-        <p className="text-[10px] font-black text-white/40 tracking-wider uppercase mb-3">
-          {t("ترکیب اصلی", "Starting XI")}
-        </p>
-        <ul className="space-y-2">
-          {lineups.home.players.map((p: any) => (
-            <li
-              key={p.id}
-              className="flex items-center justify-between text-xs p-2 rounded-xl bg-black/20 hover:bg-white/[.05] transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center font-bold text-[11px] text-white/90">
-                  {p.number || "-"}
-                </span>
-                <span className="font-bold text-white">{p.name}</span>
-              </div>
-              <span className="text-[10px] font-bold text-white/40 uppercase">
-                {p.position}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {lineups.home.substitutes.length > 0 && (
-          <>
-            <p className="text-[10px] font-black text-white/40 tracking-wider uppercase mt-6 mb-3">
-              {t("نیمکت‌نشینان", "Substitutes")}
-            </p>
-            <ul className="space-y-2">
-              {lineups.home.substitutes.map((p: any) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between text-xs p-2 rounded-xl bg-black/10 hover:bg-white/[.04] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="h-6 w-6 rounded-lg bg-white/5 flex items-center justify-center font-bold text-[11px] text-white/50">
-                      {p.number || "-"}
-                    </span>
-                    <span className="text-white/70">{p.name}</span>
-                  </div>
-                  <span className="text-[10px] text-white/30 uppercase">
-                    {p.position}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+    <div className="space-y-6 pb-6">
+      <div className="flex justify-between items-center px-4 mb-2">
+        <span className="text-[10px] font-bold text-white/40 uppercase">{homeName}</span>
+        <span className="text-[10px] font-bold text-white/40 uppercase">{awayName}</span>
       </div>
 
-      {/* Away Lineup */}
-      <div className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
-          <h4 className="font-black text-white text-base">{awayName}</h4>
-          {lineups.away.formation && (
-            <span className="text-xs font-bold text-brand bg-brand/10 px-2.5 py-1 rounded-md border border-brand/20">
-              {lineups.away.formation}
-            </span>
-          )}
+      {possessionStat && (
+        <div className="px-2">
+          <StatComparison stat={possessionStat} isHighlight={true} />
         </div>
+      )}
 
-        <p className="text-[10px] font-black text-white/40 tracking-wider uppercase mb-3">
-          {t("ترکیب اصلی", "Starting XI")}
-        </p>
-        <ul className="space-y-2">
-          {lineups.away.players.map((p: any) => (
-            <li
-              key={p.id}
-              className="flex items-center justify-between text-xs p-2 rounded-xl bg-black/20 hover:bg-white/[.05] transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center font-bold text-[11px] text-white/90">
-                  {p.number || "-"}
-                </span>
-                <span className="font-bold text-white">{p.name}</span>
-              </div>
-              <span className="text-[10px] font-bold text-white/40 uppercase">
-                {p.position}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {lineups.away.substitutes.length > 0 && (
-          <>
-            <p className="text-[10px] font-black text-white/40 tracking-wider uppercase mt-6 mb-3">
-              {t("نیمکت‌نشینان", "Substitutes")}
-            </p>
-            <ul className="space-y-2">
-              {lineups.away.substitutes.map((p: any) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between text-xs p-2 rounded-xl bg-black/10 hover:bg-white/[.04] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="h-6 w-6 rounded-lg bg-white/5 flex items-center justify-center font-bold text-[11px] text-white/50">
-                      {p.number || "-"}
-                    </span>
-                    <span className="text-white/70">{p.name}</span>
-                  </div>
-                  <span className="text-[10px] text-white/30 uppercase">
-                    {p.position}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+      <div className="bg-[#07100c] border border-[#1a382d] rounded-[24px] p-4 space-y-5">
+        {otherStats.slice(0, 10).map((stat: any, idx: number) => (
+          <StatComparison key={idx} stat={stat} />
+        ))}
       </div>
     </div>
   );
 }
+
+function StatComparison({ stat, isHighlight }: any) {
+  // Attempt to parse values
+  const homeStr = String(stat.home || "0").replace("%", "");
+  const awayStr = String(stat.away || "0").replace("%", "");
+  const hVal = Number(stat.homeValue ?? parseFloat(homeStr)) || 0;
+  const aVal = Number(stat.awayValue ?? parseFloat(awayStr)) || 0;
+  
+  const total = hVal + aVal || 1;
+  const hPct = (hVal / total) * 100;
+  const aPct = (aVal / total) * 100;
+
+  return (
+    <div className={cn("flex flex-col gap-2", isHighlight && "p-4 bg-[#07100c] border border-[#1a382d] rounded-[24px]")}>
+      <div className="flex justify-between items-end">
+        <span className="text-base font-bold text-white w-12">{stat.home}</span>
+        <span className={cn("text-[11px] font-bold text-white/50 uppercase tracking-wide", isHighlight && "text-[#10b981]")}>{stat.name}</span>
+        <span className="text-base font-bold text-white w-12 text-right">{stat.away}</span>
+      </div>
+      <div className="flex h-1.5 w-full rounded-full bg-white/5 overflow-hidden gap-1">
+        <div className="bg-gradient-to-r from-[#059669] to-[#10b981] h-full rounded-full transition-all" style={{ width: `${hPct}%` }} />
+        <div className="bg-gradient-to-l from-white/10 to-white/20 h-full rounded-full transition-all" style={{ width: `${aPct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 
 /* =========================================================================
- * 5. PREDICTIONS SUB-COMPONENTS
+ * 4. COMMENTARY / TIMELINE VIEW
  * ========================================================================= */
-function InsightCard({ data, topPrediction, maxCount, number, t }: any) {
-  const share = topPrediction
-    ? Math.round((topPrediction.count / Math.max(data.total, 1)) * 100)
-    : 0;
+function CommentaryView({ incidents, match, language, t }: any) {
+  if (!incidents || incidents.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
+        {t("No events recorded yet.", "No events recorded yet.")}
+      </div>
+    );
+  }
+
+  // Sort incidents by time descending
+  const sorted = [...incidents].sort((a: any, b: any) => (b.time || 0) - (a.time || 0));
+
   return (
-    <div className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-7">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-black tracking-[.18em] text-white/40">
-            {t("نبض جامعه", "COMMUNITY PULSE")}
-          </p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight">
-            {t("پیش‌بینی‌ها زنده‌اند", "The crowd has spoken")}
-          </h2>
-        </div>
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand/10 text-brand">
-          <Sparkles size={19} />
-        </span>
+    <div className="relative py-4 pb-20">
+      {/* Center Timeline line */}
+      <div className="absolute left-1/2 top-4 bottom-4 w-px bg-gradient-to-b from-[#10b981]/50 via-[#10b981]/20 to-transparent -translate-x-1/2" />
+
+      <div className="space-y-6">
+        {sorted.map((inc: any, idx: number) => {
+          const isHome = inc.isHome;
+          
+          if (inc.type === "period" || inc.type === "injury_time") {
+             return (
+               <div key={inc.id || idx} className="flex justify-center relative z-10 my-6">
+                 <span className="bg-[#07100c] border border-[#1a382d] text-white/60 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
+                   {inc.detail || inc.type} {inc.time ? `${inc.time}'` : ''}
+                 </span>
+               </div>
+             );
+          }
+
+          return (
+            <div key={inc.id || idx} className={cn("flex w-full relative z-10", isHome ? "justify-start" : "justify-end")}>
+              
+              {/* Event Card */}
+              <div className={cn("w-[calc(50%-20px)]", isHome ? "pr-4 text-right" : "pl-4 text-left")}>
+                <div className={cn(
+                  "inline-flex flex-col gap-1 rounded-2xl border border-white/5 bg-[#07100c]/80 backdrop-blur-md p-3 shadow-lg hover:border-white/10 transition-colors max-w-full",
+                  isHome ? "items-end" : "items-start"
+                )}>
+                  
+                  <div className={cn("flex items-center gap-2", isHome ? "flex-row-reverse" : "flex-row")}>
+                     <IncidentIcon type={inc.type} cardType={inc.cardType} />
+                     <span className="text-[13px] font-bold text-white truncate max-w-[120px]">
+                       {inc.type === "substitution" ? inc.playerInName : (inc.playerName || "Unknown")}
+                     </span>
+                  </div>
+                  
+                  {inc.type === "substitution" && (
+                    <div className={cn("flex items-center gap-1 text-[11px] text-white/40", isHome ? "flex-row-reverse" : "flex-row")}>
+                       <span>Out:</span> <span>{inc.playerOutName}</span>
+                    </div>
+                  )}
+
+                  {inc.score && inc.type === "goal" && (
+                    <div className="mt-1 bg-[#10b981]/10 border border-[#10b981]/20 text-[#10b981] text-[11px] font-bold px-2 py-0.5 rounded">
+                      {inc.score.home} - {inc.score.away}
+                    </div>
+                  )}
+
+                  {inc.detail && inc.type !== "substitution" && (
+                     <span className="text-[10px] text-white/40 mt-0.5 block">{inc.detail}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Center Node */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                 <div className="w-8 h-8 rounded-full bg-[#050b09] border border-[#10b981]/30 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.2)] z-10">
+                   <span className="text-[10px] font-black text-[#10b981]">{inc.time}'</span>
+                 </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <div className="mt-7 grid grid-cols-3 gap-2">
-        <Metric
-          icon={<Users size={15} />}
-          value={number(data.total)}
-          label={t("پیش‌بینی", "PREDICTIONS")}
-        />
-        <Metric
-          icon={<Trophy size={15} />}
-          value={data.locked ? number(data.averagePoints) : "—"}
-          label={t("میانگین امتیاز", "AVG POINTS")}
-        />
-        <Metric
-          icon={<Flame size={15} />}
-          value={`${share}%`}
-          label={t("تمرکز اول", "TOP PICK")}
-        />
-      </div>
-      {topPrediction ? (
-        <div className="mt-5 rounded-2xl border border-brand/20 bg-brand/[.07] p-4">
-          <div className="flex items-center justify-between text-xs text-white/55">
-            <span>{t("محبوب‌ترین نتیجه", "Most popular score")}</span>
-            <b className="text-brand">
-              {number(topPrediction.count)} {t("رأی", "votes")}
-            </b>
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <strong className="text-3xl font-black">
-              {topPrediction.score.replace("-", " – ")}
-            </strong>
-            <span className="text-xs text-brand">
-              {share}% {t("از جامعه", "of the crowd")}
-            </span>
-          </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/25">
-            <motion.div
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: Math.min(1, topPrediction.count / maxCount) }}
-              style={{ transformOrigin: "left" }}
-              className="h-full rounded-full bg-brand"
-            />
-          </div>
-        </div>
-      ) : (
-        <EmptyState t={t} />
-      )}
     </div>
   );
 }
 
-function Metric({ icon, value, label }: any) {
-  return (
-    <div className="rounded-2xl border border-white/[.06] bg-black/15 p-3">
-      <span className="text-brand">{icon}</span>
-      <b className="mt-1 block text-xl font-black">{value}</b>
-      <small className="text-[9px] font-bold tracking-wide text-white/40">
-        {label}
-      </small>
-    </div>
-  );
-}
-
-function Distribution({ data, maxCount, number, t }: any) {
-  return (
-    <section className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-7">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-black tracking-[.18em] text-brand">
-            {t("نقشه پیش‌بینی", "PREDICTION MAP")}
-          </p>
-          <h2 className="mt-2 text-xl font-black">
-            {t("توزیع نتایج", "Score distribution")}
-          </h2>
-        </div>
-        <span className="text-xs text-white/35">
-          {number(data.total)} {t("پیش‌بینی", "total")}
-        </span>
-      </div>
-      {data.distribution.length ? (
-        <div className="mt-6 space-y-3">
-          {data.distribution.map((item: any) => (
-            <DistributionRow
-              key={item.score}
-              item={item}
-              maxCount={maxCount}
-              total={data.total}
-            />
-          ))}
-        </div>
-      ) : (
-        <EmptyState t={t} />
-      )}
-    </section>
-  );
-}
-
-function DistributionRow({ item, maxCount, total }: any) {
-  const ratio = item.count / maxCount;
-  const percentage = Math.round((item.count / Math.max(total, 1)) * 100);
-  return (
-    <div className="grid grid-cols-[3.2rem_1fr_2.6rem] items-center gap-3">
-      <b className="rounded-xl border border-white/[.07] bg-black/20 px-2 py-2 text-center text-sm">
-        {item.score.replace("-", " – ")}
-      </b>
-      <div className="h-3 overflow-hidden rounded-full bg-white/[.06]">
-        <motion.div
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: ratio }}
-          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-          style={{ transformOrigin: "left" }}
-          className="h-full rounded-full bg-gradient-to-r from-brand to-cyan-300 shadow-[0_0_18px_rgba(32,184,121,.35)]"
-        />
-      </div>
-      <span className="text-end text-xs font-black text-white/55">
-        {percentage}%
-      </span>
-    </div>
-  );
-}
-
-function UserPredictions({ users, number, score, t }: any) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? users : users.slice(0, 6);
-  return (
-    <section className="rounded-[2rem] border border-white/[.08] bg-white/[.035] p-5 md:p-7">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[10px] font-black tracking-[.18em] text-brand">
-            {t("اتاق رختکن", "THE LOCKER ROOM")}
-          </p>
-          <h2 className="mt-2 text-xl font-black">
-            {t("پیش‌بینی کاربران", "Player predictions")}
-          </h2>
-        </div>
-        <span className="text-xs text-white/35">
-          {number(users.length)} {t("بازیکن", "players")}
-        </span>
-      </div>
-      <div className="mt-5 space-y-2">
-        {shown.length ? (
-          shown.map((user: any, index: number) => (
-            <motion.div
-              key={`${user.userId ?? user.username}-${index}`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(index, 6) * 0.04 }}
-              className="group flex items-center gap-3 rounded-2xl border border-white/[.05] bg-black/15 px-3 py-2.5 transition hover:border-brand/25 hover:bg-brand/[.05]"
-            >
-              <UserAvatar
-                name={user.username}
-                avatarUrl={user.avatarUrl}
-                isDefendingChampion={user.isDefendingChampion}
-                className="h-9 w-9 text-[10px]"
-              />
-              <span className="min-w-0 flex-1 truncate text-sm font-bold">
-                {user.username}
-              </span>
-              <span className="rounded-xl border border-brand/20 bg-brand/10 px-2.5 py-1 text-sm font-black text-brand">
-                {score(user.homeGoals, user.awayGoals)}
-              </span>
-              <span className="hidden w-12 text-end text-[10px] font-bold text-white/40 sm:block">
-                {user.points == null ? "—" : `${number(user.points)} pts`}
-              </span>
-            </motion.div>
-          ))
-        ) : (
-          <EmptyState t={t} />
-        )}
-      </div>
-      {users.length > 6 && (
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="mt-4 inline-flex items-center gap-2 text-xs font-black text-brand"
-        >
-          {expanded ? t("نمایش کمتر", "Show less") : t("نمایش همه", "Show all")}
-          <ChevronDown size={14} className={expanded ? "rotate-180" : ""} />
-        </button>
-      )}
-    </section>
-  );
-}
-
-function EmptyState({ t }: any) {
-  return (
-    <div className="mt-5 rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-white/35">
-      {t("هنوز داده‌ای برای نمایش نیست.", "No data to show yet.")}
-    </div>
-  );
+function IncidentIcon({ type, cardType }: any) {
+  if (type === "goal") return <span className="text-base drop-shadow-md">⚽</span>;
+  if (type === "substitution") return <span className="text-base text-white/60">🔄</span>;
+  if (type === "card") {
+    if (cardType === "red") return <span className="w-3 h-4 rounded-sm bg-[#ef4444] border border-white/20 shadow-md inline-block"></span>;
+    return <span className="w-3 h-4 rounded-sm bg-[#eab308] border border-white/20 shadow-md inline-block"></span>;
+  }
+  return <CircleDot size={14} className="text-white/40" />;
 }
 
 function AnalyticsSkeleton() {
   return (
-    <div className="animate-pulse space-y-5">
-      <div className="h-10 w-1/3 rounded-xl bg-white/10" />
-      <div className="h-56 rounded-[2rem] bg-white/[.06]" />
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="h-72 rounded-[2rem] bg-white/[.06]" />
-        <div className="h-72 rounded-[2rem] bg-white/[.06]" />
-      </div>
+    <div className="animate-pulse space-y-6">
+      <div className="h-32 rounded-[24px] bg-white/[.02]" />
+      <div className="h-12 rounded-xl bg-white/[.02]" />
+      <div className="h-64 rounded-[24px] bg-white/[.02]" />
     </div>
   );
 }
