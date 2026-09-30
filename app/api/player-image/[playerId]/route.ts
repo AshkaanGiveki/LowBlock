@@ -5,12 +5,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ teamId: string }> },
+  { params }: { params: Promise<{ playerId: string }> },
 ) {
-  const { teamId } = await params;
-  const cleanTeamId = String(teamId || "").replace(/\.png$/i, "").trim();
+  const { playerId } = await params;
+  const cleanId = String(playerId || "").replace(/\.png$/i, "").trim();
 
-  if (!cleanTeamId || !/^\d+$/.test(cleanTeamId) || cleanTeamId === "0") {
+  if (!cleanId || !/^\d+$/.test(cleanId) || cleanId === "0") {
     return new NextResponse(null, { status: 404 });
   }
 
@@ -19,8 +19,8 @@ export async function GET(
   // 1. Try SportsAPI if API key is provided
   if (apiKey) {
     try {
-      const imageUrl = `https://v2.football.sportsapipro.com/images/teams/${cleanTeamId}`;
-      const response = await fetch(imageUrl, {
+      const sportsApiUrl = `https://v2.football.sportsapipro.com/images/players/${cleanId}`;
+      const response = await fetch(sportsApiUrl, {
         headers: { "x-api-key": apiKey },
         signal: AbortSignal.timeout(4000),
         next: { revalidate: 2592000 },
@@ -44,9 +44,9 @@ export async function GET(
     }
   }
 
-  // 2. Direct fallback to Sofascore team image CDN (bypassing hotlink protection and client ISP filtering)
+  // 2. Direct fallback to Sofascore player image CDN (bypassing hotlink protection and client ISP filtering)
   try {
-    const sofascoreUrl = `https://img.sofascore.com/api/v1/team/${cleanTeamId}/image`;
+    const sofascoreUrl = `https://img.sofascore.com/api/v1/player/${cleanId}/image`;
     const response = await fetch(sofascoreUrl, {
       headers: {
         "User-Agent":

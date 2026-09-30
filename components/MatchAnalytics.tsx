@@ -599,6 +599,10 @@ function PlayerAvatar({
   const playerId = player.id ? String(player.id) : null;
   const showImage = Boolean(playerId && playerId !== "0" && !imgError);
 
+  useEffect(() => {
+    setImgError(false);
+  }, [playerId]);
+
   const sizeClasses = {
     sm: "w-8 h-8",
     md: "w-10 h-10",
@@ -615,7 +619,7 @@ function PlayerAvatar({
     >
       {showImage ? (
         <img
-          src={`https://img.sofascore.com/api/v1/player/${playerId}/image`}
+          src={`/api/player-image/${playerId}`}
           alt={player.name || "Player"}
           loading="lazy"
           className="w-full h-full object-cover object-top"
