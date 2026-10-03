@@ -20,6 +20,7 @@ export type CanonicalTeam = {
   name: string;
   faName?: string;
   logoUrl: string | null;
+  logo?: string | null;
   shortName?: string;
   code?: string;
 };

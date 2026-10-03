@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import {
   BarChart3,
@@ -22,12 +21,17 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  ArrowUp,
+  ArrowDown,
+  Tv,
+  Clock,
+  ShieldAlert,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
-import { LocalDateTime } from "@/components/LocalDateTime";
+import { LocalDateTime, LocalTime } from "@/components/LocalDateTime";
 import { TeamCrest } from "@/components/TeamCrest";
 import type {
   LiveMatchSnapshot,
@@ -58,10 +62,12 @@ type AnalyticsData = {
 export function MatchAnalytics({
   matchId,
   clubId,
+  initialMatch,
   onClose,
 }: {
   matchId: string;
   clubId?: string;
+  initialMatch?: any;
   onClose: () => void;
 }) {
   const { language, t } = useLanguage();
@@ -70,7 +76,6 @@ export function MatchAnalytics({
   const [visible, setVisible] = useState(true);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
-  const touchStartY = useRef<number | null>(null);
 
   const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
   const number = (value: number | null | undefined) =>
@@ -101,7 +106,7 @@ export function MatchAnalytics({
   }, [matchId, query]);
 
   useEffect(() => {
-    const status = String(data?.match?.status || "");
+    const status = String(data?.match?.status || initialMatch?.status || "");
     const shouldStream =
       Boolean(status) &&
       !["FINISHED", "CANCELLED", "POSTPONED", "VOID"].includes(status);
@@ -150,18 +155,18 @@ export function MatchAnalytics({
       if (eventSource) eventSource.close();
       setIsLiveConnected(false);
     };
-  }, [data?.match?.status, matchId]);
+  }, [data?.match?.status, initialMatch?.status, matchId]);
 
   const close = () => {
     setVisible(false);
     window.setTimeout(onClose, 280);
   };
 
+  const match = data?.match || initialMatch;
   const liveDetails = data?.liveDetails;
   const incidents = liveDetails?.incidents ?? [];
   const statsGroups = liveDetails?.stats ?? [];
   const lineups = liveDetails?.lineups ?? null;
-  const match = data?.match;
 
   return (
     <AnimatePresence>
@@ -181,14 +186,14 @@ export function MatchAnalytics({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
-            className="relative flex flex-col h-[94dvh] w-full max-w-[600px] overflow-hidden rounded-t-[32px] border border-[#1a382d] bg-[#050b09] text-white shadow-[0_-32px_120px_rgba(0,0,0,.8)]"
+            className="relative flex flex-col h-[94dvh] w-full max-w-[640px] overflow-hidden rounded-t-[32px] border border-[#1a382d] bg-[#050b09] text-white shadow-[0_-32px_120px_rgba(0,0,0,.85)]"
           >
             {/* Drawer Header Handle */}
             <div className="flex-shrink-0 z-30 flex h-14 items-center justify-between border-b border-white/[.04] bg-[#050b09]/80 px-6 backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className="h-1 w-10 rounded-full bg-white/20" />
                 {isLiveConnected && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#10b981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10b981] border border-[#10b981]/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#10b981]/10 px-2.5 py-0.5 text-[10px] font-bold text-[#10b981] border border-[#10b981]/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#10b981] animate-pulse" />
                     LIVE
                   </span>
@@ -204,7 +209,7 @@ export function MatchAnalytics({
               </button>
             </div>
 
-            {data && match ? (
+            {match ? (
               <div className="flex-1 overflow-y-auto overscroll-contain pb-12">
                 {/* Background glowing effects */}
                 <div className="pointer-events-none absolute -right-32 top-0 h-96 w-96 rounded-full bg-[#059669]/10 blur-[100px]" />
@@ -235,6 +240,7 @@ export function MatchAnalytics({
                       active={tab === "timeline"}
                       onClick={() => setTab("timeline")}
                       label={t("رویدادها", "Events")}
+                      badge={incidents.length > 0 ? formatNumber(incidents.length, language) : undefined}
                     />
                   </div>
 
@@ -284,13 +290,13 @@ export function MatchAnalytics({
   );
 }
 
-function TabButton({ active, onClick, label }: any) {
+function TabButton({ active, onClick, label, badge }: any) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "relative flex flex-1 items-center justify-center py-2.5 rounded-xl text-[13px] font-bold transition-all duration-300",
+        "relative flex flex-1 items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold transition-all duration-300",
         active ? "text-[#020705]" : "text-white/50 hover:text-white"
       )}
     >
@@ -301,23 +307,36 @@ function TabButton({ active, onClick, label }: any) {
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         />
       )}
-      <span className="relative z-10">{label}</span>
+      <span className="relative z-10 flex items-center gap-1.5">
+        {label}
+        {badge && (
+          <span className={cn(
+            "px-1.5 py-0.2 rounded-full text-[10px] font-extrabold",
+            active ? "bg-black/20 text-[#020705]" : "bg-white/10 text-white/70"
+          )}>
+            {badge}
+          </span>
+        )}
+      </span>
     </button>
   );
 }
 
 /* =========================================================================
- * 1. HEADER
+ * 1. HEADER WITH RESILIENT TEAM CRESTS
  * ========================================================================= */
 function MatchHeader({ match, language, number, score, t }: any) {
-  const home = teamName(language, match.homeTeam.id, match.homeTeam.name);
-  const away = teamName(language, match.awayTeam.id, match.awayTeam.name);
+  const home = teamName(language, match.homeTeam?.id, match.homeTeam?.name);
+  const away = teamName(language, match.awayTeam?.id, match.awayTeam?.name);
   const finished = ["FINISHED", "FT"].includes(String(match.status));
   const live =
     !finished &&
     (["LIVE", "SUSPENDED", "IN_PLAY"].includes(String(match.status)) ||
       (match.status === "SCHEDULED" &&
         new Date(match.kickoffAt).getTime() <= Date.now()));
+
+  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
+  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
 
   return (
     <div className="relative overflow-hidden rounded-[24px] border border-[#1a382d] bg-gradient-to-b from-[#091610] to-[#050b09] p-5 md:p-6 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
@@ -332,68 +351,69 @@ function MatchHeader({ match, language, number, score, t }: any) {
       </div>
 
       <div className="mt-6 flex items-center justify-between">
+        {/* Home Team */}
         <div className="flex flex-col items-center flex-1">
-          <div className="h-14 w-14 rounded-full border border-white/10 bg-black/30 flex items-center justify-center p-2 mb-2 shadow-[0_4px_20px_rgba(0,0,0,.4)]">
-            <Image
-              src={match.homeTeam.logoUrl ?? "/icon.png"}
-              alt=""
-              width={40}
-              height={40}
-              className="h-full w-full object-contain"
+          <div className="h-16 w-16 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-center p-2 mb-2 shadow-[0_4px_24px_rgba(0,0,0,.5)]">
+            <TeamCrest
+              name={match.homeTeam?.name || home}
+              logo={homeLogo}
+              className="h-12 w-12 object-contain"
             />
           </div>
-          <span className="text-xs font-bold text-white text-center">{home}</span>
+          <span className="text-xs font-bold text-white text-center line-clamp-2 max-w-[120px]">{home}</span>
         </div>
 
+        {/* Score & Status */}
         <div className="flex flex-col items-center justify-center px-4">
-          <div className="text-[32px] font-black tracking-tight text-white leading-none mb-1">
+          <div className="text-[34px] font-black tracking-tight text-white leading-none mb-1">
             {score(match.homeGoals, match.awayGoals)}
           </div>
           <Status match={match} live={live} finished={finished} number={number} />
         </div>
 
+        {/* Away Team */}
         <div className="flex flex-col items-center flex-1">
-          <div className="h-14 w-14 rounded-full border border-white/10 bg-black/30 flex items-center justify-center p-2 mb-2 shadow-[0_4px_20px_rgba(0,0,0,.4)]">
-            <Image
-              src={match.awayTeam.logoUrl ?? "/icon.png"}
-              alt=""
-              width={40}
-              height={40}
-              className="h-full w-full object-contain"
+          <div className="h-16 w-16 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-center p-2 mb-2 shadow-[0_4px_24px_rgba(0,0,0,.5)]">
+            <TeamCrest
+              name={match.awayTeam?.name || away}
+              logo={awayLogo}
+              className="h-12 w-12 object-contain"
             />
           </div>
-          <span className="text-xs font-bold text-white text-center">{away}</span>
+          <span className="text-xs font-bold text-white text-center line-clamp-2 max-w-[120px]">{away}</span>
         </div>
-      </div>
-      
-      <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] text-white/40 font-medium">
-        <CalendarDays size={12} className="text-white/30" />
-        <LocalDateTime
-          value={match.kickoffAt}
-          locale={language === "fa" ? "fa-IR" : "en-GB"}
-        />
       </div>
     </div>
   );
 }
 
 function Status({ match, live, finished, number }: any) {
-  if (finished || (match.elapsed != null && match.elapsed > 130))
+  const { language, t } = useLanguage();
+
+  if (live) {
+    const isRealisticElapsed = match.elapsed != null && match.elapsed > 0 && match.elapsed <= 130;
     return (
-      <div className="text-[11px] font-bold text-white/40">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold text-red-400 animate-pulse">
+        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+        LIVE {isRealisticElapsed && `(${number(match.elapsed)}')`}
+      </span>
+    );
+  }
+  if (finished) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[.04] px-2.5 py-0.5 text-[10px] font-bold text-white/50">
+        <Check size={10} className="text-[#10b981]" />
         FT
-      </div>
+      </span>
     );
-  if (live)
-    return (
-      <div className="text-xs font-bold text-[#10b981] flex items-center gap-1 animate-pulse">
-        {match.elapsed != null && match.elapsed > 0 && match.elapsed <= 130 ? `${number(match.elapsed)}'` : "LIVE"}
-      </div>
-    );
+  }
   return (
-    <div className="text-[11px] font-bold text-white/40">
-      {match.status}
-    </div>
+    <span className="text-[11px] font-medium text-white/40">
+      <LocalTime
+        value={match.kickoffAt}
+        locale={language === "fa" ? "fa-IR" : "en-GB"}
+      />
+    </span>
   );
 }
 
@@ -401,114 +421,94 @@ function Status({ match, live, finished, number }: any) {
  * 2. LINEUPS VIEW
  * ========================================================================= */
 function LineupsView({ lineups, match, language, t, incidents }: any) {
-  const [selectedSide, setSelectedSide] = useState<"home" | "away">("home");
+  const [activeSide, setActiveSide] = useState<"home" | "away">("home");
 
-  if (!lineups || (!lineups.home.players.length && !lineups.away.players.length)) {
+  if (!lineups || (!lineups.home?.players?.length && !lineups.away?.players?.length)) {
     return (
       <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
-        {t("ترکیب تیم‌ها هنوز اعلام نشده است.", "Lineups are not available yet.")}
+        {t("ترکیب این مسابقه هنوز اعلام نشده است.", "Lineups are not available yet.")}
       </div>
     );
   }
 
-  const activeLineup = selectedSide === "home" ? lineups.home : lineups.away;
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
-  const formationStr = activeLineup.formation || "4-3-3";
+
+  const currentTeam = activeSide === "home" ? lineups.home : lineups.away;
+  const isHome = activeSide === "home";
 
   return (
-    <div className="space-y-4">
-      {/* Team Selector */}
-      <div className="flex rounded-xl border border-[#1a382d] bg-[#07100c] p-1">
+    <div className="space-y-6">
+      <div className="flex rounded-xl bg-black/40 p-1 border border-white/5">
         <button
-          onClick={() => setSelectedSide("home")}
+          type="button"
+          onClick={() => setActiveSide("home")}
           className={cn(
-            "flex-1 py-2 text-xs font-bold rounded-lg transition-colors",
-            selectedSide === "home"
-              ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20"
-              : "text-white/40 hover:text-white/70"
+            "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+            activeSide === "home"
+              ? "bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30 shadow-sm"
+              : "text-white/40 hover:text-white"
           )}
         >
-          {homeName}
+          {homeName} {lineups.home?.formation ? `(${lineups.home.formation})` : ""}
         </button>
         <button
-          onClick={() => setSelectedSide("away")}
+          type="button"
+          onClick={() => setActiveSide("away")}
           className={cn(
-            "flex-1 py-2 text-xs font-bold rounded-lg transition-colors",
-            selectedSide === "away"
-              ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20"
-              : "text-white/40 hover:text-white/70"
+            "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+            activeSide === "away"
+              ? "bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30 shadow-sm"
+              : "text-white/40 hover:text-white"
           )}
         >
-          {awayName}
+          {awayName} {lineups.away?.formation ? `(${lineups.away.formation})` : ""}
         </button>
       </div>
 
-      <div className="flex justify-between items-center px-2">
-        <span className="text-xs font-bold text-white/40 uppercase tracking-wider">
-          {t("آرایش تیمی", "Formation")}
-        </span>
-        <span className="text-xs font-bold text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">
-          {formationStr}
-        </span>
-      </div>
+      {/* Starting XI */}
+      <div>
+        <div className="flex items-center justify-between px-2 mb-3">
+          <span className="text-xs font-bold text-white/50 uppercase tracking-wider">
+            {t("ترکیب اصلی", "Starting XI")}
+          </span>
+          <span className="text-[10px] font-bold text-white/30">
+            {currentTeam?.players?.length || 0} {t("بازیکن", "Players")}
+          </span>
+        </div>
 
-      {/* Football Pitch */}
-      <div className="relative w-full aspect-[2/3] rounded-[24px] border border-[#1a382d] bg-[#0a1a12] overflow-hidden p-4">
-        {/* Pitch Lines (SVG overlay) */}
-        <svg
-          className="absolute inset-0 w-full h-full opacity-20 pointer-events-none"
-          viewBox="0 0 100 150"
-          preserveAspectRatio="none"
-        >
-          {/* Outer line */}
-          <rect x="2" y="2" width="96" height="146" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Halfway line */}
-          <line x1="2" y1="75" x2="98" y2="75" stroke="#10b981" strokeWidth="0.5" />
-          {/* Center circle */}
-          <circle cx="50" cy="75" r="10" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          <circle cx="50" cy="75" r="0.5" fill="#10b981" />
-          
-          {/* Top Penalty Area */}
-          <rect x="20" y="2" width="60" height="20" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Top Goal Area */}
-          <rect x="35" y="2" width="30" height="8" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Top Penalty Arc */}
-          <path d="M 40 22 A 10 10 0 0 0 60 22" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Top Penalty Spot */}
-          <circle cx="50" cy="15" r="0.5" fill="#10b981" />
-
-          {/* Bottom Penalty Area */}
-          <rect x="20" y="128" width="60" height="20" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Bottom Goal Area */}
-          <rect x="35" y="140" width="30" height="8" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Bottom Penalty Arc */}
-          <path d="M 40 128 A 10 10 0 0 1 60 128" fill="none" stroke="#10b981" strokeWidth="0.5" />
-          {/* Bottom Penalty Spot */}
-          <circle cx="50" cy="135" r="0.5" fill="#10b981" />
-        </svg>
-
-        {/* Players on Pitch */}
-        <div className="absolute inset-0 p-4">
-          <PitchPlayers
-            players={activeLineup.players}
-            formation={formationStr}
-            incidents={incidents}
-            isHome={selectedSide === "home"}
-            isPersian={language === "fa"}
-          />
+        <div className="divide-y divide-white/[.04] rounded-2xl border border-[#1a382d] bg-[#07100c] overflow-hidden">
+          {currentTeam?.players?.map((player: any) => (
+            <PlayerRow
+              key={player.id}
+              player={player}
+              isHome={isHome}
+              incidents={incidents}
+            />
+          ))}
         </div>
       </div>
 
       {/* Substitutes */}
-      {activeLineup.substitutes.length > 0 && (
-        <div className="mt-6">
-          <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 px-2">
-            {t("بازیکنان تعویضی", "Substitutes")}
-          </h4>
-          <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar px-2">
-            {activeLineup.substitutes.map((sub: any) => (
-              <SubPlayerCard key={sub.id} player={sub} incidents={incidents} isHome={selectedSide === "home"} />
+      {currentTeam?.substitutes?.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between px-2 mb-3">
+            <span className="text-xs font-bold text-white/50 uppercase tracking-wider">
+              {t("نیمکت‌نشینان", "Substitutes")}
+            </span>
+            <span className="text-[10px] font-bold text-white/30">
+              {currentTeam.substitutes.length} {t("بازیکن", "Players")}
+            </span>
+          </div>
+
+          <div className="divide-y divide-white/[.04] rounded-2xl border border-[#1a382d] bg-[#07100c] overflow-hidden">
+            {currentTeam.substitutes.map((player: any) => (
+              <PlayerRow
+                key={player.id}
+                player={player}
+                isHome={isHome}
+                incidents={incidents}
+              />
             ))}
           </div>
         </div>
@@ -517,180 +517,7 @@ function LineupsView({ lineups, match, language, t, incidents }: any) {
   );
 }
 
-function parseFormation(formation: string) {
-  const parts = formation.split("-").map(Number);
-  if (parts.length === 3) return [1, parts[0], parts[1], parts[2]]; // e.g. 4-3-3 -> GK, DEF, MID, FWD
-  if (parts.length === 4) return [1, parts[0], parts[1], parts[2], parts[3]];
-  if (parts.length === 5) return [1, parts[0], parts[1], parts[2], parts[3], parts[4]];
-  return [1, 4, 3, 3]; // Default fallback
-}
-
-function PitchPlayers({ players, formation, incidents, isHome, isPersian }: any) {
-  // Simple heuristic to distribute players on grid rows
-  const rows = parseFormation(formation);
-  
-  // Try to use positions if available, otherwise fallback to formation count
-  let playersByRow: any[][] = Array.from({ length: rows.length }, () => []);
-  
-  if (players.length >= 11) {
-    let pIdx = 0;
-    // GK
-    playersByRow[0].push(players[0]);
-    pIdx++;
-    // Field players
-    for (let r = 1; r < rows.length; r++) {
-      for (let i = 0; i < rows[r]; i++) {
-        if (pIdx < players.length) {
-          playersByRow[r].push(players[pIdx]);
-          pIdx++;
-        }
-      }
-    }
-  } else {
-    // If not full lineup, just dump them all (fallback)
-    playersByRow = [players];
-  }
-
-  // If away team, we might want to invert the rows so their GK is at top. 
-  // Wait, standard pitch view is home attacking top, away attacking bottom.
-  // We will always draw GK at bottom for the selected team, attacking top.
-  const displayRows = [...playersByRow].reverse();
-
-  return (
-    <div className="w-full h-full flex flex-col justify-between items-center z-10 relative pointer-events-none">
-      {displayRows.map((rowPlayers, rIdx) => (
-        <div key={rIdx} className="w-full flex justify-around items-center">
-          {rowPlayers.map((p: any) => {
-            const pIncidents = incidents.filter(
-              (i: any) => i.isHome === isHome && (i.playerName === p.name || i.playerName === p.shortName || i.playerInName === p.name || i.playerOutName === p.name)
-            );
-            return (
-              <PlayerNode key={p.id} player={p} incidents={pIncidents} isPersian={isPersian} />
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PlayerAvatar({
-  player,
-  size = "md",
-  className,
-}: {
-  player: { id?: number | string; name?: string; number?: string | number };
-  size?: "sm" | "md" | "lg";
-  className?: string;
-}) {
-  const [imgError, setImgError] = useState(false);
-  const playerId = player.id ? String(player.id) : null;
-  const showImage = Boolean(playerId && playerId !== "0" && !imgError);
-
-  useEffect(() => {
-    setImgError(false);
-  }, [playerId]);
-
-  const sizeClasses = {
-    sm: "w-8 h-8",
-    md: "w-10 h-10",
-    lg: "w-12 h-12",
-  }[size];
-
-  return (
-    <div
-      className={cn(
-        "relative rounded-full overflow-hidden border-[1.5px] border-[#10b981] bg-gradient-to-b from-[#162e22] to-[#07130c] shadow-[0_2px_8px_rgba(16,185,129,0.3)] flex items-center justify-center select-none",
-        sizeClasses,
-        className
-      )}
-    >
-      {showImage ? (
-        <img
-          src={`/api/player-image/${playerId}`}
-          alt={player.name || "Player"}
-          loading="lazy"
-          className="w-full h-full object-cover object-top"
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center font-black text-white/90 text-xs bg-[#0b1912]">
-          {player.number ? player.number : player.name ? player.name[0]?.toUpperCase() : "-"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PlayerNode({ player, incidents, isPersian }: any) {
-  const name = player.shortName || player.name;
-  const truncName = name.length > 13 ? name.substring(0, 11) + ".." : name;
-
-  const goals = incidents.filter(
-    (i: any) =>
-      i.type === "goal" &&
-      (i.playerName === player.name || i.playerName === player.shortName)
-  );
-  const cards = incidents.filter(
-    (i: any) =>
-      i.type === "card" &&
-      (i.playerName === player.name || i.playerName === player.shortName)
-  );
-  const subOut = incidents.find(
-    (i: any) =>
-      i.type === "substitution" &&
-      (i.playerOutName === player.name || i.playerOutName === player.shortName)
-  );
-
-  return (
-    <div className="flex flex-col items-center pointer-events-auto w-16 group transition-transform duration-150 hover:scale-105">
-      <div className="relative">
-        <PlayerAvatar player={player} size="md" />
-
-        {/* Jersey Number Badge (bottom corner) */}
-        {player.number && (
-          <span className="absolute -bottom-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-black/90 border border-[#10b981]/50 text-[9px] font-black text-[#10b981] flex items-center justify-center shadow-md">
-            {player.number}
-          </span>
-        )}
-
-        {/* Badges container */}
-        <div className="absolute -top-2 -right-2 flex gap-0.5 z-10">
-          {goals.map((_: any, i: number) => (
-            <span key={`g-${i}`} className="text-xs drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              ⚽
-            </span>
-          ))}
-          {cards.map((c: any, i: number) => (
-            <span
-              key={`c-${i}`}
-              className="w-2.5 h-3.5 rounded-[1px] shadow-sm border border-black/40 inline-block"
-              style={{ backgroundColor: c.cardType === "red" ? "#ef4444" : "#eab308" }}
-            />
-          ))}
-          {subOut && (
-            <span
-              className="text-[10px] bg-black/80 rounded-full px-0.5 shadow border border-white/10"
-              title="Substituted Out"
-            >
-              🔻
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="mt-1 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 shadow-lg whitespace-nowrap overflow-hidden text-ellipsis max-w-[68px] text-center">
-        <span
-          className="text-[10px] font-bold text-white/95 drop-shadow block truncate"
-          dir={isPersian ? "rtl" : "ltr"}
-        >
-          {truncName}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function SubPlayerCard({ player, incidents, isHome }: any) {
+function PlayerRow({ player, isHome, incidents }: any) {
   const name = player.shortName || player.name;
   const pIncidents = incidents.filter(
     (i: any) =>
@@ -698,56 +525,69 @@ function SubPlayerCard({ player, incidents, isHome }: any) {
       (i.playerName === player.name ||
         i.playerName === player.shortName ||
         i.playerInName === player.name ||
-        i.playerOutName === player.name)
-  );
-  const subIn = pIncidents.find(
-    (i: any) =>
-      i.type === "substitution" &&
-      (i.playerInName === player.name || i.playerInName === player.shortName)
-  );
-  const goals = pIncidents.filter(
-    (i: any) =>
-      i.type === "goal" &&
-      (i.playerName === player.name || i.playerName === player.shortName)
-  );
-  const cards = pIncidents.filter(
-    (i: any) =>
-      i.type === "card" &&
-      (i.playerName === player.name || i.playerName === player.shortName)
+        i.playerInName === player.shortName ||
+        i.playerOutName === player.name ||
+        i.playerOutName === player.shortName)
   );
 
   return (
-    <div className="flex-shrink-0 w-[84px] rounded-2xl border border-white/10 bg-[#07130c]/90 hover:bg-[#0c1f14] transition-colors p-2.5 flex flex-col items-center text-center snap-center relative shadow-sm">
-      <div className="relative mb-1.5">
-        <PlayerAvatar player={player} size="md" />
-        {player.number && (
-          <span className="absolute -bottom-1 -left-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-black/90 border border-white/20 text-[8px] font-black text-white/70 flex items-center justify-center">
-            {player.number}
+    <div className="flex items-center justify-between p-3.5 hover:bg-white/[.02] transition-colors">
+      <div className="flex items-center gap-3">
+        <span className="w-6 text-center text-xs font-mono font-bold text-white/30">
+          {player.number || "—"}
+        </span>
+        <span className="text-xs font-medium text-white/90">{name}</span>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        {pIncidents.map((inc: any, i: number) => {
+          if (inc.type === "goal") {
+            return (
+              <span key={i} className="text-xs" title={`Goal ${inc.time}'`}>
+                ⚽
+              </span>
+            );
+          }
+          if (inc.type === "card") {
+            return (
+              <span
+                key={i}
+                className={cn(
+                  "w-2.5 h-3.5 rounded-sm inline-block shadow-sm",
+                  inc.cardType === "red" ? "bg-red-500" : "bg-amber-400"
+                )}
+                title={`Card ${inc.time}'`}
+              />
+            );
+          }
+          if (inc.type === "substitution") {
+            const isSubIn = inc.playerInName === player.name || inc.playerInName === player.shortName;
+            return (
+              <span
+                key={i}
+                className={cn(
+                  "text-[10px] font-bold px-1 py-0.2 rounded border",
+                  isSubIn
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                    : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                )}
+                title={`Sub ${inc.time}'`}
+              >
+                {isSubIn ? "↑" : "↓"} {inc.time}'
+              </span>
+            );
+          }
+          return null;
+        })}
+        {player.position && (
+          <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest pl-2">
+            {player.position}
           </span>
         )}
       </div>
-      <span className="text-[10px] font-bold text-white truncate w-full">{name}</span>
-      <span className="text-[8px] font-semibold text-[#10b981] uppercase tracking-wider mt-0.5">
-        {player.position || "SUB"}
-      </span>
-
-      {(subIn || goals.length > 0 || cards.length > 0) && (
-        <div className="absolute top-1.5 right-1.5 flex gap-0.5 z-10 bg-black/80 rounded-full px-1 py-0.5 border border-white/10 shadow">
-          {subIn && <span className="text-[9px]">🔺</span>}
-          {goals.length > 0 && <span className="text-[9px]">⚽</span>}
-          {cards.map((c: any, i: number) => (
-            <span
-              key={`sc-${i}`}
-              className="w-2 h-3 rounded-[1px] inline-block"
-              style={{ backgroundColor: c.cardType === "red" ? "#ef4444" : "#eab308" }}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
-
 
 /* =========================================================================
  * 3. STATS VIEW
@@ -789,18 +629,16 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
   const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
   const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
 
-  // Flatten for simple view if preferred, or group
   const allStats = statsGroups.flatMap((g: any) => g.items);
 
-  // Filter out key stats
   const possessionStat = allStats.find((s: any) => s.name?.includes("Possession"));
   const otherStats = allStats.filter((s: any) => !s.name?.includes("Possession"));
 
   return (
     <div className="space-y-6 pb-6">
       <div className="flex justify-between items-center px-4 mb-2">
-        <span className="text-[10px] font-bold text-white/40 uppercase">{homeName}</span>
-        <span className="text-[10px] font-bold text-white/40 uppercase">{awayName}</span>
+        <span className="text-[10px] font-bold text-white/50 uppercase tracking-wide">{homeName}</span>
+        <span className="text-[10px] font-bold text-white/50 uppercase tracking-wide">{awayName}</span>
       </div>
 
       {possessionStat && (
@@ -810,7 +648,7 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
       )}
 
       <div className="bg-[#07100c] border border-[#1a382d] rounded-[24px] p-4 space-y-5">
-        {otherStats.slice(0, 10).map((stat: any, idx: number) => (
+        {otherStats.slice(0, 12).map((stat: any, idx: number) => (
           <StatComparison key={idx} stat={stat} language={language} />
         ))}
       </div>
@@ -819,12 +657,11 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
 }
 
 function StatComparison({ stat, isHighlight, language }: any) {
-  // Attempt to parse values
   const homeStr = String(stat.home || "0").replace("%", "");
   const awayStr = String(stat.away || "0").replace("%", "");
   const hVal = Number(stat.homeValue ?? parseFloat(homeStr)) || 0;
   const aVal = Number(stat.awayValue ?? parseFloat(awayStr)) || 0;
-  
+
   const total = hVal + aVal || 1;
   const hPct = (hVal / total) * 100;
   const aPct = (aVal / total) * 100;
@@ -846,118 +683,458 @@ function StatComparison({ stat, isHighlight, language }: any) {
   );
 }
 
-
 /* =========================================================================
- * 4. COMMENTARY / TIMELINE VIEW
+ * 4. COMMENTARY / MATCH EVENTS 10000x OVERHAUL
  * ========================================================================= */
-function formatPeriodLabel(label: string, language: "fa" | "en") {
-  if (language !== "fa") return label;
-  const l = String(label || "").toLowerCase();
-  if (l.includes("1st half")) return "نیمه اول";
-  if (l.includes("2nd half")) return "نیمه دوم";
-  if (l.includes("halftime") || l.includes("half time")) return "پایان نیمه اول";
-  if (l.includes("ended") || l.includes("full time") || l.includes("ft")) return "پایان بازی";
-  if (l.includes("extra time")) return "وقت اضافه";
-  if (l.includes("injury")) return "وقت تلف‌شده";
-  return label;
-}
+type EventFilter = "all" | "goals" | "cards" | "subs";
 
 function CommentaryView({ incidents, match, language, t }: any) {
+  const [filter, setFilter] = useState<EventFilter>("all");
+
   if (!incidents || incidents.length === 0) {
     return (
       <div className="rounded-[24px] border border-dashed border-[#1a382d] p-12 text-center text-sm text-white/40">
-        {t("هنوز رویدادی ثبت نشده است.", "No events recorded yet.")}
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-[#10b981]/10 text-[#10b981]">
+          <Clock size={24} />
+        </div>
+        <p className="font-bold text-white/70 mb-1">{t("هنوز رویدادی ثبت نشده است", "No events recorded yet")}</p>
+        <p className="text-xs text-white/40">{t("اتفاقات بازی (گل‌ها، کارت‌ها، تعویض‌ها) به محض رخ دادن در اینجا نمایش داده می‌شوند.", "Goals, cards, and substitutions will stream here live as they happen.")}</p>
       </div>
     );
   }
 
-  // Sort incidents by time descending
-  const sorted = [...incidents].sort((a: any, b: any) => (b.time || 0) - (a.time || 0));
+  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name);
+  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name);
+  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
+  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
+
+  // Counts for filter pills
+  const goalsCount = incidents.filter((i: any) => i.type === "goal").length;
+  const cardsCount = incidents.filter((i: any) => i.type === "card").length;
+  const subsCount = incidents.filter((i: any) => i.type === "substitution").length;
+
+  const filteredIncidents = incidents.filter((i: any) => {
+    if (filter === "goals") return i.type === "goal";
+    if (filter === "cards") return i.type === "card";
+    if (filter === "subs") return i.type === "substitution";
+    return true;
+  });
+
+  // Sort descending by time
+  const sorted = [...filteredIncidents].sort((a: any, b: any) => {
+    const timeDiff = (b.time || 0) - (a.time || 0);
+    if (timeDiff !== 0) return timeDiff;
+    return (b.addedTime || 0) - (a.addedTime || 0);
+  });
 
   return (
-    <div className="relative py-4 pb-20">
-      {/* Center Timeline line */}
-      <div className="absolute left-1/2 top-4 bottom-4 w-px bg-gradient-to-b from-[#10b981]/50 via-[#10b981]/20 to-transparent -translate-x-1/2" />
+    <div className="space-y-5 pb-16">
+      {/* Event Type Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <FilterPill
+          active={filter === "all"}
+          onClick={() => setFilter("all")}
+          label={t("همه", "All")}
+          count={incidents.length}
+        />
+        <FilterPill
+          active={filter === "goals"}
+          onClick={() => setFilter("goals")}
+          label={t("گل‌ها", "Goals")}
+          count={goalsCount}
+          icon="⚽"
+        />
+        <FilterPill
+          active={filter === "cards"}
+          onClick={() => setFilter("cards")}
+          label={t("کارت‌ها", "Cards")}
+          count={cardsCount}
+          icon="🟨"
+        />
+        <FilterPill
+          active={filter === "subs"}
+          onClick={() => setFilter("subs")}
+          label={t("تعویض‌ها", "Subs")}
+          count={subsCount}
+          icon="🔄"
+        />
+      </div>
 
-      <div className="space-y-6">
-        {sorted.map((inc: any, idx: number) => {
-          const isHome = inc.isHome;
-          
-          if (inc.type === "period" || inc.type === "injury_time") {
-             return (
-               <div key={inc.id || idx} className="flex justify-center relative z-10 my-6">
-                 <span className="bg-[#07100c] border border-[#1a382d] text-white/60 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
-                   {formatPeriodLabel(inc.detail || inc.type, language)} {inc.time ? `${inc.time}'` : ''}
-                 </span>
-               </div>
-             );
-          }
+      {/* Modern Streamlined Timeline */}
+      <div className="relative pt-2">
+        {/* Timeline Spine Line */}
+        <div className="absolute start-6 top-3 bottom-3 w-0.5 bg-gradient-to-b from-[#10b981]/50 via-emerald-500/20 to-transparent" />
 
-          return (
-            <div key={inc.id || idx} className={cn("flex w-full relative z-10", isHome ? "justify-start" : "justify-end")}>
-              
-              {/* Event Card */}
-              <div className={cn("w-[calc(50%-20px)]", isHome ? "pr-4 text-right" : "pl-4 text-left")}>
-                <div className={cn(
-                  "inline-flex flex-col gap-1 rounded-2xl border border-white/5 bg-[#07100c]/80 backdrop-blur-md p-3 shadow-lg hover:border-white/10 transition-colors max-w-full",
-                  isHome ? "items-end" : "items-start"
-                )}>
-                  
-                  <div className={cn("flex items-center gap-2", isHome ? "flex-row-reverse" : "flex-row")}>
-                     <IncidentIcon type={inc.type} cardType={inc.cardType} />
-                     <span className="text-[13px] font-bold text-white truncate max-w-[120px]">
-                       {inc.type === "substitution" ? inc.playerInName : (inc.playerName || t("نامشخص", "Unknown"))}
-                     </span>
-                  </div>
-                  
-                  {inc.type === "substitution" && (
-                    <div className={cn("flex items-center gap-1 text-[11px] text-white/40", isHome ? "flex-row-reverse" : "flex-row")}>
-                       <span>{t("خروج:", "Out:")}</span> <span>{inc.playerOutName}</span>
-                    </div>
-                  )}
+        <div className="space-y-4">
+          {sorted.map((inc: any, idx: number) => {
+            const isHome = inc.isHome;
+            const teamTitle = isHome ? homeName : awayName;
+            const teamCrestLogo = isHome ? homeLogo : awayLogo;
 
-                  {inc.score && inc.type === "goal" && (
-                    <div className="mt-1 bg-[#10b981]/10 border border-[#10b981]/20 text-[#10b981] text-[11px] font-bold px-2 py-0.5 rounded">
-                      {inc.score.home} - {inc.score.away}
-                    </div>
-                  )}
+            // Period Marker Banner
+            if (inc.type === "period") {
+              return (
+                <PeriodBanner
+                  key={inc.id || idx}
+                  detail={inc.detail}
+                  time={inc.time}
+                  language={language}
+                  t={t}
+                />
+              );
+            }
 
-                  {inc.detail && inc.type !== "substitution" && (
-                     <span className="text-[10px] text-white/40 mt-0.5 block">{inc.detail}</span>
-                  )}
+            // Stoppage Time Announcement
+            if (inc.type === "injury_time") {
+              return (
+                <InjuryTimeBanner
+                  key={inc.id || idx}
+                  time={inc.time}
+                  detail={inc.detail}
+                  language={language}
+                  t={t}
+                />
+              );
+            }
+
+            // Normal Match Event Card
+            return (
+              <div key={inc.id || idx} className="relative flex items-start gap-3 ps-2">
+                {/* Timeline Minute Node */}
+                <div className="relative z-10 flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-[#050b09] border border-[#10b981]/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                  <span className="text-[10px] font-black font-mono text-[#10b981]">
+                    {inc.time}
+                    {inc.addedTime ? `+${inc.addedTime}` : ""}
+                    '
+                  </span>
+                </div>
+
+                {/* Event Card Content */}
+                <div className="flex-1 min-w-0">
+                  <EventCard
+                    incident={inc}
+                    isHome={isHome}
+                    teamTitle={teamTitle}
+                    teamLogo={teamCrestLogo}
+                    language={language}
+                    t={t}
+                  />
                 </div>
               </div>
-
-              {/* Center Node */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-                 <div className="w-8 h-8 rounded-full bg-[#050b09] border border-[#10b981]/30 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.2)] z-10">
-                   <span className="text-[10px] font-black text-[#10b981]">{inc.time}'</span>
-                 </div>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-function IncidentIcon({ type, cardType }: any) {
-  if (type === "goal") return <span className="text-base drop-shadow-md">⚽</span>;
-  if (type === "substitution") return <span className="text-base text-white/60">🔄</span>;
-  if (type === "card") {
-    if (cardType === "red") return <span className="w-3 h-4 rounded-sm bg-[#ef4444] border border-white/20 shadow-md inline-block"></span>;
-    return <span className="w-3 h-4 rounded-sm bg-[#eab308] border border-white/20 shadow-md inline-block"></span>;
+function FilterPill({ active, onClick, label, count, icon }: any) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border",
+        active
+          ? "bg-[#10b981] border-[#10b981] text-[#020705] shadow-[0_0_18px_rgba(16,185,129,0.35)]"
+          : "bg-white/[.04] border-white/10 text-white/60 hover:text-white hover:border-white/20"
+      )}
+    >
+      {icon && <span className="text-xs">{icon}</span>}
+      <span>{label}</span>
+      <span className={cn(
+        "px-1.5 py-0.2 rounded-full text-[10px] font-extrabold",
+        active ? "bg-black/20 text-[#020705]" : "bg-white/10 text-white/50"
+      )}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function PeriodBanner({ detail, time, language, t }: any) {
+  const d = String(detail || "").toLowerCase();
+  let label = detail;
+  let isFullTime = false;
+  let isHalfTime = false;
+
+  if (d.includes("ft") || d.includes("ended") || d.includes("full time")) {
+    label = language === "fa" ? "پایان بازی (سوت پایان)" : "Full Time";
+    isFullTime = true;
+  } else if (d.includes("ht") || d.includes("halftime") || d.includes("half time")) {
+    label = language === "fa" ? "پایان نیمه اول" : "Half Time";
+    isHalfTime = true;
+  } else if (d.includes("2nd") || d.includes("second half")) {
+    label = language === "fa" ? "شروع نیمه دوم" : "Second Half Started";
+  } else if (d.includes("1st") || d.includes("kickoff") || d.includes("start")) {
+    label = language === "fa" ? "سوت آغاز بازی" : "Match Kickoff";
   }
-  return <CircleDot size={14} className="text-white/40" />;
+
+  return (
+    <div className="relative my-4 flex items-center justify-center">
+      <div className={cn(
+        "relative z-10 flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-black tracking-wide border shadow-lg backdrop-blur-md",
+        isFullTime
+          ? "border-amber-400/40 bg-gradient-to-r from-amber-950/50 via-[#0e1610] to-amber-950/50 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+          : isHalfTime
+            ? "border-emerald-500/40 bg-gradient-to-r from-emerald-950/50 via-[#07130c] to-emerald-950/50 text-[#10b981] shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+            : "border-white/10 bg-[#091510] text-white/70"
+      )}>
+        <Timer size={13} className={isFullTime ? "text-amber-400" : "text-[#10b981]"} />
+        <span>{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function InjuryTimeBanner({ time, detail, language, t }: any) {
+  return (
+    <div className="relative my-3 flex items-center justify-center">
+      <div className="relative z-10 inline-flex items-center gap-2 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3.5 py-1 text-xs font-bold text-yellow-300">
+        <Clock size={12} />
+        <span>
+          {time ? `+${time}' ` : ""}
+          {language === "fa" ? "وقت تلف‌شده" : "Added Time"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EventCard({ incident, isHome, teamTitle, teamLogo, language, t }: any) {
+  const type = incident.type;
+
+  // GOAL CARD
+  if (type === "goal") {
+    const isPen = incident.detail?.toLowerCase().includes("penalty");
+    const isOg = incident.detail?.toLowerCase().includes("own");
+
+    return (
+      <div className="overflow-hidden rounded-2xl border border-emerald-500/35 bg-gradient-to-br from-emerald-950/40 via-[#07160f] to-[#040e0a] p-3.5 shadow-[0_4px_24px_rgba(16,185,129,0.12)] hover:border-emerald-500/60 transition-colors">
+        {/* Team Chip & Category */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <TeamCrest name={teamTitle} logo={teamLogo} className="h-4 w-4 object-contain rounded" />
+            <span className="text-[11px] font-bold text-white/60 truncate">{teamTitle}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {incident.score && (
+              <span className="rounded-md bg-[#10b981] px-2 py-0.5 text-xs font-black text-[#020705] shadow-[0_0_12px_rgba(16,185,129,0.4)]">
+                {incident.score.home} - {incident.score.away}
+              </span>
+            )}
+            <span className={cn(
+              "rounded px-1.5 py-0.2 text-[10px] font-extrabold uppercase tracking-wide",
+              isPen
+                ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
+                : isOg
+                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                  : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+            )}>
+              {isPen ? (language === "fa" ? "پنالتی" : "PEN") : isOg ? (language === "fa" ? "گل به خودی" : "OG") : (language === "fa" ? "گل" : "GOAL")}
+            </span>
+          </div>
+        </div>
+
+        {/* Scorer Info */}
+        <div className="flex items-center gap-2.5">
+          <span className="text-xl drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">⚽</span>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-black text-white truncate">
+              {incident.playerName || t("گل بازیکن", "Goal")}
+            </h4>
+            {incident.assistName && (
+              <p className="text-[11px] text-white/50 flex items-center gap-1 mt-0.5">
+                <span className="text-emerald-400 font-bold">↳</span>
+                <span>{language === "fa" ? "پاس گل:" : "Assist:"}</span>
+                <span className="text-white/80 font-medium">{incident.assistName}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CARD EVENT
+  if (type === "card") {
+    const isRed = incident.cardType === "red";
+    const isYellowRed = incident.cardType === "yellow_red";
+
+    return (
+      <div className={cn(
+        "overflow-hidden rounded-2xl border p-3.5 transition-colors",
+        isRed
+          ? "border-red-500/40 bg-gradient-to-br from-red-950/35 via-[#110708] to-[#0a0405] shadow-[0_4px_24px_rgba(239,68,68,0.12)]"
+          : isYellowRed
+            ? "border-amber-500/40 bg-gradient-to-br from-amber-950/30 via-[#100c06] to-[#0a0703]"
+            : "border-amber-500/30 bg-gradient-to-br from-amber-950/25 via-[#0e0c06] to-[#070603] shadow-[0_4px_20px_rgba(234,179,8,0.08)]"
+      )}>
+        {/* Team Chip & Category */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <TeamCrest name={teamTitle} logo={teamLogo} className="h-4 w-4 object-contain rounded" />
+            <span className="text-[11px] font-bold text-white/60 truncate">{teamTitle}</span>
+          </div>
+
+          <span className={cn(
+            "rounded px-1.5 py-0.2 text-[10px] font-extrabold uppercase tracking-wide border",
+            isRed
+              ? "bg-red-500/20 text-red-300 border-red-500/30"
+              : isYellowRed
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                : "bg-amber-400/20 text-amber-300 border-amber-400/30"
+          )}>
+            {isRed
+              ? (language === "fa" ? "کارت قرمز مستقیم" : "RED CARD")
+              : isYellowRed
+                ? (language === "fa" ? "کارت زرد دوم (اخراج)" : "2ND YELLOW")
+                : (language === "fa" ? "کارت زرد" : "YELLOW CARD")}
+          </span>
+        </div>
+
+        {/* Player and Reason */}
+        <div className="flex items-center gap-3">
+          {/* Card Graphic */}
+          <div className="flex-shrink-0">
+            {isYellowRed ? (
+              <div className="relative w-5 h-6">
+                <span className="absolute top-0 start-0 w-3.5 h-5 rounded-[2px] bg-gradient-to-tr from-amber-500 to-yellow-300 border border-yellow-200/50 shadow-md transform -rotate-12" />
+                <span className="absolute top-0.5 start-2 w-3.5 h-5 rounded-[2px] bg-gradient-to-tr from-red-600 to-rose-400 border border-red-200/50 shadow-md transform rotate-12" />
+              </div>
+            ) : isRed ? (
+              <span className="block w-4 h-5.5 rounded-[2px] bg-gradient-to-tr from-red-600 to-rose-400 border border-red-200/50 shadow-[0_0_12px_rgba(239,68,68,0.5)]" />
+            ) : (
+              <span className="block w-4 h-5.5 rounded-[2px] bg-gradient-to-tr from-amber-500 to-yellow-300 border border-yellow-200/50 shadow-[0_0_12px_rgba(245,158,11,0.5)]" />
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-black text-white truncate">
+              {incident.playerName || t("بازیکن", "Player")}
+            </h4>
+            {incident.detail && (
+              <p className="text-[11px] text-white/45 truncate mt-0.5">
+                {incident.detail}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SUBSTITUTION CARD
+  if (type === "substitution") {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0c1410] to-[#060a08] p-3.5 shadow-md">
+        {/* Team Chip & Category */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <TeamCrest name={teamTitle} logo={teamLogo} className="h-4 w-4 object-contain rounded" />
+            <span className="text-[11px] font-bold text-white/60 truncate">{teamTitle}</span>
+          </div>
+
+          <span className="rounded bg-white/10 px-1.5 py-0.2 text-[10px] font-extrabold uppercase tracking-wide text-white/70 border border-white/10">
+            {language === "fa" ? "تعویض" : "SUB"}
+          </span>
+        </div>
+
+        {/* In and Out Players */}
+        <div className="space-y-1.5">
+          {/* Player In */}
+          <div className="flex items-center gap-2">
+            <span className="flex-shrink-0 grid h-5 w-5 place-items-center rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs border border-emerald-500/30">
+              <ArrowUp size={12} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="text-xs font-bold text-white truncate block">
+                {incident.playerInName || t("بازیکن ورودی", "Incoming Player")}
+              </span>
+            </div>
+            <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+              IN
+            </span>
+          </div>
+
+          {/* Player Out */}
+          {incident.playerOutName && (
+            <div className="flex items-center gap-2">
+              <span className="flex-shrink-0 grid h-5 w-5 place-items-center rounded-full bg-rose-500/20 text-rose-400 font-black text-xs border border-rose-500/30">
+                <ArrowDown size={12} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="text-xs font-medium text-white/60 truncate block">
+                  {incident.playerOutName}
+                </span>
+              </div>
+              <span className="text-[10px] font-extrabold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                OUT
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // VAR REVIEW CARD
+  if (type === "var") {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-violet-500/40 bg-gradient-to-br from-violet-950/35 via-[#0d0917] to-[#06040c] p-3.5 shadow-md">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <TeamCrest name={teamTitle} logo={teamLogo} className="h-4 w-4 object-contain rounded" />
+            <span className="text-[11px] font-bold text-white/60 truncate">{teamTitle}</span>
+          </div>
+
+          <span className="rounded bg-violet-500/20 text-violet-300 border border-violet-500/30 px-1.5 py-0.2 text-[10px] font-extrabold uppercase tracking-wide">
+            VAR
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-7 w-7 place-items-center rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30">
+            <Tv size={15} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-xs font-bold text-white truncate">
+              {language === "fa" ? "بررسی ویدئویی (VAR)" : "VAR Review"}
+            </h4>
+            <p className="text-[11px] text-white/50 truncate mt-0.5">
+              {incident.detail || (language === "fa" ? "بررسی تصمیم داور" : "Decision review")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // DEFAULT / OTHER CARD
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#07100c] p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <TeamCrest name={teamTitle} logo={teamLogo} className="h-4 w-4 object-contain rounded" />
+          <span className="text-[11px] font-bold text-white/60 truncate">{teamTitle}</span>
+        </div>
+        <span className="text-[10px] font-mono text-white/40">{type}</span>
+      </div>
+      <p className="mt-1 text-xs font-medium text-white/80">
+        {incident.playerName || incident.detail || t("رویداد بازی", "Match incident")}
+      </p>
+    </div>
+  );
 }
 
 function AnalyticsSkeleton() {
   return (
     <div className="animate-pulse space-y-6">
-      <div className="h-32 rounded-[24px] bg-white/[.02]" />
-      <div className="h-12 rounded-xl bg-white/[.02]" />
-      <div className="h-64 rounded-[24px] bg-white/[.02]" />
+      <div className="h-32 rounded-[24px] bg-white/[.04]" />
+      <div className="h-12 rounded-xl bg-white/[.04]" />
+      <div className="h-64 rounded-[24px] bg-white/[.04]" />
     </div>
   );
 }

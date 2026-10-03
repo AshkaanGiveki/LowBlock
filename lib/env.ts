@@ -41,7 +41,7 @@ const schema = z.object({
   QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
   APP_TIMEZONE: z.string().default("UTC"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-  FOOTBALL_DATA_PROVIDER: z.enum(["current", "sportsapi"]).default("current"),
+  FOOTBALL_DATA_PROVIDER: z.enum(["current", "sportsapi"]).default("sportsapi"),
   FOOTBALL_DATA_PROVIDER_SHADOW: z.enum(["none", "sportsapi"]).default("none"),
   FOOTBALL_API_KEY: z.string().optional(),
   FOOTBALL_API_BASE_URL: z

@@ -51,6 +51,7 @@ export function MatchAnalyticsCard({
       {open && started && (
         <MatchAnalytics
           matchId={match.providerMatchId}
+          initialMatch={match}
           onClose={() => {
             setOpen(false);
             closeMatchRoute();

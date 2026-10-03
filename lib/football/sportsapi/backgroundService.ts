@@ -89,6 +89,7 @@ export function startSportsApiBackgroundService(): void {
       console.error("[SportsApiBackground] syncSubscriptions error:", err),
     );
   }, 60_000);
+  refreshTimer.unref?.();
 }
 
 /**

@@ -20,6 +20,7 @@ export type LiveIncident = {
   playerName?: string;
   playerInName?: string;
   playerOutName?: string;
+  assistName?: string | null;
   cardType?: "yellow" | "red" | "yellow_red";
   score?: { home: number; away: number };
   detail?: string;
@@ -124,6 +125,12 @@ class MatchMonitorService {
       this.subscribeMatchChannels(matchId);
     }
     return snapshot;
+  }
+
+  public updateFromSnapshot(snapshot: LiveMatchSnapshot): void {
+    this.ensureInitialized();
+    this.snapshots.set(snapshot.matchId, snapshot);
+    this.broadcast(snapshot.matchId, snapshot);
   }
 
   public async loadSnapshotFromDb(matchId: string): Promise<LiveMatchSnapshot> {

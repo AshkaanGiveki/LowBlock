@@ -413,6 +413,7 @@ export function PredictionCard({
         {analyticsOpen && (
           <MatchAnalytics
             matchId={match.providerMatchId}
+            initialMatch={match}
             onClose={closeAnalytics}
           />
         )}

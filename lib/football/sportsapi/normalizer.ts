@@ -13,13 +13,14 @@ function normalizeStatus(status?: { code?: number; type?: string; description?: 
 
   const type = status.type?.toLowerCase();
   const desc = status.description?.toUpperCase();
+  const code = status.code;
 
-  if (type === "finished" || desc === "ENDED" || desc === "AWARDED" || desc === "WO") return "FINISHED";
-  if (type === "inprogress" || desc === "INPROGRESS" || desc === "1ST HALF" || desc === "2ND HALF" || desc === "HALFTIME") return "LIVE";
-  if (type === "postponed" || desc === "POSTPONED") return "POSTPONED";
-  if (type === "canceled" || desc === "CANCELED" || desc === "CANCELLED") return "VOID";
-  if (type === "suspended" || desc === "SUSPENDED") return "SUSPENDED";
-  if (type === "notstarted") return "SCHEDULED";
+  if (type === "finished" || desc === "ENDED" || desc === "FT" || desc === "AET" || desc === "AFTER ET" || desc === "AWARDED" || desc === "WO" || code === 100) return "FINISHED";
+  if (type === "inprogress" || desc === "INPROGRESS" || desc === "1ST HALF" || desc === "2ND HALF" || desc === "HALFTIME" || code === 6 || code === 7 || code === 31) return "LIVE";
+  if (type === "postponed" || desc === "POSTPONED" || code === 60) return "POSTPONED";
+  if (type === "canceled" || desc === "CANCELED" || desc === "CANCELLED" || code === 70) return "VOID";
+  if (type === "suspended" || desc === "SUSPENDED" || code === 50) return "SUSPENDED";
+  if (type === "notstarted" || code === 0) return "SCHEDULED";
 
   return "SCHEDULED";
 }
@@ -132,10 +133,28 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   let canonicalElapsed: number | null = null;
   if (canonicalStatus === "FINISHED") {
     canonicalElapsed = 90;
-  } else if (canonicalStatus === "LIVE" && rawEvent.time?.currentPeriodStartTimestamp) {
-    const calc = Math.floor((Date.now() / 1000 - rawEvent.time.currentPeriodStartTimestamp) / 60);
-    canonicalElapsed = Math.min(130, Math.max(1, calc));
+  } else if (canonicalStatus === "LIVE") {
+    const desc = String(rawEvent.status?.description || "").toLowerCase();
+    const isHalftime = (desc.includes("half") && !desc.includes("1st") && !desc.includes("2nd")) || rawEvent.status?.code === 31;
+    if (isHalftime) {
+      canonicalElapsed = 45;
+    } else {
+      const isSecondHalf = desc.includes("2nd") || rawEvent.lastPeriod === "period2" || rawEvent.status?.code === 7;
+      const baseMinutes = isSecondHalf ? 45 : 0;
+      const timestamp = rawEvent.time?.currentPeriodStartTimestamp || rawEvent.statusTime?.timestamp;
+      if (timestamp) {
+        const calc = baseMinutes + Math.floor((Date.now() / 1000 - timestamp) / 60);
+        canonicalElapsed = Math.min(130, Math.max(1, calc));
+      } else if (isSecondHalf) {
+        canonicalElapsed = 46;
+      } else {
+        canonicalElapsed = 1;
+      }
+    }
   }
+
+  const homeLogo = homeCanonical.logoUrl || resolveTeamLogo(rawEvent.homeTeam);
+  const awayLogo = awayCanonical.logoUrl || resolveTeamLogo(rawEvent.awayTeam);
 
   return {
     provider: "sportsapi",
@@ -151,7 +170,8 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
       id: Number(rawEvent.homeTeam?.id || 0),
       name: homeCanonical.name,
       faName: homeCanonical.faName,
-      logoUrl: homeCanonical.logoUrl || resolveTeamLogo(rawEvent.homeTeam),
+      logoUrl: homeLogo,
+      logo: homeLogo,
       shortName: rawEvent.homeTeam?.shortName,
       code: rawEvent.homeTeam?.nameCode,
     },
@@ -159,7 +179,8 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
       id: Number(rawEvent.awayTeam?.id || 0),
       name: awayCanonical.name,
       faName: awayCanonical.faName,
-      logoUrl: awayCanonical.logoUrl || resolveTeamLogo(rawEvent.awayTeam),
+      logoUrl: awayLogo,
+      logo: awayLogo,
       shortName: rawEvent.awayTeam?.shortName,
       code: rawEvent.awayTeam?.nameCode,
     },

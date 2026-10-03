@@ -15,7 +15,7 @@ export const COMPETITION_MAPPINGS: readonly CompetitionMappingEntry[] = [
     code: "GB1",
     apiSportsId: 39,
     sportsApiUniqueTournamentId: 17,
-    expectedCategories: ["England", "england", "UK"],
+    expectedCategories: ["England", "england", "UK", "United Kingdom"],
     slugs: ["premier-league"],
     aliases: ["Premier League", "English Premier League", "EPL"],
   },
@@ -419,6 +419,11 @@ function checkCategoryMatch(entry: CompetitionMappingEntry, tournament: any): bo
 
   return entry.expectedCategories.some((expected) => {
     const cleanExpected = cleanString(expected);
+    if (!cleanExpected) return false;
+    // For short codes (<= 3 chars, e.g. "uk"), only allow exact match to prevent "ukraine" matching "uk"
+    if (cleanExpected.length <= 3) {
+      return values.some((v) => v === cleanExpected);
+    }
     return values.some((v) => v === cleanExpected || v.includes(cleanExpected) || cleanExpected.includes(v));
   });
 }

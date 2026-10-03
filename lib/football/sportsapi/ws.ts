@@ -74,6 +74,7 @@ export class SportsApiWebSocketManager {
             this.ws.send(JSON.stringify({ action: "ping" }));
           }
         }, 30000);
+        this.pingInterval.unref?.();
       };
 
       this.ws.onmessage = (event) => {

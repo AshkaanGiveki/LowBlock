@@ -120,10 +120,23 @@ export async function GET(
   const latestStatus = liveDetails?.score?.status ?? match.status;
   const latestElapsed = liveDetails?.score?.elapsed ?? match.elapsed;
 
+  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
+  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
+
   return NextResponse.json({
     match: {
-      homeTeam: match.homeTeam,
-      awayTeam: match.awayTeam,
+      id: match.providerMatchId || matchId,
+      providerMatchId: match.providerMatchId || matchId,
+      homeTeam: {
+        ...match.homeTeam,
+        logo: homeLogo,
+        logoUrl: homeLogo,
+      },
+      awayTeam: {
+        ...match.awayTeam,
+        logo: awayLogo,
+        logoUrl: awayLogo,
+      },
       homeGoals: latestHomeGoals,
       awayGoals: latestAwayGoals,
       leagueCode: match.leagueCode,

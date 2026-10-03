@@ -121,6 +121,7 @@ const dailyFixturesCache = new Map<
 
 /**
  * Fetches daily fixtures. Cached in-memory to prevent quota consumption.
+ * Merges /today with /schedule to guarantee all 800+ matches across all tournaments are captured.
  */
 export async function getSportsApiDailyFixtures(
   dateString: string,
@@ -131,47 +132,79 @@ export async function getSportsApiDailyFixtures(
     return cached.data;
   }
 
-  // 1. Try /schedule/{dateString} as primary
-  try {
-    const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
-    const events =
-      res.events || res.data || (Array.isArray(res) ? res : null);
-    if (Array.isArray(events) && events.length > 0) {
-      const result = { success: true, events };
-      dailyFixturesCache.set(dateString, {
-        data: result,
-        expiresAt: now + CACHE_TTL * 1000,
-      });
-      return result;
-    }
-  } catch (err) {
-    console.warn(
-      `[SportsAPI] /schedule/${dateString} failed, falling back:`,
-      err,
-    );
-  }
-
-  // 2. If it's today, try /today fallback
+  const eventsMap = new Map<number | string, any>();
   const todayStr = new Date().toISOString().slice(0, 10);
-  if (dateString === todayStr) {
+  const isToday = dateString === todayStr;
+
+  // 1. If today, fetch /today first (returns full 800+ matches across all tournaments)
+  if (isToday) {
     try {
       const res = await fetchSportsApi<any>("/today");
-      const events =
-        res.events || res.data || (Array.isArray(res) ? res : null);
-      if (Array.isArray(events) && events.length > 0) {
-        const result = { success: true, events };
-        dailyFixturesCache.set(dateString, {
-          data: result,
-          expiresAt: now + CACHE_TTL * 1000,
-        });
-        return result;
+      const events = res.events || res.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(events)) {
+        for (const ev of events) {
+          const id = ev.id || ev.eventId;
+          if (id) eventsMap.set(id, ev);
+        }
       }
     } catch (err) {
-      console.warn("[SportsAPI] /today fallback failed:", err);
+      console.warn("[SportsAPI] /today query failed:", err);
     }
+  }
+
+  // 2. Fetch /schedule/{dateString}
+  try {
+    const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
+    const events = res.events || res.data || (Array.isArray(res) ? res : null);
+    if (Array.isArray(events)) {
+      for (const ev of events) {
+        const id = ev.id || ev.eventId;
+        if (id && !eventsMap.has(id)) {
+          eventsMap.set(id, ev);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[SportsAPI] /schedule/${dateString} failed:`, err);
+  }
+
+  const allEvents = Array.from(eventsMap.values());
+  if (allEvents.length > 0) {
+    const result = { success: true, events: allEvents };
+    dailyFixturesCache.set(dateString, {
+      data: result,
+      expiresAt: now + CACHE_TTL * 1000,
+    });
+    return result;
   }
 
   return { success: false, events: [] };
+}
+
+/**
+ * Fetches tournament seasons list to identify the current active season.
+ */
+export async function getSportsApiTournamentSeasons(tournamentId: number | string) {
+  return fetchSportsApi<any>(`/tournaments/${tournamentId}/seasons`);
+}
+
+/**
+ * Fetches tournament events (next upcoming or last finished) for a specific season.
+ */
+export async function getSportsApiTournamentEvents(
+  tournamentId: number | string,
+  seasonId: number | string,
+  type: "next" | "last" = "next",
+  page = 0,
+) {
+  return fetchSportsApi<any>(`/tournament/${tournamentId}/season/${seasonId}/events/${type}/${page}`);
+}
+
+/**
+ * Fetches all currently active live matches.
+ */
+export async function getSportsApiLiveMatches() {
+  return fetchSportsApi<any>("/live");
 }
 
 /**

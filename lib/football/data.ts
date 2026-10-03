@@ -155,6 +155,18 @@ export async function getMatchesPage(
                 { $eq: ["$leagueCode", "FRIENDLY"] },
                 {
                   $in: [
+                    "$homeTeam.name",
+                    IMPORTANT_NATIONAL_TEAM_NAMES,
+                  ],
+                },
+                {
+                  $in: [
+                    "$awayTeam.name",
+                    IMPORTANT_NATIONAL_TEAM_NAMES,
+                  ],
+                },
+                {
+                  $in: [
                     "$rawApiResponse.teams.home.name",
                     IMPORTANT_NATIONAL_TEAM_NAMES,
                   ],
@@ -221,20 +233,33 @@ export async function getMatchesPage(
 
   const hasMore = matches.length > pageSize;
   const page = hasMore ? matches.slice(0, -1) : matches;
-  const publicPage = page.map((match) => ({
-    provider: match.provider,
-    providerMatchId: match.providerMatchId,
-    leagueCode: match.leagueCode,
-    matchday: match.matchday,
-    kickoffAt: new Date(match.kickoffAt).toISOString(),
-    status: match.status,
-    elapsed: match.elapsed ?? null,
-    homeGoals: match.homeGoals,
-    awayGoals: match.awayGoals,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    seasonStartYear: match.seasonStartYear,
-  }));
+  const publicPage = page.map((match) => {
+    const homeLogo = match.homeTeam.logoUrl || (match.homeTeam as any).logo || (match.homeTeam.id ? `/api/team-image/${match.homeTeam.id}` : null);
+    const awayLogo = match.awayTeam.logoUrl || (match.awayTeam as any).logo || (match.awayTeam.id ? `/api/team-image/${match.awayTeam.id}` : null);
+
+    return {
+      provider: match.provider,
+      providerMatchId: match.providerMatchId,
+      leagueCode: match.leagueCode,
+      matchday: match.matchday,
+      kickoffAt: new Date(match.kickoffAt).toISOString(),
+      status: match.status,
+      elapsed: match.elapsed ?? null,
+      homeGoals: match.homeGoals,
+      awayGoals: match.awayGoals,
+      homeTeam: {
+        ...match.homeTeam,
+        logo: homeLogo,
+        logoUrl: homeLogo,
+      },
+      awayTeam: {
+        ...match.awayTeam,
+        logo: awayLogo,
+        logoUrl: awayLogo,
+      },
+      seasonStartYear: match.seasonStartYear,
+    };
+  });
   const last = publicPage.at(-1);
   return {
     matches: publicPage,
