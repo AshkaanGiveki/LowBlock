@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { cn } from "@/lib/utils";
 import { TeamCrest } from "./TeamCrest";
+import clsx from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
 
 type Player = {
   id: number;

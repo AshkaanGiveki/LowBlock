@@ -7,6 +7,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 import { PitchLineup } from "./PitchLineup";
+import { TeamCrest } from "./TeamCrest";
 import { LocalShortDate } from "@/components/LocalDateTime";
 
 type H2HMeeting = {

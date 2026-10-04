@@ -32,7 +32,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 import { LocalDateTime, LocalTime } from "@/components/LocalDateTime";
-import { PitchLineup } from "./PitchLineup";
+import { TeamCrest } from "./TeamCrest";
 import { MatchReplay } from "./MatchReplay";
 import type {
   LiveMatchSnapshot,

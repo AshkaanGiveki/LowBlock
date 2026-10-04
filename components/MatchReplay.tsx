@@ -4,7 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Play, Pause, RotateCcw, FastForward, Tv, X } from "lucide-react";
 import { TeamCrest } from "./TeamCrest";
-import { cn } from "@/lib/utils";
+import clsx from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
 import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
 
