@@ -187,35 +187,35 @@ function PitchPlayer({ player, isHome, incidents, language, rowCount }: { player
 
   return (
     <div className="flex flex-col items-center relative">
-      {/* Top: Goals/Assists/Pens */}
+      {/* Top Right: Goals/Assists/Pens */}
       {goals.length > 0 && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex gap-0.5 z-20">
+        <div className="absolute -top-1.5 -right-1.5 flex flex-row-reverse gap-[-4px] z-20">
           {goals.map((_, i) => (
-            <span key={`goal-${i}`} className="text-[12px] drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">⚽</span>
+            <span key={`goal-${i}`} className="text-[14px] drop-shadow-[0_2px_2px_rgba(0,0,0,1)] -ml-1.5">⚽</span>
           ))}
         </div>
       )}
 
       {/* Left: Subs */}
       {(isSubIn || isSubOut) && (
-        <div className="absolute top-1/2 -left-3 -translate-y-1/2 z-20">
-          <span className={cn("text-[12px] drop-shadow-[0_2px_4px_rgba(0,0,0,1)]", isSubIn ? "text-emerald-400" : "text-rose-400")}>
+        <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 z-20 w-4 h-4 bg-white rounded-full flex items-center justify-center border-[1.5px] border-[#3e7d56] shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+          <span className={cn("text-[9px] font-black leading-none", isSubIn ? "text-emerald-600" : "text-rose-600")}>
             {isSubIn ? "⬆" : "⬇"}
           </span>
         </div>
       )}
 
-      {/* Right: Cards */}
+      {/* Bottom Right: Cards */}
       {cards.length > 0 && (
-        <div className="absolute top-1/2 -right-2 -translate-y-1/2 flex flex-col gap-0.5 z-20">
+        <div className="absolute -bottom-0.5 -right-1 flex gap-0.5 z-20">
           {cards.map((c, i) => (
-            <span key={`card-${i}`} className={cn("w-2 h-3 rounded-[1px] border border-white/50 shadow-[0_2px_4px_rgba(0,0,0,0.8)]", c.cardType === "red" ? "bg-red-500" : "bg-amber-400")} />
+            <span key={`card-${i}`} className={cn("w-2.5 h-3.5 rounded-[2px] border border-white/70 shadow-[0_2px_4px_rgba(0,0,0,0.8)]", c.cardType === "red" ? "bg-red-500" : "bg-amber-400")} />
           ))}
         </div>
       )}
 
       {/* Player Avatar */}
-      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#112a1e] border border-white/30 flex items-center justify-center overflow-hidden shadow-[0_4px_10px_rgba(0,0,0,0.5)] mb-1 relative z-10">
+      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#112a1e] border-[1.5px] border-white/40 flex items-center justify-center overflow-hidden shadow-[0_4px_10px_rgba(0,0,0,0.5)] mb-1 relative z-10">
         {player.id && String(player.id) !== "0" ? (
           <img 
             src={`/api/player-image/${player.id}`} 

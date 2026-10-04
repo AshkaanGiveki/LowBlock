@@ -253,45 +253,54 @@ export function MatchAnalytics({
                     )}
                   </div>
 
-                  <div className="mt-6">
-                    {tab === "lineups" && (
-                      <PitchLineup
-                        lineups={lineups}
-                        match={match}
-                        language={language}
-                        t={t}
-                        incidents={incidents}
-                      />
-                    )}
+                  <div className="mt-6 min-h-[300px]">
+                    {data === null ? (
+                      <div className="flex flex-col items-center justify-center h-[300px] text-white/50">
+                        <span className="w-8 h-8 border-2 border-[#10b981] border-t-transparent rounded-full animate-spin mb-4" />
+                        <span className="text-xs font-bold uppercase tracking-widest">{t("در حال دریافت اطلاعات...", "Loading Match Data...")}</span>
+                      </div>
+                    ) : (
+                      <>
+                        {tab === "lineups" && (
+                          <PitchLineup
+                            lineups={lineups}
+                            match={match}
+                            language={language}
+                            t={t}
+                            incidents={incidents}
+                          />
+                        )}
 
-                    {tab === "stats" && (
-                      <StatsView
-                        statsGroups={statsGroups}
-                        match={match}
-                        language={language}
-                        t={t}
-                        data={data}
-                        number={number}
-                        score={score}
-                      />
-                    )}
+                        {tab === "stats" && (
+                          <StatsView
+                            statsGroups={statsGroups}
+                            match={match}
+                            language={language}
+                            t={t}
+                            data={data}
+                            number={number}
+                            score={score}
+                          />
+                        )}
 
-                    {tab === "timeline" && (
-                      <CommentaryView
-                        incidents={incidents}
-                        match={match}
-                        language={language}
-                        t={t}
-                      />
-                    )}
-                    
-                    {tab === "replay" && (
-                      <MatchReplay
-                        match={match}
-                        incidents={incidents}
-                        language={language}
-                        t={t}
-                      />
+                        {tab === "timeline" && (
+                          <CommentaryView
+                            incidents={incidents}
+                            match={match}
+                            language={language}
+                            t={t}
+                          />
+                        )}
+                        
+                        {tab === "replay" && (
+                          <MatchReplay
+                            match={match}
+                            incidents={incidents}
+                            language={language}
+                            t={t}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
