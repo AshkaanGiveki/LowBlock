@@ -24,7 +24,7 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentMinute, setCurrentMinute] = useState(0);
   const [simulatedScore, setSimulatedScore] = useState({ home: 0, away: 0 });
-  const [activeEvent, setActiveEvent] = useState<any | null>(null);
+  const [activeEvents, setActiveEvents] = useState<any[] | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const maxMinute = Math.max(90, ...(incidents.map((i) => i.time))); // Ignore addedTime for max duration
@@ -52,34 +52,31 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
           return prev;
         }
 
-        // Check for events at the next minute
         const nextMin = prev + 1;
-        // Include events that happened at this minute, regardless of addedTime
-        // because addedTime events still happen during that base minute (e.g. 90+3 happens during minute 90 for replay purposes)
         const eventsAtNextMin = sortedIncidents.filter((i) => i.time === nextMin);
         
         if (eventsAtNextMin.length > 0) {
           setIsPlaying(false); // Pause for event
           
-          // Check if any of these events is a goal/var to prioritize
-          const importantEvent = eventsAtNextMin.find(e => e.type === "goal" || e.type === "var") || eventsAtNextMin[0];
-          setActiveEvent(importantEvent);
+          setActiveEvents(eventsAtNextMin);
 
-          // Update score if the event has a score attached
-          if (importantEvent.score) {
-            setSimulatedScore(importantEvent.score);
+          // Update score if any event has a score attached
+          const scoreEvent = [...eventsAtNextMin].reverse().find(e => e.score);
+          if (scoreEvent) {
+            setSimulatedScore(scoreEvent.score);
           }
 
-          // Resume after 3.5 seconds
+          // Resume after a delay based on the number of events
+          const delay = eventsAtNextMin.some(e => e.type === "goal" || e.type === "var") ? 3500 : 2500;
           setTimeout(() => {
-            setActiveEvent(null);
+            setActiveEvents(null);
             setIsPlaying(true);
-          }, 3500);
+          }, delay);
         }
 
         return nextMin;
       });
-    }, 300); // 300ms per minute = ~27 seconds for 90 minutes
+    }, 300);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -90,7 +87,7 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
     setIsPlaying(false);
     setCurrentMinute(0);
     setSimulatedScore({ home: 0, away: 0 });
-    setActiveEvent(null);
+    setActiveEvents(null);
     setTimeout(() => setIsPlaying(true), 500);
   };
 
@@ -126,14 +123,24 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
         <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/grass.png')] mix-blend-overlay" />
         
         <AnimatePresence mode="wait">
-          {activeEvent ? (
-            <EventOverlay 
-              key={activeEvent.id} 
-              event={activeEvent} 
-              match={match} 
-              language={language} 
-              t={t} 
-            />
+          {activeEvents && activeEvents.length > 0 ? (
+            <motion.div
+              key="events-container"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1 }}
+              className="flex flex-col gap-4 items-center justify-center w-full max-w-md max-h-full overflow-y-auto no-scrollbar"
+            >
+              {activeEvents.map(ev => (
+                <EventOverlay 
+                  key={ev.id} 
+                  event={ev} 
+                  match={match} 
+                  language={language} 
+                  t={t} 
+                />
+              ))}
+            </motion.div>
           ) : (
             <motion.div 
               key="playing-state"
@@ -201,135 +208,127 @@ function EventOverlay({ event, match, language, t }: { event: any, match: any, l
   const teamTitle = isHome ? match.homeTeam.name : match.awayTeam.name;
   const teamLogo = isHome ? match.homeTeam.logoUrl : match.awayTeam.logoUrl;
 
+  if (event.type === "period") {
+    let label = event.detail;
+    const d = String(event.detail || "").toLowerCase();
+    if (d.includes("ft") || d.includes("ended") || d.includes("full time")) {
+      label = language === "fa" ? "پایان بازی" : "Full Time";
+    } else if (d.includes("ht") || d.includes("halftime") || d.includes("half time")) {
+      label = language === "fa" ? "پایان نیمه اول" : "Half Time";
+    }
+    return (
+      <div className="text-center w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md">
+        <h3 className="text-3xl font-black text-white uppercase tracking-widest">{label}</h3>
+      </div>
+    );
+  }
+
   if (event.type === "goal") {
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.5, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
-        transition={{ type: "spring", damping: 15 }}
-        className="text-center w-full px-6"
-      >
+      <div className="text-center w-full px-6 py-4">
         <motion.div 
           animate={{ rotate: [0, 10, -10, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="text-7xl mb-4 drop-shadow-[0_0_30px_rgba(16,185,129,0.8)]"
+          className="text-6xl mb-3 drop-shadow-[0_0_30px_rgba(16,185,129,0.8)]"
         >
           ⚽
         </motion.div>
-        <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 rounded-full px-4 py-1.5 mb-6 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+        <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 rounded-full px-4 py-1.5 mb-4 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
           <span className="text-emerald-400 font-black text-sm uppercase tracking-widest">{t("گل", "GOAL!")}</span>
           <span className="text-white/60 text-xs">|</span>
           <TeamCrest name={teamTitle} logo={teamLogo} className="w-4 h-4" />
           <span className="text-white font-bold text-xs">{teamTitle}</span>
         </div>
-        <h3 className="text-3xl md:text-5xl font-black text-white mb-2 tracking-tight">{event.playerName || t("بازیکن", "Player")}</h3>
-        {event.assistName && (
-          <p className="text-white/50 text-sm font-bold uppercase tracking-wider">
-            {t("پاس گل:", "Assist:")} <span className="text-emerald-400">{event.assistName}</span>
-          </p>
-        )}
-      </motion.div>
+        <div className="flex items-center justify-center gap-3">
+          {event.playerImage && (
+            <img src={event.playerImage} className="w-12 h-12 rounded-full border-2 border-emerald-500 bg-black/40 object-cover" />
+          )}
+          <div className="text-left">
+            <h3 className="text-3xl font-black text-white tracking-tight">{event.playerName || t("بازیکن", "Player")}</h3>
+            {event.assistName && (
+              <p className="text-white/50 text-sm font-bold uppercase tracking-wider">
+                {t("پاس گل:", "Assist:")} <span className="text-emerald-400">{event.assistName}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     );
   }
 
   if (event.type === "card") {
     const isRed = event.cardType === "red" || event.cardType === "yellow_red";
     return (
-      <motion.div 
-        initial={{ opacity: 0, x: isHome ? -50 : 50, rotate: isHome ? -10 : 10 }}
-        animate={{ opacity: 1, x: 0, rotate: 0 }}
-        exit={{ opacity: 0, y: -50 }}
-        className="flex flex-col items-center"
-      >
-        <motion.div 
-          initial={{ y: -100 }}
-          animate={{ y: 0 }}
-          transition={{ type: "spring", bounce: 0.6 }}
-          className={cn(
-            "w-20 h-28 rounded-md mb-6 shadow-[0_10px_40px_rgba(0,0,0,0.5)] border-2 border-white/20",
-            isRed ? "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_40px_rgba(239,68,68,0.5)]" : "bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_40px_rgba(245,158,11,0.5)]"
-          )}
-        />
-        <div className="inline-flex items-center gap-2 bg-black/40 border border-white/10 rounded-full px-4 py-1.5 mb-4">
-          <TeamCrest name={teamTitle} logo={teamLogo} className="w-4 h-4" />
-          <span className="text-white font-bold text-xs">{teamTitle}</span>
+      <div className="flex items-center gap-4 bg-black/40 border border-white/10 rounded-2xl p-4 w-full">
+        <div className={cn(
+          "w-10 h-14 rounded-sm shadow-[0_5px_15px_rgba(0,0,0,0.5)] border border-white/20 flex-shrink-0",
+          isRed ? "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.3)]" : "bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_20px_rgba(245,158,11,0.3)]"
+        )} />
+        <div className="flex-1 text-left">
+          <div className="flex items-center gap-1.5 mb-1">
+            <TeamCrest name={teamTitle} logo={teamLogo} className="w-3.5 h-3.5" />
+            <span className="text-white/50 text-[10px] font-bold">{teamTitle}</span>
+          </div>
+          <h3 className="text-xl font-black text-white">{event.playerName}</h3>
+          <p className={cn("text-xs font-bold uppercase tracking-widest", isRed ? "text-red-400" : "text-amber-400")}>
+            {isRed ? (language === "fa" ? "کارت قرمز" : "RED CARD") : (language === "fa" ? "کارت زرد" : "YELLOW CARD")}
+          </p>
         </div>
-        <h3 className="text-2xl font-black text-white text-center">{event.playerName}</h3>
-        <p className={cn("text-sm font-bold mt-1 uppercase tracking-widest", isRed ? "text-red-400" : "text-amber-400")}>
-          {isRed ? (language === "fa" ? "کارت قرمز" : "RED CARD") : (language === "fa" ? "کارت زرد" : "YELLOW CARD")}
-        </p>
-      </motion.div>
+      </div>
     );
   }
 
   if (event.type === "var") {
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 1.2 }}
-        className="flex flex-col items-center"
-      >
-        <div className="w-24 h-24 rounded-2xl bg-violet-600/20 border border-violet-500/50 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(139,92,246,0.4)]">
-          <Tv className="text-violet-400" size={48} />
+      <div className="flex flex-col items-center p-4 bg-violet-900/20 border border-violet-500/30 rounded-2xl w-full">
+        <div className="flex items-center gap-2 mb-2">
+          <Tv className="text-violet-400" size={24} />
+          <h3 className="text-xl font-black text-violet-300 uppercase tracking-widest">VAR</h3>
         </div>
-        <h3 className="text-3xl font-black text-violet-300 mb-2 uppercase tracking-widest">VAR</h3>
-        <p className="text-white/80 font-bold text-center max-w-[250px]">{event.detail || "Decision Review"}</p>
-      </motion.div>
+        <p className="text-white/80 font-bold text-center text-sm">{event.detail || "Decision Review"}</p>
+      </div>
     );
   }
 
   if (event.type === "substitution") {
     return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl p-6 w-full max-w-sm"
-      >
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="text-white/50 text-xs font-bold uppercase tracking-widest">{t("تعویض", "SUBSTITUTION")}</span>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-              <span className="text-emerald-400 text-lg font-black">↑</span>
-            </div>
-            <div className="flex-1">
-              <span className="text-xs text-white/50 font-bold uppercase block mb-0.5">IN</span>
-              <span className="text-white font-black text-lg">{event.playerInName}</span>
-            </div>
+      <div className="bg-black/60 border border-white/10 rounded-2xl p-3 w-full flex items-center justify-between">
+        <div className="flex items-center gap-3 w-[45%]">
+          <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-emerald-400 text-xs font-black">↑</span>
           </div>
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/30">
-              <span className="text-rose-400 text-lg font-black">↓</span>
-            </div>
-            <div className="flex-1">
-              <span className="text-xs text-white/50 font-bold uppercase block mb-0.5">OUT</span>
-              <span className="text-white/60 font-bold text-lg">{event.playerOutName}</span>
-            </div>
+          <div className="min-w-0">
+            <span className="text-[9px] text-emerald-400 font-bold uppercase block leading-none">IN</span>
+            <span className="text-white font-bold text-sm truncate block">{event.playerInName}</span>
           </div>
         </div>
-      </motion.div>
+        
+        <div className="flex flex-col items-center px-2">
+          <TeamCrest name={teamTitle} logo={teamLogo} className="w-5 h-5 mb-1" />
+          <span className="text-[8px] text-white/30 font-mono tracking-widest">SUB</span>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 w-[45%] text-right">
+          <div className="min-w-0">
+            <span className="text-[9px] text-rose-400 font-bold uppercase block leading-none">OUT</span>
+            <span className="text-white/60 font-bold text-sm truncate block">{event.playerOutName}</span>
+          </div>
+          <div className="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-rose-400 text-xs font-black">↓</span>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // Fallback for other events
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="text-center"
-    >
-      <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-4">
+    <div className="text-center p-4 bg-white/5 rounded-2xl border border-white/10 w-full">
+      <div className="inline-flex items-center gap-1.5 mb-2">
         <TeamCrest name={teamTitle} logo={teamLogo} className="w-4 h-4" />
-        <span className="text-white font-bold text-xs">{teamTitle}</span>
+        <span className="text-white/60 font-bold text-[10px]">{teamTitle}</span>
       </div>
-      <h3 className="text-xl font-bold text-white mb-2">{event.playerName || event.detail}</h3>
-      <p className="text-white/50 text-sm uppercase tracking-widest">{event.type}</p>
-    </motion.div>
+      <h3 className="text-lg font-bold text-white leading-tight">{event.playerName || event.detail}</h3>
+      <p className="text-white/40 text-[10px] uppercase tracking-widest mt-1">{event.type}</p>
+    </div>
   );
 }

@@ -106,11 +106,24 @@ export function PitchLineup({ lineups, match, language, t, incidents }: LineupPr
           <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wider px-2">
             {t("نیمکت‌نشینان", "Substitutes")}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex overflow-x-auto no-scrollbar gap-4 pb-2 px-2">
             {currentTeam.substitutes.map((sub: Player) => (
-              <div key={sub.id} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
-                <span className="text-[10px] font-mono text-white/40 w-4 text-center">{sub.number}</span>
-                <span className="text-xs font-medium text-white/80">{sub.shortName || sub.name}</span>
+              <div key={sub.id} className="flex flex-col items-center flex-shrink-0 w-12">
+                <div className="w-10 h-10 rounded-full bg-[#112a1e] border border-white/20 flex items-center justify-center overflow-hidden shadow-sm mb-1 relative">
+                  {sub.id && String(sub.id) !== "0" ? (
+                    <img
+                      src={`/api/player-image/${sub.id}`}
+                      alt={sub.shortName || sub.name}
+                      className="w-full h-full object-cover object-top"
+                      onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span className="text-[10px] font-bold text-white/40">{sub.number || "?"}</span>
+                  )}
+                </div>
+                <div className="text-center text-[9px] font-bold text-white/90 w-full truncate drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                  {sub.shortName || sub.name}
+                </div>
               </div>
             ))}
           </div>
@@ -135,14 +148,10 @@ function renderPitchRows(team: any, isHome: boolean, incidents: any[], language:
     currentIndex += count;
   }
 
-  // If it's the away team, they defend the top, so GK is at the top.
-  // Home team defends the bottom, so GK is at the bottom.
-  // We want to reverse the rows for home team so GK is at bottom.
-  // Actually, usually in standard pitch view, your team's GK is at bottom.
   const displayRows = [...rows].reverse(); 
 
   return displayRows.map((rowPlayers, rowIndex) => (
-    <div key={rowIndex} className="flex justify-evenly items-center w-full px-4">
+    <div key={rowIndex} className="flex justify-evenly items-center w-full px-2 md:px-4">
       {rowPlayers.map((player: Player) => (
         <PitchPlayer 
           key={player.id} 
@@ -150,13 +159,14 @@ function renderPitchRows(team: any, isHome: boolean, incidents: any[], language:
           isHome={isHome} 
           incidents={incidents} 
           language={language}
+          rowCount={rowPlayers.length}
         />
       ))}
     </div>
   ));
 }
 
-function PitchPlayer({ player, isHome, incidents, language }: { player: Player, isHome: boolean, incidents: any[], language: string }) {
+function PitchPlayer({ player, isHome, incidents, language, rowCount }: { player: Player, isHome: boolean, incidents: any[], language: string, rowCount: number }) {
   const pIncidents = incidents.filter(
     (i: any) =>
       i.isHome === isHome &&
@@ -173,29 +183,39 @@ function PitchPlayer({ player, isHome, incidents, language }: { player: Player, 
   const isSubIn = pIncidents.some((i) => i.type === "substitution" && (i.playerInName === player.name || i.playerInName === player.shortName));
   const isSubOut = pIncidents.some((i) => i.type === "substitution" && (i.playerOutName === player.name || i.playerOutName === player.shortName));
 
+  const maxWidth = rowCount <= 3 ? "max-w-[100px]" : rowCount <= 4 ? "max-w-[85px]" : "max-w-[65px]";
+
   return (
     <div className="flex flex-col items-center relative">
-      {/* Event Icons */}
-      <div className="absolute -top-3 -right-3 flex gap-0.5 z-10">
-        {goals.map((_, i) => (
-          <span key={`goal-${i}`} className="text-[12px] bg-black/50 rounded-full leading-none drop-shadow-md">⚽</span>
-        ))}
-        {cards.map((c, i) => (
-          <span key={`card-${i}`} className={cn("w-2 h-3 rounded-[1px] border border-white/50 shadow-md", c.cardType === "red" ? "bg-red-500" : "bg-amber-400")} />
-        ))}
-      </div>
-      
-      {/* Sub Icon */}
+      {/* Top: Goals/Assists/Pens */}
+      {goals.length > 0 && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex gap-0.5 z-20">
+          {goals.map((_, i) => (
+            <span key={`goal-${i}`} className="text-[12px] drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">⚽</span>
+          ))}
+        </div>
+      )}
+
+      {/* Left: Subs */}
       {(isSubIn || isSubOut) && (
-        <div className="absolute -bottom-1 -right-2 bg-black/60 border border-white/20 rounded-full p-0.5 z-10">
-          <span className={cn("text-[8px] font-bold", isSubIn ? "text-emerald-400" : "text-rose-400")}>
-            {isSubIn ? "↑" : "↓"}
+        <div className="absolute top-1/2 -left-3 -translate-y-1/2 z-20">
+          <span className={cn("text-[12px] drop-shadow-[0_2px_4px_rgba(0,0,0,1)]", isSubIn ? "text-emerald-400" : "text-rose-400")}>
+            {isSubIn ? "⬆" : "⬇"}
           </span>
         </div>
       )}
 
+      {/* Right: Cards */}
+      {cards.length > 0 && (
+        <div className="absolute top-1/2 -right-2 -translate-y-1/2 flex flex-col gap-0.5 z-20">
+          {cards.map((c, i) => (
+            <span key={`card-${i}`} className={cn("w-2 h-3 rounded-[1px] border border-white/50 shadow-[0_2px_4px_rgba(0,0,0,0.8)]", c.cardType === "red" ? "bg-red-500" : "bg-amber-400")} />
+          ))}
+        </div>
+      )}
+
       {/* Player Avatar */}
-      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border-2 border-[#3e7d56] flex items-center justify-center overflow-hidden shadow-lg mb-1 relative">
+      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#112a1e] border border-white/30 flex items-center justify-center overflow-hidden shadow-[0_4px_10px_rgba(0,0,0,0.5)] mb-1 relative z-10">
         {player.id && String(player.id) !== "0" ? (
           <img 
             src={`/api/player-image/${player.id}`} 
@@ -206,18 +226,11 @@ function PitchPlayer({ player, isHome, incidents, language }: { player: Player, 
         ) : (
           <span className="text-xs font-bold text-gray-400">{player.number || "?"}</span>
         )}
-        
-        {/* Rating Bubble (Placeholder for now as rating isn't in DB yet, but design requires it) */}
-        {/*
-        <div className="absolute bottom-0 bg-orange-500 text-white text-[8px] font-bold px-1 rounded-sm border border-white/20">
-          6.5
-        </div>
-        */}
       </div>
       
       {/* Player Name */}
-      <div className="bg-black/50 backdrop-blur-sm rounded text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 text-center max-w-[60px] md:max-w-[80px] truncate shadow-sm border border-white/10">
-        {player.number && <span className="text-white/50 mr-1">{player.number}</span>}
+      <div className={cn("text-white text-[9px] md:text-[10px] font-bold px-1 text-center truncate drop-shadow-[0_2px_3px_rgba(0,0,0,1)] z-10", maxWidth)}>
+        {player.number && <span className="text-white/70 mr-1">{player.number}</span>}
         {player.shortName || player.name}
       </div>
     </div>
