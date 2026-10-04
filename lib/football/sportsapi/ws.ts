@@ -43,6 +43,12 @@ export class SportsApiWebSocketManager {
     this.listeners = this.listeners.filter((l) => l !== cb);
   }
 
+  public sendRequest(payload: any) {
+    if (this.ws !== null && this.ws.readyState === 1) {
+      this.ws.send(JSON.stringify(payload));
+    }
+  }
+
   public connect() {
     const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
     if (!apiKey) return;

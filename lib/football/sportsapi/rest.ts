@@ -1,5 +1,7 @@
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
+import { getSportsApiWsManager } from "./ws";
+import crypto from "crypto";
 
 export type SportsApiRestResponse<T> = {
   success?: boolean;
@@ -12,9 +14,6 @@ export type SportsApiRestResponse<T> = {
 
 const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 mins
 
-/**
- * Tracks API requests in MongoDB for observability and quota management.
- */
 async function trackRequest(
   path: string,
   params: Record<string, string>,
@@ -31,6 +30,7 @@ async function trackRequest(
       status,
       error,
       timestamp: new Date(),
+      via: "websocket"
     });
   } catch (err) {
     console.error("[SportsAPI] Failed to track request:", err);
@@ -38,20 +38,16 @@ async function trackRequest(
 }
 
 /**
- * Core REST fetcher with multi-endpoint fallback, timeout, and quota logging.
+ * Core fetcher rebuilt to use WebSockets exclusively to avoid HTTP 429 rate limits.
  */
 export async function fetchSportsApi<T>(
   path: string,
   params: Record<string, string> = {},
 ): Promise<SportsApiRestResponse<T>> {
-  const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
-  if (!apiKey) {
-    console.error("[SportsAPI] CRITICAL: SPORTSAPI_API_KEY is not configured in environment variables!");
-    return {
-      success: false,
-      events: [],
-      error: { code: 401, message: "SPORTSAPI_API_KEY is not configured" },
-    };
+  const wsManager = getSportsApiWsManager();
+  
+  if (!wsManager.getStatus().connected) {
+    wsManager.connect();
   }
 
   const candidatePaths = [
@@ -63,45 +59,63 @@ export async function fetchSportsApi<T>(
   const start = performance.now();
 
   for (const candidatePath of candidatePaths) {
-    const url = new URL(`${env.SPORTSAPI_BASE_URL}${candidatePath}`);
-    for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, value);
-    }
-
+    const requestId = crypto.randomUUID();
+    
+    // We create a promise that resolves when the WS sends back a message with this requestId
     try {
-      const response = await fetch(url.toString(), {
-        headers: {
-          "x-api-key": apiKey,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-        next: { revalidate: 0 },
+      const response = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          wsManager.removeListener(listener);
+          reject(new Error("WebSocket request timeout"));
+        }, 15000);
+
+        const listener = (channel: string, payload: any) => {
+          if (payload.requestId === requestId) {
+            clearTimeout(timeout);
+            wsManager.removeListener(listener);
+            resolve(payload.data || payload);
+          }
+        };
+
+        wsManager.addListener(listener);
+
+        // Ensure connected before sending
+        if (!wsManager.getStatus().connected) {
+           wsManager.connect();
+           // Small wait to allow connection
+           setTimeout(() => {
+             wsManager.sendRequest({
+                action: "request",
+                path: candidatePath,
+                params,
+                requestId
+             });
+           }, 1000);
+        } else {
+           wsManager.sendRequest({
+              action: "request",
+              path: candidatePath,
+              params,
+              requestId
+           });
+        }
       });
 
       const duration = performance.now() - start;
 
-      if (response.status === 404 && candidatePath !== candidatePaths.at(-1)) {
-        // Try the alternative path
-        continue;
+      if (response && response.success === false && response.error && response.error.code === 404 && candidatePath !== candidatePaths.at(-1)) {
+        continue; // Try next path
       }
 
-      if (!response.ok) {
-        const text = await response.text();
-        await trackRequest(candidatePath, params, duration, "FAILED", `HTTP ${response.status}: ${text}`);
-        if (response.status === 404) continue;
-        throw new Error(`SportsAPI HTTP ${response.status}: ${text}`);
-      }
-
-      const body = await response.json();
-
-      // Check if body represents an explicit error
-      if (body && body.success === false && body.error && !body.events && !body.data) {
-        await trackRequest(candidatePath, params, duration, "FAILED", JSON.stringify(body.error));
-        throw new Error(`SportsAPI Error: ${JSON.stringify(body.error)}`);
+      if (response && response.success === false && response.error) {
+        await trackRequest(candidatePath, params, duration, "FAILED", JSON.stringify(response.error));
+        if (response.error.code === 404) continue;
+        throw new Error(`SportsAPI WS Error: ${JSON.stringify(response.error)}`);
       }
 
       await trackRequest(candidatePath, params, duration, "OK");
-      return body as SportsApiRestResponse<T>;
+      return response as SportsApiRestResponse<T>;
+
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
     }
@@ -109,7 +123,7 @@ export async function fetchSportsApi<T>(
 
   const totalDuration = performance.now() - start;
   await trackRequest(path, params, totalDuration, "FAILED", lastError?.message || "Unknown error");
-  console.error(`[SportsAPI] All endpoint variants failed for ${path}:`, lastError?.message);
+  console.error(`[SportsAPI WS] All endpoint variants failed for ${path}:`, lastError?.message);
   return { success: false, events: [], error: { code: 500, message: lastError?.message || "Failed request" } };
 }
 
