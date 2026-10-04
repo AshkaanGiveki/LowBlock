@@ -32,7 +32,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
 import { LocalDateTime, LocalTime } from "@/components/LocalDateTime";
-import { TeamCrest } from "@/components/TeamCrest";
+import { PitchLineup } from "./PitchLineup";
+import { MatchReplay } from "./MatchReplay";
 import type {
   LiveMatchSnapshot,
   LiveIncident,
@@ -46,7 +47,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
-type TabType = "lineups" | "stats" | "timeline";
+type TabType = "lineups" | "stats" | "timeline" | "replay";
 
 type AnalyticsData = {
   match: any;
@@ -224,8 +225,8 @@ export function MatchAnalytics({
                     t={t}
                   />
 
-                  {/* 3-Tab Navigation */}
-                  <div className="mt-6 flex rounded-2xl border border-[#1a382d] bg-[#07100c] p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,.02)]">
+                  {/* 4-Tab Navigation */}
+                  <div className="mt-6 flex rounded-2xl border border-[#1a382d] bg-[#07100c] p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,.02)] overflow-x-auto no-scrollbar">
                     <TabButton
                       active={tab === "lineups"}
                       onClick={() => setTab("lineups")}
@@ -242,6 +243,13 @@ export function MatchAnalytics({
                       label={t("رویدادها", "Events")}
                       badge={incidents.length > 0 ? formatNumber(incidents.length, language) : undefined}
                     />
+                    {["FINISHED", "FT", "AET"].includes(String(match.status)) && (
+                      <TabButton
+                        active={tab === "replay"}
+                        onClick={() => setTab("replay")}
+                        label={t("بازپخش", "Replay")}
+                      />
+                    )}
                   </div>
 
                   <div className="mt-6">
@@ -271,6 +279,15 @@ export function MatchAnalytics({
                       <CommentaryView
                         incidents={incidents}
                         match={match}
+                        language={language}
+                        t={t}
+                      />
+                    )}
+                    
+                    {tab === "replay" && (
+                      <MatchReplay
+                        match={match}
+                        incidents={incidents}
                         language={language}
                         t={t}
                       />

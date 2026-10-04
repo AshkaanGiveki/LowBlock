@@ -95,6 +95,49 @@ export function PredictionCard({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [liveMatch, setLiveMatch] = useState(match);
+  
+  // Real-time updates for PredictionCard
+  useEffect(() => {
+    setLiveMatch(match);
+  }, [match]);
+
+  useEffect(() => {
+    const status = String(liveMatch.status);
+    const shouldStream =
+      Boolean(status) &&
+      !["FINISHED", "CANCELLED", "POSTPONED", "VOID"].includes(status);
+    if (!shouldStream) return;
+
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`/api/matches/${liveMatch.providerMatchId}/live?stream=true`);
+
+      const applySnapshot = (data: any) => {
+        setLiveMatch((prev) => ({
+          ...prev,
+          homeGoals: data.score?.home ?? prev.homeGoals,
+          awayGoals: data.score?.away ?? prev.awayGoals,
+          status: data.score?.status ?? prev.status,
+          elapsed: data.score?.elapsed ?? prev.elapsed,
+        }));
+      };
+
+      eventSource.addEventListener("snapshot", (e) => {
+        try { applySnapshot(JSON.parse(e.data)); } catch {}
+      });
+
+      eventSource.addEventListener("update", (e) => {
+        try { applySnapshot(JSON.parse(e.data)); } catch {}
+      });
+
+    } catch {}
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
+  }, [liveMatch.providerMatchId, liveMatch.status]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);

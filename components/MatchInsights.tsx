@@ -6,7 +6,7 @@ import { History, Shield, Users, X, Info } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
-import { TeamCrest } from "@/components/TeamCrest";
+import { PitchLineup } from "./PitchLineup";
 import { LocalShortDate } from "@/components/LocalDateTime";
 
 type H2HMeeting = {
@@ -95,11 +95,12 @@ export function MatchInsightsPanel({ matchId }: { matchId: string }) {
     >
       {/* 1. LINEUPS SECTION */}
       {hasLineups && matchData ? (
-        <LineupsCard
+        <PitchLineup
           lineups={lineups!}
           match={matchData}
           language={language}
           t={t}
+          incidents={[]}
         />
       ) : (
         <div className="rounded-2xl border border-dashed border-[#1a382d] bg-[#07100c]/60 p-5 text-center">
