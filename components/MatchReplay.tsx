@@ -27,7 +27,7 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
   const [activeEvent, setActiveEvent] = useState<any | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const maxMinute = Math.max(90, ...(incidents.map((i) => i.time + (i.addedTime || 0))));
+  const maxMinute = Math.max(90, ...(incidents.map((i) => i.time))); // Ignore addedTime for max duration
 
   const sortedIncidents = [...incidents].sort((a, b) => {
     const timeDiff = a.time - b.time;
@@ -54,12 +54,14 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
 
         // Check for events at the next minute
         const nextMin = prev + 1;
-        const eventsAtNextMin = sortedIncidents.filter((i) => i.time === nextMin && !i.addedTime);
+        // Include events that happened at this minute, regardless of addedTime
+        // because addedTime events still happen during that base minute (e.g. 90+3 happens during minute 90 for replay purposes)
+        const eventsAtNextMin = sortedIncidents.filter((i) => i.time === nextMin);
         
         if (eventsAtNextMin.length > 0) {
           setIsPlaying(false); // Pause for event
           
-          // Show the first event (if multiple, we could queue them, but for simplicity we take the most important or just the first)
+          // Check if any of these events is a goal/var to prioritize
           const importantEvent = eventsAtNextMin.find(e => e.type === "goal" || e.type === "var") || eventsAtNextMin[0];
           setActiveEvent(importantEvent);
 

@@ -34,6 +34,7 @@ import { teamName } from "@/lib/football/team-names";
 import { LocalDateTime, LocalTime } from "@/components/LocalDateTime";
 import { TeamCrest } from "./TeamCrest";
 import { MatchReplay } from "./MatchReplay";
+import { PitchLineup } from "./PitchLineup";
 import type {
   LiveMatchSnapshot,
   LiveIncident,
@@ -254,7 +255,7 @@ export function MatchAnalytics({
 
                   <div className="mt-6">
                     {tab === "lineups" && (
-                      <LineupsView
+                      <PitchLineup
                         lineups={lineups}
                         match={match}
                         language={language}

@@ -202,7 +202,6 @@ export function PredictionCard({
     leaveMatchRoute();
   };
   const open = () => {
-    if (!isMatchRoute) openMatchRoute(match.providerMatchId, pathname);
     if (locked) setAnalyticsOpen(true);
     else {
       setDrawerOpen(true);
