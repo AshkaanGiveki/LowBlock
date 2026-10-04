@@ -143,7 +143,7 @@ export const COMPETITION_MAPPINGS: readonly CompetitionMappingEntry[] = [
     code: "NATIONS",
     apiSportsId: 5,
     sportsApiUniqueTournamentId: 10783,
-    expectedCategories: ["Europe", "europe"],
+    expectedCategories: ["Europe", "europe", "World", "world", "International", "international"],
     slugs: ["uefa-nations-league"],
     aliases: ["UEFA Nations League", "Nations League"],
   },
