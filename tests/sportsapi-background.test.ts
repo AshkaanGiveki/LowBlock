@@ -186,6 +186,33 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(snap.score.statusDescription).toBe("1st half");
   });
 
+  it("keeps regulation score separate from penalty shootout score", () => {
+    const monitor = getMatchMonitorService();
+    const matchId = "99008";
+
+    monitor.handleWsMessage("live-scores", {
+      event: {
+        id: matchId,
+        status: { code: 120, type: "finished", description: "AP" },
+        homeScore: { display: 1, current: 7, normaltime: 1, penalties: 6 },
+        awayScore: { display: 1, current: 8, normaltime: 1, penalties: 7 },
+      },
+    });
+    monitor.handleWsMessage(`match:${matchId}:incidents`, {
+      data: {
+        incidents: [
+          { id: 1, incidentType: "goal", time: 0, incidentClass: "penaltyShootout", isHome: true, homeScore: 6, awayScore: 5 },
+        ],
+      },
+    });
+
+    const snap = monitor.getSnapshot(matchId);
+    expect(snap.score.home).toBe(1);
+    expect(snap.score.away).toBe(1);
+    expect(snap.score.penalties).toEqual({ home: 6, away: 7 });
+    expect(snap.incidents[0].isPenaltyShootout).toBe(true);
+  });
+
   it("reconciles SportsAPI flattened live-score deltas", () => {
     const monitor = getMatchMonitorService();
 

@@ -82,8 +82,17 @@ export function MatchAnalytics({
   const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
   const number = (value: number | null | undefined) =>
     formatNumber(Number(value ?? 0), language, { maximumFractionDigits: 1 });
-  const score = (home: number | null, away: number | null) =>
-    home == null || away == null ? "—" : `${number(home)} - ${number(away)}`;
+  const score = (
+    home: number | null,
+    away: number | null,
+    homePenalties?: number | null,
+    awayPenalties?: number | null,
+  ) => {
+    if (home == null || away == null) return "—";
+    return homePenalties != null && awayPenalties != null
+      ? `${number(home)}(${number(homePenalties)}) - (${number(awayPenalties)})${number(away)}`
+      : `${number(home)} - ${number(away)}`;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +182,8 @@ export function MatchAnalytics({
         ...baseMatch,
         homeGoals: baseMatch.homeGoals ?? liveDetails?.score?.home,
         awayGoals: baseMatch.awayGoals ?? liveDetails?.score?.away,
+        homePenaltyGoals: baseMatch.homePenaltyGoals ?? liveDetails?.score?.penalties?.home,
+        awayPenaltyGoals: baseMatch.awayPenaltyGoals ?? liveDetails?.score?.penalties?.away,
         status: liveDetails?.score?.status ?? baseMatch.status,
         elapsed: liveDetails?.score?.elapsed ?? baseMatch.elapsed,
       }
@@ -404,7 +415,7 @@ function MatchHeader({ match, language, number, score, t }: any) {
         {/* Score & Status */}
         <div className="flex flex-col items-center justify-center px-4">
           <div className="text-[34px] font-black tracking-tight text-white leading-none mb-1">
-            {score(match.homeGoals, match.awayGoals)}
+            {score(match.homeGoals, match.awayGoals, match.homePenaltyGoals, match.awayPenaltyGoals)}
           </div>
           <Status match={match} live={live} finished={finished} number={number} />
         </div>
@@ -839,6 +850,20 @@ function StatComparison({ stat, isHighlight, language }: any) {
  * ========================================================================= */
 type EventFilter = "all" | "goals" | "cards" | "subs";
 
+function isPenaltyShootoutIncident(incident: any) {
+  const raw = incident?.raw || incident;
+  const text = [raw.incidentType, raw.incidentClass, raw.description, raw.text, raw.period, incident?.detail]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return Boolean(incident?.isPenaltyShootout || raw.isPenaltyShootout || raw.penaltyShootout || text.includes("shootout") || text.includes("penaltyshootout") || (Number(raw.time) === 0 && text.includes("penalty")));
+}
+
+function incidentMinuteLabel(incident: any, language: "fa" | "en", t: (fa: string, en: string) => string) {
+  if (isPenaltyShootoutIncident(incident)) return t("پنالتی", "PEN");
+  return `${incident.time || 0}${incident.addedTime ? `+${incident.addedTime}` : ""}'`;
+}
+
 function CommentaryView({ incidents, match, language, t }: any) {
   const [filter, setFilter] = useState<EventFilter>("all");
 
@@ -954,9 +979,7 @@ function CommentaryView({ incidents, match, language, t }: any) {
                 {/* Timeline Minute Node */}
                 <div className="relative z-10 flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-[#050b09] border border-[#10b981]/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
                   <span className="text-[10px] font-black font-mono text-[#10b981]">
-                    {inc.time}
-                    {inc.addedTime ? `+${inc.addedTime}` : ""}
-                    '
+                    {incidentMinuteLabel(inc, language, t)}
                   </span>
                 </div>
 

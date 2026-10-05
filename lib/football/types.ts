@@ -57,6 +57,7 @@ export type CanonicalIncident = {
   cardType?: "yellow" | "red" | "yellow_red";
   score?: { home: number; away: number };
   detail?: string;
+  isPenaltyShootout?: boolean;
 };
 
 export type TeamStatPair = {

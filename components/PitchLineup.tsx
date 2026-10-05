@@ -85,8 +85,12 @@ export function PitchLineup({ lineups, match, language, t, incidents }: LineupPr
           <div className="no-scrollbar flex gap-4 overflow-x-auto px-2 pb-2">
             {currentTeam.substitutes.map((sub: Player) => (
               <div key={sub.id} className="flex w-12 shrink-0 flex-col items-center">
-                <div className="relative mb-1 flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-[#112a1e] shadow-sm">
+                <div className="relative mb-1 flex h-10 w-10 items-center justify-center overflow-visible rounded-full border border-white/20 bg-[#112a1e] shadow-sm">
                   {sub.id && String(sub.id) !== "0" ? <img src={`/api/player-image/${sub.id}`} alt={sub.shortName || sub.name} className="h-full w-full object-cover object-top" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <span className="text-[10px] font-bold text-white/40">{sub.number || "?"}</span>}
+                  {incidents.filter((incident: any) => incident.isHome === isHome && (incident.playerInName === sub.name || incident.playerInName === sub.shortName || incident.playerOutName === sub.name || incident.playerOutName === sub.shortName)).map((incident: any, index: number) => {
+                    const incoming = incident.playerInName === sub.name || incident.playerInName === sub.shortName;
+                    return <span key={`${incident.id}-${index}`} className={cn("absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border bg-[#07100c]/95 shadow-md", incoming ? "border-emerald-300/70" : "border-rose-300/70")}><IncidentIcon kind="substitution" direction={incoming ? "in" : "out"} /></span>;
+                  })}
                 </div>
                 <div className="w-full truncate text-center text-[9px] font-bold text-white/90">{sub.shortName || sub.name}</div>
               </div>

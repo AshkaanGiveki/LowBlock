@@ -33,6 +33,29 @@ function extractAssistName(incident: any): string | null {
   );
 }
 
+function isPenaltyShootoutIncident(incident: any): boolean {
+  const text = [
+    incident?.incidentType,
+    incident?.incidentClass,
+    incident?.description,
+    incident?.text,
+    incident?.period,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return Boolean(
+    incident?.isPenaltyShootout ||
+    incident?.penaltyShootout ||
+    text.includes("penalty shootout") ||
+    text.includes("penaltyshootout") ||
+    text.includes("shootout") ||
+    (Number(incident?.time) === 0 && text.includes("penalty")),
+  );
+}
+
+function penaltyValue(score: any): number | null {
+  const value = score?.penalties ?? score?.penaltyShootout ?? score?.shootout;
+  return typeof value === "number" ? value : null;
+}
+
 function parseCanonicalStatus(rawStatus: any): "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "VOID" | "SUSPENDED" {
   if (!rawStatus) return "SCHEDULED";
   const type = String(rawStatus.type || "").toLowerCase();
@@ -193,6 +216,7 @@ export async function getOrFetchMatchDetails(
           playerInName: inc.playerIn?.name || inc.playerIn?.shortName,
           playerOutName: inc.playerOut?.name || inc.playerOut?.shortName,
           assistName: extractAssistName(inc),
+          isPenaltyShootout: isPenaltyShootoutIncident(inc),
           cardType,
           score:
             inc.homeScore !== undefined && inc.awayScore !== undefined
@@ -207,12 +231,12 @@ export async function getOrFetchMatchDetails(
       let status = parseCanonicalStatus(ev?.status);
       let elapsed = ev ? calculateElapsed(status, ev) : null;
 
-      let homeGoals = ev?.homeScore?.display ?? ev?.homeScore?.current ?? ev?.homeScore?.normaltime ?? null;
-      let awayGoals = ev?.awayScore?.display ?? ev?.awayScore?.current ?? ev?.awayScore?.normaltime ?? null;
+      let homeGoals = ev?.homeScore?.display ?? ev?.homeScore?.normaltime ?? ev?.homeScore?.current ?? null;
+      let awayGoals = ev?.awayScore?.display ?? ev?.awayScore?.normaltime ?? ev?.awayScore?.current ?? null;
 
       // If scores not directly on match object, derive from incidents
       if (homeGoals === null && incidents.length > 0) {
-        const lastScoredInc = [...incidents].reverse().find((i) => i.score);
+        const lastScoredInc = [...incidents].reverse().find((i) => i.score && !i.isPenaltyShootout);
         if (lastScoredInc?.score) {
           homeGoals = lastScoredInc.score.home;
           awayGoals = lastScoredInc.score.away;
@@ -229,6 +253,10 @@ export async function getOrFetchMatchDetails(
       const score = {
         home: homeGoals ?? fromDb.score.home ?? null,
         away: awayGoals ?? fromDb.score.away ?? null,
+        penalties: {
+          home: penaltyValue(ev?.homeScore) ?? fromDb.score.penalties?.home ?? null,
+          away: penaltyValue(ev?.awayScore) ?? fromDb.score.penalties?.away ?? null,
+        },
         period1: {
           home: ev?.homeScore?.period1 ?? fromDb.score.period1?.home ?? null,
           away: ev?.awayScore?.period1 ?? fromDb.score.period1?.away ?? null,
@@ -344,6 +372,10 @@ export async function getOrFetchMatchDetails(
       if (score.status) updateFields.status = score.status;
       if (score.home !== null && score.home !== undefined) updateFields.homeGoals = score.home;
       if (score.away !== null && score.away !== undefined) updateFields.awayGoals = score.away;
+      if (score.penalties) {
+        updateFields.homePenaltyGoals = score.penalties.home;
+        updateFields.awayPenaltyGoals = score.penalties.away;
+      }
       if (score.elapsed !== null && score.elapsed !== undefined) updateFields.elapsed = score.elapsed;
 
       await db.collection("matches").updateOne(

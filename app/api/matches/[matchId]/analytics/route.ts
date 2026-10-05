@@ -117,6 +117,8 @@ export async function GET(
 
   const latestHomeGoals = liveDetails?.score?.home ?? match.homeGoals;
   const latestAwayGoals = liveDetails?.score?.away ?? match.awayGoals;
+  const latestHomePenaltyGoals = liveDetails?.score?.penalties?.home ?? match.homePenaltyGoals ?? match.homeScore?.penalties ?? null;
+  const latestAwayPenaltyGoals = liveDetails?.score?.penalties?.away ?? match.awayPenaltyGoals ?? match.awayScore?.penalties ?? null;
   const latestStatus = liveDetails?.score?.status ?? match.status;
   const latestElapsed = liveDetails?.score?.elapsed ?? match.elapsed;
 
@@ -143,6 +145,8 @@ export async function GET(
       },
       homeGoals: latestHomeGoals,
       awayGoals: latestAwayGoals,
+      homePenaltyGoals: latestHomePenaltyGoals,
+      awayPenaltyGoals: latestAwayPenaltyGoals,
       leagueCode: match.leagueCode,
       matchday: match.matchday,
       status: latestStatus,

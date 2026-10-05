@@ -33,6 +33,24 @@ function extractGoals(scoreObj: any): number | null {
   return null;
 }
 
+function isPenaltyShootoutIncident(rawIncident: any): boolean {
+  const text = [
+    rawIncident?.incidentType,
+    rawIncident?.incidentClass,
+    rawIncident?.description,
+    rawIncident?.text,
+    rawIncident?.period,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return Boolean(
+    rawIncident?.isPenaltyShootout ||
+    rawIncident?.penaltyShootout ||
+    text.includes("penalty shootout") ||
+    text.includes("penaltyshootout") ||
+    text.includes("shootout") ||
+    (Number(rawIncident?.time) === 0 && text.includes("penalty")),
+  );
+}
+
 function resolveTeamLogo(team: any): string | null {
   if (!team) return null;
   const teamId = team.id || team.eventId;
@@ -248,5 +266,6 @@ export function normalizeSportsApiIncident(rawIncident: any): CanonicalIncident 
         ? { home: rawIncident.homeScore, away: rawIncident.awayScore }
         : undefined,
     detail: rawIncident.incidentClass || rawIncident.description,
+    isPenaltyShootout: isPenaltyShootoutIncident(rawIncident),
   };
 }

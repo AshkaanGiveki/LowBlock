@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db/mongo";
 export type LiveMatchScore = {
   home: number | null;
   away: number | null;
+  penalties?: { home: number | null; away: number | null };
   period1?: { home: number | null; away: number | null };
   period2?: { home: number | null; away: number | null };
   status: string;
@@ -25,6 +26,7 @@ export type LiveIncident = {
   score?: { home: number; away: number };
   detail?: string;
   raw?: Record<string, unknown>;
+  isPenaltyShootout?: boolean;
 };
 
 export type LiveStatItem = {
@@ -134,6 +136,30 @@ function providerScoreValue(value: any, fallback: number | null): number | null 
   return value.display ?? value.current ?? value.normaltime ?? fallback;
 }
 
+function providerPenaltyValue(value: any, fallback: number | null): number | null {
+  if (!value || typeof value !== "object") return fallback;
+  const penalty = value.penalties ?? value.penaltyShootout ?? value.shootout;
+  return typeof penalty === "number" ? penalty : fallback;
+}
+
+function isPenaltyShootoutIncident(incident: any): boolean {
+  const text = [
+    incident?.incidentType,
+    incident?.incidentClass,
+    incident?.description,
+    incident?.text,
+    incident?.period,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return Boolean(
+    incident?.isPenaltyShootout ||
+    incident?.penaltyShootout ||
+    text.includes("penalty shootout") ||
+    text.includes("penaltyshootout") ||
+    text.includes("shootout") ||
+    (Number(incident?.time) === 0 && text.includes("penalty")),
+  );
+}
+
 function providerPeriodStart(event: any): number | null {
   const timestamp =
     event?.time?.currentPeriodStartTimestamp ??
@@ -175,7 +201,9 @@ function collectRawIncidents(value: any, result: any[] = []): any[] {
 }
 
 function reconcileScoreFromIncidents(snapshot: LiveMatchSnapshot, incidents: LiveIncident[]) {
-  const withScore = incidents.filter((incident) => incident.score).sort((a, b) => a.time - b.time);
+  const withScore = incidents
+    .filter((incident) => incident.score && !incident.isPenaltyShootout)
+    .sort((a, b) => a.time - b.time);
   const latestScore = withScore.at(-1)?.score;
   if (latestScore) {
     snapshot.score.home = latestScore.home;
@@ -273,6 +301,7 @@ class MatchMonitorService {
           snapshot.incidents = existing.incidents.map((incident: LiveIncident) => ({
             ...incident,
             assistName: incident.assistName || extractAssistName(rawById.get(String(incident.id))),
+            isPenaltyShootout: incident.isPenaltyShootout || isPenaltyShootoutIncident(rawById.get(String(incident.id))),
           }));
           reconcileScoreFromIncidents(snapshot, snapshot.incidents);
         }
@@ -386,6 +415,10 @@ class MatchMonitorService {
       }
       if (ev.homeScore) {
         snapshot.score.home = ev.homeScore.display ?? ev.homeScore.current ?? snapshot.score.home;
+        snapshot.score.penalties = {
+          home: providerPenaltyValue(ev.homeScore, snapshot.score.penalties?.home ?? null),
+          away: providerPenaltyValue(ev.awayScore, snapshot.score.penalties?.away ?? null),
+        };
         snapshot.score.period1 = {
           home: ev.homeScore.period1 ?? snapshot.score.period1?.home ?? null,
           away: ev.awayScore?.period1 ?? snapshot.score.period1?.away ?? null,
@@ -438,6 +471,7 @@ class MatchMonitorService {
           playerInName: inc.playerIn?.name || inc.playerIn?.shortName,
           playerOutName: inc.playerOut?.name || inc.playerOut?.shortName,
           assistName: extractAssistName(inc),
+          isPenaltyShootout: isPenaltyShootoutIncident(inc),
           cardType,
           score:
             inc.homeScore !== undefined && inc.awayScore !== undefined
@@ -581,6 +615,10 @@ class MatchMonitorService {
 
         if (ev.homeScore !== undefined) {
           snap.score.home = providerScoreValue(ev.homeScore, snap.score.home);
+          snap.score.penalties = {
+            home: providerPenaltyValue(ev.homeScore, snap.score.penalties?.home ?? null),
+            away: providerPenaltyValue(ev.awayScore, snap.score.penalties?.away ?? null),
+          };
           snap.score.period1 = {
             home: ev.homeScore.period1 ?? snap.score.period1?.home ?? null,
             away: ev.awayScore?.period1 ?? snap.score.period1?.away ?? null,
@@ -648,6 +686,10 @@ class MatchMonitorService {
       }
       if (snapshot.score.away !== null && snapshot.score.away !== undefined) {
         updateFields.awayGoals = snapshot.score.away;
+      }
+      if (snapshot.score.penalties) {
+        updateFields.homePenaltyGoals = snapshot.score.penalties.home;
+        updateFields.awayPenaltyGoals = snapshot.score.penalties.away;
       }
       if (snapshot.score.elapsed !== null && snapshot.score.elapsed !== undefined) {
         updateFields.elapsed = snapshot.score.elapsed;

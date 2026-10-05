@@ -44,6 +44,8 @@ type Match = {
   elapsed?: number | null;
   homeGoals?: number | null;
   awayGoals?: number | null;
+  homePenaltyGoals?: number | null;
+  awayPenaltyGoals?: number | null;
   homeTeam: Team;
   awayTeam: Team;
 };
@@ -254,6 +256,8 @@ export function PredictionCard({
       finished={finished}
       homeGoals={match.homeGoals}
       awayGoals={match.awayGoals}
+      homePenaltyGoals={match.homePenaltyGoals}
+      awayPenaltyGoals={match.awayPenaltyGoals}
       elapsed={match.elapsed}
       kickoff={kickoff}
       now={now}
@@ -469,6 +473,8 @@ function MatchStatusBadge({
   finished,
   homeGoals,
   awayGoals,
+  homePenaltyGoals,
+  awayPenaltyGoals,
   elapsed,
   kickoff,
   now,
@@ -478,6 +484,8 @@ function MatchStatusBadge({
   finished: boolean;
   homeGoals?: number | null;
   awayGoals?: number | null;
+  homePenaltyGoals?: number | null;
+  awayPenaltyGoals?: number | null;
   elapsed?: number | null;
   kickoff: number;
   now: number;
@@ -485,7 +493,9 @@ function MatchStatusBadge({
 }) {
   const result =
     homeGoals != null && awayGoals != null
-      ? `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}`
+      ? homePenaltyGoals != null && awayPenaltyGoals != null
+        ? `${formatNumber(homeGoals, language)}(${formatNumber(homePenaltyGoals, language)}) - (${formatNumber(awayPenaltyGoals, language)})${formatNumber(awayGoals, language)}`
+        : `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}`
       : "—";
   if (live) {
     const isRealisticElapsed = elapsed != null && elapsed > 0 && elapsed <= 130;
