@@ -655,6 +655,74 @@ function translateStatName(name: string, language: "fa" | "en") {
   return map[name] || name;
 }
 
+function translateStatNameComplete(name: string, language: "fa" | "en") {
+  if (language !== "fa") return name;
+  const key = String(name || "").trim().toLowerCase().replace(/[：:]/g, "").replace(/\s+/g, " ");
+  const map: Record<string, string> = {
+    "ball possession": "مالکیت توپ",
+    "total shots": "مجموع شوت‌ها",
+    "shots on goal": "شوت در چارچوب",
+    "shots on target": "شوت در چارچوب",
+    "shots off goal": "شوت خارج از چارچوب",
+    "shots off target": "شوت خارج از چارچوب",
+    "blocked shots": "شوت‌های بلوکه‌شده",
+    "shots inside box": "شوت از داخل محوطه",
+    "shots outside box": "شوت از خارج محوطه",
+    "big chances": "موقعیت‌های بزرگ",
+    "big chances missed": "موقعیت‌های بزرگ از دست‌رفته",
+    "hit woodwork": "برخورد با تیرک",
+    "expected goals": "گل‌های مورد انتظار",
+    "xg": "گل‌های مورد انتظار",
+    "expected assists": "پاس گل‌های مورد انتظار",
+    "xga": "پاس گل‌های مورد انتظار",
+    "corners": "کرنرها",
+    "corner kicks": "کرنرها",
+    "offsides": "آفسایدها",
+    "fouls": "خطاها",
+    "free kicks": "ضربات آزاد",
+    "penalties": "پنالتی‌ها",
+    "penalty kicks": "ضربات پنالتی",
+    "goals": "گل‌ها",
+    "assists": "پاس گل‌ها",
+    "total passes": "مجموع پاس‌ها",
+    "accurate passes": "پاس‌های صحیح",
+    "passes %": "دقت پاس",
+    "pass accuracy": "دقت پاس",
+    "key passes": "پاس‌های کلیدی",
+    "crosses": "ارسال‌ها",
+    "accurate crosses": "ارسال‌های صحیح",
+    "long balls": "پاس‌های بلند",
+    "accurate long balls": "پاس‌های بلند صحیح",
+    "through balls": "پاس‌های عمقی",
+    "dribbles": "دریبل‌ها",
+    "successful dribbles": "دریبل‌های موفق",
+    "tackles": "تکل‌ها",
+    "interceptions": "توپ‌گیری‌ها",
+    "clearances": "دفع توپ‌ها",
+    "errors leading to goal": "اشتباه منجر به گل",
+    "possession lost": "از دست دادن مالکیت",
+    "duels": "دوئل‌ها",
+    "duels won": "دوئل‌های برده‌شده",
+    "aerial duels": "دوئل‌های هوایی",
+    "aerial duels won": "دوئل‌های هوایی برده‌شده",
+    "ground duels": "دوئل‌های زمینی",
+    "goalkeeper saves": "مهارهای دروازه‌بان",
+    "saves": "مهارها",
+    "goals prevented": "گل‌های جلوگیری‌شده",
+    "goal kicks": "ضربات دروازه",
+    "throw-ins": "پرتاب‌های اوت",
+    "yellow cards": "کارت‌های زرد",
+    "red cards": "کارت‌های قرمز",
+    "yellow red cards": "کارت‌های زرد دوم",
+    "counter attacks": "حملات ضدحمله‌ای",
+    "fast breaks": "ضدحمله‌ها",
+    "attacks": "حملات",
+    "dangerous attacks": "حملات خطرناک",
+    "injuries": "مصدومیت‌ها",
+  };
+  return map[key] || `آمار: ${name}`;
+}
+
 function StatsView({ statsGroups, match, language, t, data, number, score }: any) {
   if (!statsGroups || statsGroups.length === 0) {
     return (
@@ -670,7 +738,7 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
   const allStats = statsGroups.flatMap((g: any) => g.items);
 
   const possessionStat = allStats.find((s: any) => s.name?.includes("Possession"));
-  const otherStats = allStats.filter((s: any) => !s.name?.includes("Possession"));
+  const assistIncidents = (data?.liveDetails?.incidents || []).filter((incident: any) => incident.assistName);
 
   return (
     <div className="space-y-6 pb-6">
@@ -685,11 +753,30 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
         </div>
       )}
 
-      <div className="bg-[#07100c] border border-[#1a382d] rounded-[24px] p-4 space-y-5">
-        {otherStats.slice(0, 12).map((stat: any, idx: number) => (
-          <StatComparison key={idx} stat={stat} language={language} />
-        ))}
-      </div>
+      {assistIncidents.length > 0 && (
+        <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-400/[.04] p-4">
+          <div className="mb-3 text-[11px] font-black uppercase tracking-wider text-cyan-300">{language === "fa" ? "پاس گل‌ها" : "Assists"}</div>
+          <div className="space-y-2">
+            {assistIncidents.map((incident: any, index: number) => (
+              <div key={incident.id || index} className="flex items-center justify-between gap-3 text-xs">
+                <span className="truncate font-bold text-white">{incident.assistName}</span>
+                <span className="shrink-0 text-white/50">→ {incident.playerName || (language === "fa" ? "گل" : "Goal")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {statsGroups.map((group: any, groupIndex: number) => {
+        const items = (group.items || []).filter((stat: any) => stat !== possessionStat);
+        if (!items.length) return null;
+        return (
+          <div key={groupIndex} className="space-y-4 rounded-[24px] border border-[#1a382d] bg-[#07100c] p-4">
+            <div className="border-b border-white/10 pb-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#10b981]">{translateStatNameComplete(group.groupName || "Stats", language)}</div>
+            {items.map((stat: any, statIndex: number) => <StatComparison key={`${groupIndex}-${statIndex}`} stat={stat} language={language} />)}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -703,13 +790,14 @@ function StatComparison({ stat, isHighlight, language }: any) {
   const total = hVal + aVal || 1;
   const hPct = (hVal / total) * 100;
   const aPct = (aVal / total) * 100;
+  const extraEntries = Object.entries(stat.raw || {}).filter(([key, value]) => !["name", "label", "home", "away", "homeValue", "awayValue"].includes(key) && value !== null && value !== undefined && typeof value !== "object");
 
   return (
     <div className={cn("flex flex-col gap-2", isHighlight && "p-4 bg-[#07100c] border border-[#1a382d] rounded-[24px]")}>
       <div className="flex justify-between items-end">
         <span className="text-base font-bold text-white w-12">{stat.home}</span>
         <span className={cn("text-[11px] font-bold text-white/50 uppercase tracking-wide", isHighlight && "text-[#10b981]")}>
-          {translateStatName(stat.name, language)}
+          {translateStatNameComplete(stat.name, language)}
         </span>
         <span className="text-base font-bold text-white w-12 text-right">{stat.away}</span>
       </div>
@@ -717,6 +805,13 @@ function StatComparison({ stat, isHighlight, language }: any) {
         <div className="bg-gradient-to-r from-[#059669] to-[#10b981] h-full rounded-full transition-all" style={{ width: `${hPct}%` }} />
         <div className="bg-gradient-to-l from-white/10 to-white/20 h-full rounded-full transition-all" style={{ width: `${aPct}%` }} />
       </div>
+      {extraEntries.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-white/45">
+          {extraEntries.map(([key, value]) => (
+            <span key={key}><b className="text-white/65">{translateStatNameComplete(key.replace(/([A-Z])/g, " $1"), language)}:</b> {String(value)}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -155,14 +155,15 @@ function IncidentIcon({ kind, direction }: { kind: IncidentKind; direction?: "in
 
 function PitchPlayer({ player, isHome, incidents, language, rowCount, teamColors }: { player: Player; isHome: boolean; incidents: any[]; language: string; rowCount: number; teamColors: TeamColors }) {
   const playerIncidents = incidents.filter((incident: any) => incident.isHome === isHome && (incident.playerName === player.name || incident.playerName === player.shortName || incident.playerInName === player.name || incident.playerInName === player.shortName || incident.playerOutName === player.name || incident.playerOutName === player.shortName || incident.assistName === player.name || incident.assistName === player.shortName));
-  const goals = playerIncidents.filter((incident: any) => incident.type === "goal");
   const cards = playerIncidents.filter((incident: any) => incident.type === "card");
   const isSubIn = playerIncidents.some((incident: any) => incident.type === "substitution" && (incident.playerInName === player.name || incident.playerInName === player.shortName));
   const isSubOut = playerIncidents.some((incident: any) => incident.type === "substitution" && (incident.playerOutName === player.name || incident.playerOutName === player.shortName));
   const incidentKinds = playerIncidents.flatMap((incident: any) => {
     const kinds: IncidentKind[] = [];
-    if (incident.assistName === player.name || incident.assistName === player.shortName) kinds.push("assist");
-    if (incident.type !== "card") kinds.push(getIncidentKind(incident));
+    const isAssister = incident.assistName === player.name || incident.assistName === player.shortName;
+    const isPrimaryPlayer = incident.playerName === player.name || incident.playerName === player.shortName || incident.playerInName === player.name || incident.playerInName === player.shortName || incident.playerOutName === player.name || incident.playerOutName === player.shortName;
+    if (isAssister) kinds.push("assist");
+    if (isPrimaryPlayer && incident.type !== "card") kinds.push(getIncidentKind(incident));
     return kinds;
   }).filter((kind, index, list) => list.indexOf(kind) === index).slice(0, 3);
   const cardWidth = rowCount <= 2 ? "w-[82px] sm:w-[100px]" : rowCount <= 3 ? "w-[68px] sm:w-[86px]" : rowCount <= 4 ? "w-[58px] sm:w-[74px]" : "w-[49px] sm:w-[64px]";

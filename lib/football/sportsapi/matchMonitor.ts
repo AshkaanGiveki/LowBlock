@@ -32,6 +32,7 @@ export type LiveStatItem = {
   away: string | number;
   homeValue?: number;
   awayValue?: number;
+  raw?: Record<string, unknown>;
 };
 
 export type LiveStatGroup = {
@@ -389,7 +390,8 @@ class MatchMonitorService {
         snapshot.incidents = Array.from(byId.values()).sort((a, b) => a.time - b.time);
       }
     } else if (subType === "stats") {
-      const statsObj = data.statistics || data.data?.statistics || (Array.isArray(data) ? data : []);
+      const statsPayload = data.statistics || data.data?.statistics || data;
+      const statsObj = Array.isArray(statsPayload) ? statsPayload : statsPayload?.periods || statsPayload?.groups || [];
       const groups: LiveStatGroup[] = [];
       for (const periodGroup of statsObj) {
         if (periodGroup.groups) {
@@ -397,11 +399,13 @@ class MatchMonitorService {
             groups.push({
               groupName: g.groupName || "Stats",
               items: (g.statisticsItems || []).map((it: any) => ({
-                name: it.name,
-                home: it.home,
-                away: it.away,
+                ...it,
+                name: it.name || it.label || "Statistic",
+                home: it.home ?? it.homeValue ?? "-",
+                away: it.away ?? it.awayValue ?? "-",
                 homeValue: it.homeValue,
                 awayValue: it.awayValue,
+                raw: it,
               })),
             });
           }

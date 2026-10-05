@@ -224,14 +224,8 @@ export async function getOrFetchMatchDetails(
 
       // Parse Statistics
       const statsRaw: any = statsRes.status === "fulfilled" ? statsRes.value : null;
-      const rawStats =
-        statsRaw?.statistics ||
-        statsRaw?.data?.statistics ||
-        (Array.isArray(statsRaw?.data)
-          ? statsRaw.data
-          : Array.isArray(statsRaw)
-            ? statsRaw
-            : []);
+      const statsPayload = statsRaw?.statistics || statsRaw?.data?.statistics || statsRaw?.data || statsRaw;
+      const rawStats = Array.isArray(statsPayload) ? statsPayload : statsPayload?.periods || statsPayload?.groups || [];
 
       const stats: LiveStatGroup[] = [];
       for (const periodGroup of rawStats) {
@@ -240,11 +234,13 @@ export async function getOrFetchMatchDetails(
             stats.push({
               groupName: g.groupName || "Stats",
               items: (g.statisticsItems || []).map((it: any) => ({
-                name: it.name,
-                home: it.home,
-                away: it.away,
+                ...it,
+                name: it.name || it.label || "Statistic",
+                home: it.home ?? it.homeValue ?? "-",
+                away: it.away ?? it.awayValue ?? "-",
                 homeValue: it.homeValue,
                 awayValue: it.awayValue,
+                raw: it,
               })),
             });
           }
