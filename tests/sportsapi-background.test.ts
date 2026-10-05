@@ -130,6 +130,7 @@ describe("sportsapi match monitor and background handlers", () => {
             time: 24,
             isHome: true,
             player: { name: "Lionel Messi" },
+            assist1: { name: "Andres Iniesta" },
             homeScore: 1,
             awayScore: 0,
           },
@@ -141,6 +142,7 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(snap.incidents.length).toBe(1);
     expect(snap.incidents[0].type).toBe("goal");
     expect(snap.incidents[0].playerName).toBe("Lionel Messi");
+    expect(snap.incidents[0].assistName).toBe("Andres Iniesta");
     expect(snap.incidents[0].score).toEqual({ home: 1, away: 0 });
   });
 

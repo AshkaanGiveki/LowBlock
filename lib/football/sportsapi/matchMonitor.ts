@@ -24,6 +24,7 @@ export type LiveIncident = {
   cardType?: "yellow" | "red" | "yellow_red";
   score?: { home: number; away: number };
   detail?: string;
+  raw?: Record<string, unknown>;
 };
 
 export type LiveStatItem = {
@@ -142,6 +143,37 @@ function providerPeriodStart(event: any): number | null {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
 }
 
+function personName(value: any): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (!value || typeof value !== "object") return null;
+  return value.name || value.shortName || value.player?.name || value.player?.shortName || null;
+}
+
+function extractAssistName(incident: any): string | null {
+  return personName(
+    incident.assist1 ??
+      incident.assist2 ??
+      incident.assist ??
+      incident.assistant ??
+      incident.assistPlayer ??
+      incident.playerAssist ??
+      incident.incident?.assist1 ??
+      incident.incident?.assist,
+  );
+}
+
+function collectRawIncidents(value: any, result: any[] = []): any[] {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (item && typeof item === "object" && (item.incidentType || item.player || item.assist1 || item.assist)) result.push(item);
+      collectRawIncidents(item, result);
+    }
+  } else if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) collectRawIncidents(nested, result);
+  }
+  return result;
+}
+
 class MatchMonitorService {
   private snapshots = new Map<string, LiveMatchSnapshot>();
   private listeners = new Map<string, Set<StateListener>>();
@@ -217,7 +249,14 @@ class MatchMonitorService {
       const existing = await db.collection<any>("matchDetails").findOne({ matchId });
       if (existing) {
         if (existing.score) snapshot.score = { ...snapshot.score, ...existing.score };
-        if (existing.incidents && existing.incidents.length > 0) snapshot.incidents = existing.incidents;
+        if (existing.incidents && existing.incidents.length > 0) {
+          const rawIncidents = collectRawIncidents(existing.rawProviderPayload?.incidents);
+          const rawById = new Map(rawIncidents.map((incident) => [String(incident.id), incident]));
+          snapshot.incidents = existing.incidents.map((incident: LiveIncident) => ({
+            ...incident,
+            assistName: incident.assistName || extractAssistName(rawById.get(String(incident.id))),
+          }));
+        }
         if (existing.stats && existing.stats.length > 0) snapshot.stats = existing.stats;
         if (existing.lineups) snapshot.lineups = existing.lineups;
         if (existing.odds && existing.odds.length > 0) snapshot.odds = existing.odds;
@@ -375,13 +414,14 @@ class MatchMonitorService {
           playerName: inc.player?.name || inc.player?.shortName,
           playerInName: inc.playerIn?.name || inc.playerIn?.shortName,
           playerOutName: inc.playerOut?.name || inc.playerOut?.shortName,
-          assistName: inc.assist1?.name || inc.assist1?.shortName || inc.assist?.name || inc.assist?.shortName || null,
+          assistName: extractAssistName(inc),
           cardType,
           score:
             inc.homeScore !== undefined && inc.awayScore !== undefined
               ? { home: inc.homeScore, away: inc.awayScore }
               : undefined,
           detail: inc.text || inc.incidentClass || inc.description,
+          raw: inc,
         });
       }
       if (parsed.length > 0) {

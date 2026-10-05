@@ -659,7 +659,15 @@ function translateStatNameComplete(name: string, language: "fa" | "en") {
   if (language !== "fa") return name;
   const key = String(name || "").trim().toLowerCase().replace(/[：:]/g, "").replace(/\s+/g, " ");
   const map: Record<string, string> = {
+    "match overview": "نمای کلی بازی",
+    "shots": "شوت‌ها",
+    "attack": "حمله",
+    "passes": "پاس‌ها",
+    "duels": "دوئل‌ها",
+    "defending": "دفاع",
+    "goalkeeping": "دروازه‌بانی",
     "ball possession": "مالکیت توپ",
+    "average rating": "امتیاز میانگین",
     "total shots": "مجموع شوت‌ها",
     "shots on goal": "شوت در چارچوب",
     "shots on target": "شوت در چارچوب",
@@ -670,8 +678,10 @@ function translateStatNameComplete(name: string, language: "fa" | "en") {
     "shots outside box": "شوت از خارج محوطه",
     "big chances": "موقعیت‌های بزرگ",
     "big chances missed": "موقعیت‌های بزرگ از دست‌رفته",
+    "big chances scored": "موقعیت‌های بزرگ تبدیل‌شده به گل",
     "hit woodwork": "برخورد با تیرک",
     "expected goals": "گل‌های مورد انتظار",
+    "expected goals on target": "گل‌های مورد انتظار در چارچوب",
     "xg": "گل‌های مورد انتظار",
     "expected assists": "پاس گل‌های مورد انتظار",
     "xga": "پاس گل‌های مورد انتظار",
@@ -694,21 +704,33 @@ function translateStatNameComplete(name: string, language: "fa" | "en") {
     "long balls": "پاس‌های بلند",
     "accurate long balls": "پاس‌های بلند صحیح",
     "through balls": "پاس‌های عمقی",
+    "final third entries": "ورود به یک‌سوم نهایی",
+    "final third phase": "حضور در یک‌سوم نهایی",
     "dribbles": "دریبل‌ها",
+    "dispossessed": "توپ از دست‌رفته در دوئل",
     "successful dribbles": "دریبل‌های موفق",
     "tackles": "تکل‌ها",
+    "tackles won": "تکل‌های موفق",
+    "total tackles": "مجموع تکل‌ها",
     "interceptions": "توپ‌گیری‌ها",
     "clearances": "دفع توپ‌ها",
     "errors leading to goal": "اشتباه منجر به گل",
+    "errors lead to a goal": "اشتباه منجر به گل",
+    "errors lead to a shot": "اشتباه منجر به شوت",
     "possession lost": "از دست دادن مالکیت",
-    "duels": "دوئل‌ها",
     "duels won": "دوئل‌های برده‌شده",
     "aerial duels": "دوئل‌های هوایی",
     "aerial duels won": "دوئل‌های هوایی برده‌شده",
     "ground duels": "دوئل‌های زمینی",
+    "recoveries": "بازپس‌گیری توپ",
     "goalkeeper saves": "مهارهای دروازه‌بان",
     "saves": "مهارها",
     "goals prevented": "گل‌های جلوگیری‌شده",
+    "big saves": "مهارهای دشوار",
+    "high claims": "خروج و مهار هوایی",
+    "total saves": "مجموع مهارها",
+    "penalty saves": "مهار پنالتی",
+    "punches": "مشت‌کردن توپ",
     "goal kicks": "ضربات دروازه",
     "throw-ins": "پرتاب‌های اوت",
     "yellow cards": "کارت‌های زرد",
@@ -718,6 +740,10 @@ function translateStatNameComplete(name: string, language: "fa" | "en") {
     "fast breaks": "ضدحمله‌ها",
     "attacks": "حملات",
     "dangerous attacks": "حملات خطرناک",
+    "fouled in final third": "خطا گرفته‌شده در یک‌سوم نهایی",
+    "touches in penalty area": "لمس توپ در محوطه جریمه",
+    "number of sprints": "تعداد استارت‌ها",
+    "distance covered": "مسافت طی‌شده",
     "injuries": "مصدومیت‌ها",
   };
   return map[key] || `آمار: ${name}`;
@@ -790,7 +816,6 @@ function StatComparison({ stat, isHighlight, language }: any) {
   const total = hVal + aVal || 1;
   const hPct = (hVal / total) * 100;
   const aPct = (aVal / total) * 100;
-  const extraEntries = Object.entries(stat.raw || {}).filter(([key, value]) => !["name", "label", "home", "away", "homeValue", "awayValue"].includes(key) && value !== null && value !== undefined && typeof value !== "object");
 
   return (
     <div className={cn("flex flex-col gap-2", isHighlight && "p-4 bg-[#07100c] border border-[#1a382d] rounded-[24px]")}>
@@ -805,13 +830,6 @@ function StatComparison({ stat, isHighlight, language }: any) {
         <div className="bg-gradient-to-r from-[#059669] to-[#10b981] h-full rounded-full transition-all" style={{ width: `${hPct}%` }} />
         <div className="bg-gradient-to-l from-white/10 to-white/20 h-full rounded-full transition-all" style={{ width: `${aPct}%` }} />
       </div>
-      {extraEntries.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-white/45">
-          {extraEntries.map(([key, value]) => (
-            <span key={key}><b className="text-white/65">{translateStatNameComplete(key.replace(/([A-Z])/g, " $1"), language)}:</b> {String(value)}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

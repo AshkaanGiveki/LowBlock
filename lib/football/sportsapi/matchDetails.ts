@@ -14,6 +14,25 @@ import { env } from "@/lib/env";
 
 const inFlight = new Map<string, Promise<LiveMatchSnapshot | null>>();
 
+function personName(value: any): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (!value || typeof value !== "object") return null;
+  return value.name || value.shortName || value.player?.name || value.player?.shortName || null;
+}
+
+function extractAssistName(incident: any): string | null {
+  return personName(
+    incident.assist1 ??
+      incident.assist2 ??
+      incident.assist ??
+      incident.assistant ??
+      incident.assistPlayer ??
+      incident.playerAssist ??
+      incident.incident?.assist1 ??
+      incident.incident?.assist,
+  );
+}
+
 function parseCanonicalStatus(rawStatus: any): "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "VOID" | "SUSPENDED" {
   if (!rawStatus) return "SCHEDULED";
   const type = String(rawStatus.type || "").toLowerCase();
@@ -173,13 +192,14 @@ export async function getOrFetchMatchDetails(
           playerName: inc.player?.name || inc.player?.shortName,
           playerInName: inc.playerIn?.name || inc.playerIn?.shortName,
           playerOutName: inc.playerOut?.name || inc.playerOut?.shortName,
-          assistName: inc.assist1?.name || inc.assist1?.shortName || inc.assist?.name || null,
+          assistName: extractAssistName(inc),
           cardType,
           score:
             inc.homeScore !== undefined && inc.awayScore !== undefined
               ? { home: inc.homeScore, away: inc.awayScore }
               : undefined,
           detail: inc.text || inc.incidentClass || inc.description,
+          raw: inc,
         });
       }
 
