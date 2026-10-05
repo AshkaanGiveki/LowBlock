@@ -118,12 +118,38 @@ function todayBounds() {
   return { start, end: new Date(start.getTime() + 86_400_000) };
 }
 
+/**
+ * A partially populated matches collection is not evidence that today's
+ * SportsAPI discovery completed. In particular, one live match can exist
+ * while the rest of the daily schedule is still missing. The persisted
+ * discovery record is the source of truth and keeps this fallback to one
+ * daily REST discovery instead of repeating it on every page request.
+ */
+async function ensureSportsApiTodayDiscovery(db: Awaited<ReturnType<typeof getDb>>) {
+  if (getFootballProvider().name !== "sportsapi") return;
+
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const discovery = await db
+    .collection("sportsApiDailyFixtures")
+    .findOne({ dateString: dateKey }, { projection: { dateString: 1 } });
+  if (discovery) return;
+
+  await getFootballProvider().syncDate(dateKey);
+}
+
 export async function getMatchesPage(
   limit = 30,
   cursor?: MatchPageCursor | null,
 ) {
   const db = await getDb();
   const bounds = todayBounds();
+  if (!cursor) {
+    try {
+      await ensureSportsApiTodayDiscovery(db);
+    } catch (err) {
+      console.error("[SportsAPI] Daily discovery check failed:", err);
+    }
+  }
   const query: any = {
     provider: getFootballProvider().name,
     rawApiResponse: { $exists: true },
@@ -213,23 +239,6 @@ export async function getMatchesPage(
     .collection<MatchRecord>("matches")
     .aggregate<MatchRecord>(pipeline)
     .toArray();
-
-  if (
-    matches.length === 0 &&
-    !cursor &&
-    getFootballProvider().name === "sportsapi"
-  ) {
-    try {
-      const dateKey = bounds.start.toISOString().slice(0, 10);
-      await getFootballProvider().syncDate(dateKey);
-      matches = await db
-        .collection<MatchRecord>("matches")
-        .aggregate<MatchRecord>(pipeline)
-        .toArray();
-    } catch (err) {
-      console.error("[SportsAPI] Discovery on empty page matches failed:", err);
-    }
-  }
 
   const hasMore = matches.length > pageSize;
   const page = hasMore ? matches.slice(0, -1) : matches;
