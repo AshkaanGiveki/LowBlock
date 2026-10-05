@@ -16,6 +16,7 @@ import {
 } from "./rest";
 import { normalizeSportsApiMatch } from "./normalizer";
 import { getSportsApiWsManager } from "./ws";
+import { env } from "@/lib/env";
 import { COMPETITION_MAPPINGS } from "../competitionMapping";
 import { LEAGUES } from "../leagues";
 import { rebuildRoundRecords } from "../roundLifecycle";
@@ -294,8 +295,11 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     }
     listRequests += dateKeys.length;
 
-    // 2. Sync tournaments in our game to fetch upcoming rounds & recent fixtures
-    const tournamentSync = await this.syncAllTournaments();
+    // 2. Optional tournament discovery. Disabled by default because it can
+    // consume dozens of REST calls and is not safe on the Free plan.
+    const tournamentSync = env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED
+      ? await this.syncAllTournaments()
+      : { total: 0, requests: 0 };
     total += tournamentSync.total;
     listRequests += tournamentSync.requests;
 

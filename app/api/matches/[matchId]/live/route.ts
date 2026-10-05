@@ -4,6 +4,9 @@ import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backg
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// Vercel Hobby permits function durations up to 60 seconds. The browser's
+// EventSource automatically reconnects after this bounded stream closes.
+export const maxDuration = 60;
 
 export async function GET(
   request: Request,

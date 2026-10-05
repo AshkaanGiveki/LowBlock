@@ -81,10 +81,37 @@ export type LiveMatchSnapshot = {
   stats: LiveStatGroup[];
   lineups: LiveLineups | null;
   odds: LiveOddsMarket[];
+  rawProviderPayload?: Record<string, unknown>;
   lastUpdateAt: number;
 };
 
 type StateListener = (snapshot: LiveMatchSnapshot) => void;
+
+/** SportsAPI live updates use flattened delta keys such as
+ * `homeScore.current` and `status.code`. Rebuild the nested shape before
+ * applying them so deltas are never silently discarded. */
+function expandProviderDelta(value: any): any {
+  if (Array.isArray(value)) return value.map(expandProviderDelta);
+  if (!value || typeof value !== "object") return value;
+
+  const output: Record<string, any> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const expanded = expandProviderDelta(raw);
+    if (!key.includes(".")) {
+      output[key] = expanded;
+      continue;
+    }
+
+    const parts = key.split(".");
+    let cursor = output;
+    for (const part of parts.slice(0, -1)) {
+      cursor[part] ||= {};
+      cursor = cursor[part];
+    }
+    cursor[parts.at(-1)!] = expanded;
+  }
+  return output;
+}
 
 class MatchMonitorService {
   private snapshots = new Map<string, LiveMatchSnapshot>();
@@ -119,6 +146,7 @@ class MatchMonitorService {
         stats: [],
         lineups: null,
         odds: [],
+        rawProviderPayload: {},
         lastUpdateAt: Date.now(),
       };
       this.snapshots.set(matchId, snapshot);
@@ -149,6 +177,7 @@ class MatchMonitorService {
         stats: [],
         lineups: null,
         odds: [],
+        rawProviderPayload: {},
         lastUpdateAt: Date.now(),
       };
       this.snapshots.set(matchId, snapshot);
@@ -163,6 +192,7 @@ class MatchMonitorService {
         if (existing.stats && existing.stats.length > 0) snapshot.stats = existing.stats;
         if (existing.lineups) snapshot.lineups = existing.lineups;
         if (existing.odds && existing.odds.length > 0) snapshot.odds = existing.odds;
+        if (existing.rawProviderPayload) snapshot.rawProviderPayload = existing.rawProviderPayload;
         if (existing.updatedAt) snapshot.lastUpdateAt = new Date(existing.updatedAt).getTime();
       } else {
         const matchRecord = await db.collection<any>("matches").findOne({
@@ -218,11 +248,11 @@ class MatchMonitorService {
 
   public handleWsMessage(channel: string, payload: any) {
     if (!payload) return;
-    const data = payload?.data || payload;
+    const data = expandProviderDelta(payload?.data || payload);
     if (!data) return;
 
     // Handle global live-scores feed
-    if (channel === "live-scores") {
+    if (channel === "live-scores" || channel === "live-scores:football") {
       this.handleLiveScoresMessage(data);
       return;
     }
@@ -235,6 +265,8 @@ class MatchMonitorService {
     const subType = matchMatch[2]; // undefined (score/match), incidents, stats, lineups, odds
 
     const snapshot = this.getSnapshot(matchId);
+    snapshot.rawProviderPayload ||= {};
+    snapshot.rawProviderPayload[subType || "score"] = payload;
     snapshot.lastUpdateAt = Date.now();
 
     if (!subType) {
@@ -318,7 +350,9 @@ class MatchMonitorService {
         });
       }
       if (parsed.length > 0) {
-        snapshot.incidents = parsed;
+        const byId = new Map(snapshot.incidents.map((incident) => [incident.id, incident]));
+        for (const incident of parsed) byId.set(incident.id, incident);
+        snapshot.incidents = Array.from(byId.values()).sort((a, b) => a.time - b.time);
       }
     } else if (subType === "stats") {
       const statsObj = data.statistics || data.data?.statistics || (Array.isArray(data) ? data : []);
@@ -410,13 +444,15 @@ class MatchMonitorService {
 
     for (const item of list) {
       if (!item) continue;
-      const ev = item.event || item;
+      const ev = expandProviderDelta(item.event || item);
       const matchId = String(ev.id || ev.matchId || "");
       if (!matchId || matchId === "undefined") continue;
 
       const snapshot = this.snapshots.get(matchId);
-      if (snapshot || ev.homeScore || ev.status) {
+      if (snapshot || ev.homeScore || ev.status || ev.eventId) {
         const snap = this.getSnapshot(matchId);
+        snap.rawProviderPayload ||= {};
+        snap.rawProviderPayload.liveScores = item;
         snap.lastUpdateAt = Date.now();
 
         if (ev.status) {
@@ -516,6 +552,7 @@ class MatchMonitorService {
         matchId,
         provider: "sportsapi",
         score: snapshot.score,
+        rawProviderPayload: snapshot.rawProviderPayload || {},
         updatedAt: new Date(),
       };
       if (snapshot.incidents && snapshot.incidents.length > 0) {

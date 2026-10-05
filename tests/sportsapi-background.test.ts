@@ -163,4 +163,28 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(snap.score.away).toBe(1);
     expect(snap.score.statusDescription).toBe("1st half");
   });
+
+  it("reconciles SportsAPI flattened live-score deltas", () => {
+    const monitor = getMatchMonitorService();
+
+    monitor.handleWsMessage("live-scores", {
+      type: "update",
+      data: {
+        eventId: "99005",
+        id: "99005",
+        "status.code": 6,
+        "status.description": "2nd half",
+        "status.type": "inprogress",
+        "homeScore.current": 2,
+        "awayScore.current": 1,
+        "changes.changeTimestamp": 1234567890,
+      },
+    });
+
+    const snap = monitor.getSnapshot("99005");
+    expect(snap.score.status).toBe("LIVE");
+    expect(snap.score.home).toBe(2);
+    expect(snap.score.away).toBe(1);
+    expect(snap.score.statusDescription).toBe("2nd half");
+  });
 });

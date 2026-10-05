@@ -40,6 +40,7 @@ export async function syncActiveMatchesSubscriptions(): Promise<void> {
     // Ensure connection is active
     ws.connect();
     ws.subscribeToChannel("live-scores");
+    ws.subscribeToChannel("live-scores:football");
 
     for (const m of matches) {
       const matchId = String(m.providerMatchId);
@@ -76,6 +77,7 @@ export function startSportsApiBackgroundService(): void {
   // 1. Connect WebSocket
   ws.connect();
   ws.subscribeToChannel("live-scores");
+  ws.subscribeToChannel("live-scores:football");
 
   // 2. Discover and subscribe to all active/today matches in DB
   syncActiveMatchesSubscriptions().catch((err) =>

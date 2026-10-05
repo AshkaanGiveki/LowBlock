@@ -10,6 +10,7 @@ import { getMatchMonitorService } from "./matchMonitor";
 import { ensureSportsApiBackgroundService } from "./backgroundService";
 import { fetchSportsApi } from "./rest";
 import { runScoreEngine } from "@/lib/scoring/scoreEngine";
+import { env } from "@/lib/env";
 
 const inFlight = new Map<string, Promise<LiveMatchSnapshot | null>>();
 
@@ -98,6 +99,13 @@ export async function getOrFetchMatchDetails(
 
   const isFresh = Date.now() - fromDb.lastUpdateAt < 45_000;
   if (!forceRefresh && dbHasScore && dbHasContent && (fromDb.score.status === "FINISHED" || isFresh)) {
+    return fromDb;
+  }
+
+  // On the Free plan, WebSocket ingestion is authoritative for rich match
+  // data. Return the accumulated local state instead of silently spending
+  // quota on four detail REST calls when a channel has no snapshot yet.
+  if (!env.SPORTSAPI_DETAIL_REST_ENABLED) {
     return fromDb;
   }
 

@@ -100,6 +100,12 @@ const schema = z.object({
     .int()
     .positive()
     .default(300),
+  SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED: z
+    .preprocess((value) => value === "true" || value === true, z.boolean())
+    .default(false),
+  SPORTSAPI_DETAIL_REST_ENABLED: z
+    .preprocess((value) => value === "true" || value === true, z.boolean())
+    .default(false),
 });
 export const env = schema.parse({
   MONGODB_URI: process.env.MONGODB_URI,
@@ -147,6 +153,9 @@ export const env = schema.parse({
     process.env.SPORTSAPI_RECONNECT_MAX_DELAY_MS,
   SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL:
     process.env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL,
+  SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED:
+    process.env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED,
+  SPORTSAPI_DETAIL_REST_ENABLED: process.env.SPORTSAPI_DETAIL_REST_ENABLED,
 });
 export function validateProductionEnv() {
   if (process.env.NODE_ENV !== "production") return;
