@@ -122,6 +122,8 @@ export async function GET(
 
   const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
   const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
+  const homeTeamColors = match.homeTeam?.teamColors || match.rawApiResponse?.homeTeam?.teamColors || null;
+  const awayTeamColors = match.awayTeam?.teamColors || match.rawApiResponse?.awayTeam?.teamColors || null;
 
   return NextResponse.json({
     match: {
@@ -131,11 +133,13 @@ export async function GET(
         ...match.homeTeam,
         logo: homeLogo,
         logoUrl: homeLogo,
+        teamColors: homeTeamColors,
       },
       awayTeam: {
         ...match.awayTeam,
         logo: awayLogo,
         logoUrl: awayLogo,
+        teamColors: awayTeamColors,
       },
       homeGoals: latestHomeGoals,
       awayGoals: latestAwayGoals,

@@ -374,6 +374,7 @@ class MatchMonitorService {
           playerName: inc.player?.name || inc.player?.shortName,
           playerInName: inc.playerIn?.name || inc.playerIn?.shortName,
           playerOutName: inc.playerOut?.name || inc.playerOut?.shortName,
+          assistName: inc.assist1?.name || inc.assist1?.shortName || inc.assist?.name || inc.assist?.shortName || null,
           cardType,
           score:
             inc.homeScore !== undefined && inc.awayScore !== undefined
