@@ -174,6 +174,23 @@ function collectRawIncidents(value: any, result: any[] = []): any[] {
   return result;
 }
 
+function reconcileScoreFromIncidents(snapshot: LiveMatchSnapshot, incidents: LiveIncident[]) {
+  const withScore = incidents.filter((incident) => incident.score).sort((a, b) => a.time - b.time);
+  const latestScore = withScore.at(-1)?.score;
+  if (latestScore) {
+    snapshot.score.home = latestScore.home;
+    snapshot.score.away = latestScore.away;
+  }
+
+  const periodDetails = incidents
+    .filter((incident) => incident.type === "period")
+    .map((incident) => String(incident.detail || "").toLowerCase());
+  if (periodDetails.some((detail) => detail.includes("ft") || detail.includes("full time") || detail.includes("ended"))) {
+    snapshot.score.status = "FINISHED";
+    snapshot.score.elapsed = 90;
+  }
+}
+
 class MatchMonitorService {
   private snapshots = new Map<string, LiveMatchSnapshot>();
   private listeners = new Map<string, Set<StateListener>>();
@@ -244,6 +261,7 @@ class MatchMonitorService {
       this.snapshots.set(matchId, snapshot);
     }
 
+    const scoreBeforeLoad = JSON.stringify(snapshot.score);
     try {
       const db = await getDb();
       const existing = await db.collection<any>("matchDetails").findOne({ matchId });
@@ -256,6 +274,7 @@ class MatchMonitorService {
             ...incident,
             assistName: incident.assistName || extractAssistName(rawById.get(String(incident.id))),
           }));
+          reconcileScoreFromIncidents(snapshot, snapshot.incidents);
         }
         if (existing.stats && existing.stats.length > 0) snapshot.stats = existing.stats;
         if (existing.lineups) snapshot.lineups = existing.lineups;
@@ -281,6 +300,10 @@ class MatchMonitorService {
       }
     } catch (err) {
       console.error("[MatchMonitor] Error loading snapshot from DB:", err);
+    }
+
+    if (JSON.stringify(snapshot.score) !== scoreBeforeLoad) {
+      await this.persistMatchState(matchId, snapshot);
     }
 
     return snapshot;
@@ -428,6 +451,7 @@ class MatchMonitorService {
         const byId = new Map(snapshot.incidents.map((incident) => [incident.id, incident]));
         for (const incident of parsed) byId.set(incident.id, incident);
         snapshot.incidents = Array.from(byId.values()).sort((a, b) => a.time - b.time);
+        reconcileScoreFromIncidents(snapshot, snapshot.incidents);
       }
     } else if (subType === "stats") {
       const statsPayload = data.statistics || data.data?.statistics || data;

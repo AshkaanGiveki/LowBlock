@@ -146,6 +146,26 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(snap.incidents[0].score).toEqual({ home: 1, away: 0 });
   });
 
+  it("reconciles score and final status from an incidents snapshot", () => {
+    const monitor = getMatchMonitorService();
+    const matchId = "99007";
+
+    monitor.handleWsMessage(`match:${matchId}:incidents`, {
+      data: {
+        incidents: [
+          { id: 1, incidentType: "goal", time: 62, isHome: true, player: { name: "Scorer" }, homeScore: 1, awayScore: 0 },
+          { id: 2, incidentType: "period", time: 90, text: "FT", homeScore: 1, awayScore: 0 },
+        ],
+      },
+    });
+
+    const snap = monitor.getSnapshot(matchId);
+    expect(snap.score.home).toBe(1);
+    expect(snap.score.away).toBe(0);
+    expect(snap.score.status).toBe("FINISHED");
+    expect(snap.score.elapsed).toBe(90);
+  });
+
   it("updates score and status from live-scores message", async () => {
     const monitor = getMatchMonitorService();
     const matchId = "99004";
