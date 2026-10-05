@@ -187,4 +187,27 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(snap.score.away).toBe(1);
     expect(snap.score.statusDescription).toBe("2nd half");
   });
+
+  it("accepts nested live-score event batches and keeps a visible live clock", () => {
+    const monitor = getMatchMonitorService();
+
+    monitor.handleWsMessage("live-scores:football", {
+      data: {
+        events: [
+          {
+            eventId: "99006",
+            status: { type: "inprogress", description: "1st half" },
+            homeScore: 0,
+            awayScore: 0,
+          },
+        ],
+      },
+    });
+
+    const snap = monitor.getSnapshot("99006");
+    expect(snap.score.status).toBe("LIVE");
+    expect(snap.score.home).toBe(0);
+    expect(snap.score.away).toBe(0);
+    expect(snap.score.elapsed).toBe(1);
+  });
 });

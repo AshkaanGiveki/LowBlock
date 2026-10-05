@@ -164,8 +164,19 @@ export function MatchAnalytics({
     window.setTimeout(onClose, 280);
   };
 
-  const match = data?.match || initialMatch;
   const liveDetails = data?.liveDetails;
+  const baseMatch = data?.match || initialMatch;
+  // The live snapshot is authoritative while the match row can still be a
+  // stale scheduled record during the first WebSocket round-trip.
+  const match = baseMatch
+    ? {
+        ...baseMatch,
+        homeGoals: baseMatch.homeGoals ?? liveDetails?.score?.home,
+        awayGoals: baseMatch.awayGoals ?? liveDetails?.score?.away,
+        status: liveDetails?.score?.status ?? baseMatch.status,
+        elapsed: liveDetails?.score?.elapsed ?? baseMatch.elapsed,
+      }
+    : baseMatch;
   const incidents = liveDetails?.incidents ?? [];
   const statsGroups = liveDetails?.stats ?? [];
   const lineups = liveDetails?.lineups ?? null;

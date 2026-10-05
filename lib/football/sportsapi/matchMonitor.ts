@@ -113,6 +113,34 @@ function expandProviderDelta(value: any): any {
   return output;
 }
 
+function providerEventId(event: any): string {
+  return String(
+    event?.id ??
+      event?.eventId ??
+      event?.matchId ??
+      event?.fixtureId ??
+      event?.event?.id ??
+      event?.event?.eventId ??
+      event?.match?.id ??
+      "",
+  );
+}
+
+function providerScoreValue(value: any, fallback: number | null): number | null {
+  if (typeof value === "number") return value;
+  if (!value || typeof value !== "object") return fallback;
+  return value.display ?? value.current ?? value.normaltime ?? fallback;
+}
+
+function providerPeriodStart(event: any): number | null {
+  const timestamp =
+    event?.time?.currentPeriodStartTimestamp ??
+    event?.statusTime?.timestamp ??
+    event?.currentPeriodStartTimestamp;
+  const numeric = Number(timestamp);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
 class MatchMonitorService {
   private snapshots = new Map<string, LiveMatchSnapshot>();
   private listeners = new Map<string, Set<StateListener>>();
@@ -194,17 +222,22 @@ class MatchMonitorService {
         if (existing.odds && existing.odds.length > 0) snapshot.odds = existing.odds;
         if (existing.rawProviderPayload) snapshot.rawProviderPayload = existing.rawProviderPayload;
         if (existing.updatedAt) snapshot.lastUpdateAt = new Date(existing.updatedAt).getTime();
-      } else {
-        const matchRecord = await db.collection<any>("matches").findOne({
-          provider: "sportsapi",
-          providerMatchId: matchId,
-        });
-        if (matchRecord) {
-          snapshot.score.home = matchRecord.homeGoals ?? null;
-          snapshot.score.away = matchRecord.awayGoals ?? null;
+      }
+
+      // The details document may already contain lineups/stats/incidents while
+      // the score fields are still empty. Always merge the canonical match
+      // row as a score fallback instead of requiring one document or the other.
+      const matchRecord = await db.collection<any>("matches").findOne({
+        provider: "sportsapi",
+        providerMatchId: matchId,
+      });
+      if (matchRecord) {
+        snapshot.score.home ??= matchRecord.homeGoals ?? null;
+        snapshot.score.away ??= matchRecord.awayGoals ?? null;
+        if (snapshot.score.status === "SCHEDULED") {
           snapshot.score.status = matchRecord.status || "SCHEDULED";
-          snapshot.score.elapsed = matchRecord.elapsed ?? null;
         }
+        snapshot.score.elapsed ??= matchRecord.elapsed ?? null;
       }
     } catch (err) {
       console.error("[MatchMonitor] Error loading snapshot from DB:", err);
@@ -440,24 +473,29 @@ class MatchMonitorService {
       ? data
       : Array.isArray(data.events)
         ? data.events
-        : [data.event || data];
+        : Array.isArray(data.data?.events)
+          ? data.data.events
+          : Array.isArray(data.updates)
+            ? data.updates
+            : [data.event || data.data?.event || data];
 
     for (const item of list) {
       if (!item) continue;
       const ev = expandProviderDelta(item.event || item);
-      const matchId = String(ev.id || ev.matchId || "");
+      const matchId = providerEventId(ev);
       if (!matchId || matchId === "undefined") continue;
 
       const snapshot = this.snapshots.get(matchId);
-      if (snapshot || ev.homeScore || ev.status || ev.eventId) {
+      if (snapshot || matchId) {
         const snap = this.getSnapshot(matchId);
         snap.rawProviderPayload ||= {};
         snap.rawProviderPayload.liveScores = item;
         snap.lastUpdateAt = Date.now();
 
         if (ev.status) {
-          const type = String(ev.status.type || "").toLowerCase();
-          const desc = String(ev.status.description || "").toUpperCase();
+          const statusObject = typeof ev.status === "object" ? ev.status : { description: ev.status };
+          const type = String(statusObject.type || "").toLowerCase();
+          const desc = String(statusObject.description || "").toUpperCase();
           if (type === "finished" || desc === "ENDED" || desc === "FT" || desc === "AET" || desc === "AFTER ET" || ev.status.code === 100) {
             snap.score.status = "FINISHED";
             snap.score.elapsed = 90;
@@ -469,11 +507,11 @@ class MatchMonitorService {
           } else {
             snap.score.status = desc || snap.score.status;
           }
-          snap.score.statusDescription = ev.status.description;
+          snap.score.statusDescription = statusObject.description;
         }
 
-        if (ev.homeScore) {
-          snap.score.home = ev.homeScore.display ?? ev.homeScore.current ?? snap.score.home;
+        if (ev.homeScore !== undefined) {
+          snap.score.home = providerScoreValue(ev.homeScore, snap.score.home);
           snap.score.period1 = {
             home: ev.homeScore.period1 ?? snap.score.period1?.home ?? null,
             away: ev.awayScore?.period1 ?? snap.score.period1?.away ?? null,
@@ -483,18 +521,22 @@ class MatchMonitorService {
             away: ev.awayScore?.period2 ?? snap.score.period2?.away ?? null,
           };
         }
-        if (ev.awayScore) {
-          snap.score.away = ev.awayScore.display ?? ev.awayScore.current ?? snap.score.away;
+        if (ev.awayScore !== undefined) {
+          snap.score.away = providerScoreValue(ev.awayScore, snap.score.away);
         }
         if (snap.score.status === "FINISHED") {
           snap.score.elapsed = 90;
         } else if (snap.score.status === "SCHEDULED") {
           snap.score.elapsed = null;
-        } else if (ev.time?.currentPeriodStartTimestamp) {
+        } else if (providerPeriodStart(ev)) {
           const calc = Math.floor(
-            (Date.now() / 1000 - ev.time.currentPeriodStartTimestamp) / 60,
+            (Date.now() / 1000 - providerPeriodStart(ev)!) / 60,
           );
           snap.score.elapsed = Math.min(130, Math.max(1, calc));
+        } else if (snap.score.status === "LIVE" && snap.score.elapsed == null) {
+          // Some delta messages carry status/score but omit the clock anchor.
+          // Keep the scoreboard visibly live until a timestamped update arrives.
+          snap.score.elapsed = 1;
         }
 
         this.broadcast(matchId, snap);
