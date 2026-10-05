@@ -136,13 +136,13 @@ function getIncidentKind(incident: any): IncidentKind {
 }
 
 function IncidentIcon({ kind, direction }: { kind: IncidentKind; direction?: "in" | "out" }) {
-  const color = kind === "goal" ? "#b7ff4d" : kind === "assist" ? "#7dd3fc" : kind === "own_goal" ? "#fcd34d" : kind === "penalty_miss" ? "#fda4af" : kind === "substitution" ? "#6ee7b7" : kind === "var" ? "#93c5fd" : "#d1d5db";
+  const color = kind === "goal" ? "#b7ff4d" : kind === "assist" ? "#7dd3fc" : kind === "own_goal" ? "#fcd34d" : kind === "penalty_miss" ? "#fda4af" : kind === "substitution" ? direction === "out" ? "#fb7185" : "#6ee7b7" : kind === "var" ? "#93c5fd" : "#d1d5db";
   const label = kind.replace("_", " ");
   return (
-    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={label}>
+    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={label}>
       <title>{label}</title>
-      {kind === "goal" && <><path d="M5 8.5 8 5h8l3 3.5v8L16 20H8l-3-3.5z" /><path d="m8 5 4 3 4-3M5 8.5l7-.5 7 .5M8 20l4-5 4 5M12 8v7" /></>}
-      {kind === "assist" && <><circle cx="7" cy="12" r="2.5" /><circle cx="17" cy="7" r="2.5" /><circle cx="17" cy="17" r="2.5" /><path d="m9.2 11 5.4-3M9.2 13l5.4 3" /><path d="m17 4.5 2-2M19 21.5l-2-2" /></>}
+      {kind === "goal" && <><circle cx="12" cy="12" r="8" /><path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2z" /><path d="m12 7-2.8-2M15 9.2l3.2-1M13.9 12.7l2.2 3M10.1 12.7l-2.2 3M12 14.7v3.3" /></>}
+      {kind === "assist" && <><path d="M5.2 14.4 8.7 12l-.4-5.5c-.1-.9.5-1.6 1.3-1.6 1.3 1.5 2.4 3.2 3.2 5l2.4 2.1 3.2 1.2c.9.3 1.5 1.1 1.3 2-.2.8-.9 1.3-1.8 1.3H6.2c-1.1 0-1.8-.6-1.8-1.4 0-.3.3-.6.8-.7Z" /><path d="m10 6.2 2.2 1M9.1 8.3l2.3 1M15.2 13.1l1.4-1.2M7.4 17.7v1.2M11.3 17.7v1.2M15.2 17.7v1.2" /></>}
       {kind === "own_goal" && <><path d="M5 6h14M7 6v12h10V6M9 18l3-4 3 4" /><path d="M12 3v7M9.5 7.5 12 10l2.5-2.5" /></>}
       {kind === "penalty_miss" && <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="m7 7 10 10M17 7 7 17" /></>}
       {kind === "substitution" && <>{direction === "out" ? <><path d="M5 8h12" /><path d="m14 5 3 3-3 3" /><path d="M19 16H7" /><path d="m10 13-3 3 3 3" /></> : <><path d="M5 16h12" /><path d="m14 13 3 3-3 3" /><path d="M19 8H7" /><path d="m10 5-3 3 3 3" /></>}</>}
@@ -169,15 +169,15 @@ function PitchPlayer({ player, isHome, incidents, language, rowCount, teamColors
 
   return (
     <div className={cn("group relative flex shrink-0 flex-col items-center", cardWidth)}>
-      {incidentKinds.length > 0 && <div className="absolute -right-2 -top-2 z-20 flex items-center gap-0.5 rounded-full border border-white/20 bg-[#07100c]/95 px-1.5 py-1 shadow-lg">{incidentKinds.map((kind) => <IncidentIcon key={kind} kind={kind} />)}</div>}
+      {incidentKinds.length > 0 && <div className="absolute -right-1 -top-1 z-20 flex items-center gap-px rounded-full border border-white/20 bg-[#07100c]/95 px-1 py-0.5 shadow-md">{incidentKinds.map((kind) => <IncidentIcon key={kind} kind={kind} />)}</div>}
 
-      {(isSubIn || isSubOut) && !incidentKinds.includes("substitution") && <div className={cn("absolute -left-2 top-1/2 z-20 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full border bg-[#07100c]/95 shadow-lg", isSubIn ? "border-emerald-300/60" : "border-rose-300/60")}><IncidentIcon kind="substitution" direction={isSubIn ? "in" : "out"} /></div>}
+      {(isSubIn || isSubOut) && !incidentKinds.includes("substitution") && <div className={cn("absolute -left-1 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border bg-[#07100c]/95 shadow-md", isSubIn ? "border-emerald-300/60" : "border-rose-300/60")}><IncidentIcon kind="substitution" direction={isSubIn ? "in" : "out"} /></div>}
 
       {cards.length > 0 && <div className="absolute -bottom-1 -right-1 z-20 flex items-center gap-0.5 rounded-full border border-white/20 bg-[#07100c]/95 px-1 py-0.5 shadow-lg">{cards.map((card: any, index: number) => <span key={`card-${index}`} title={card.cardType || "card"} className={cn("h-3.5 w-2.5 rounded-[3px] border border-white/80 shadow-[0_2px_4px_rgba(0,0,0,0.8)]", card.cardType === "red" ? "bg-rose-500" : card.cardType === "yellow_red" ? "bg-gradient-to-b from-amber-300 to-rose-500" : "bg-amber-300")} />)}</div>}
 
       <div className="relative z-10 flex h-9 w-9 items-center justify-center overflow-visible rounded-full border-2 bg-[#07100c] p-0.5 shadow-[0_7px_16px_rgba(0,0,0,0.65)] transition-transform duration-200 group-hover:-translate-y-1 sm:h-11 sm:w-11" style={{ borderColor: teamColors.primary, boxShadow: `0 0 18px ${teamColors.primary}55` }}>
         {player.id && String(player.id) !== "0" ? <img src={`/api/player-image/${player.id}`} alt={player.shortName || player.name} className="h-full w-full rounded-full object-cover object-top" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <span className={cn("text-sm font-black", isHome ? "text-[#b7ff4d]" : "text-white/80")}>{player.number || "?"}</span>}
-        {player.number && <span className="absolute -bottom-0.5 -right-1 rounded-full border border-white/40 px-1 text-[7px] font-black leading-3" style={{ backgroundColor: teamColors.primary, color: teamColors.text }}>{player.number}</span>}
+        {player.number && <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-white/50 text-[7px] font-black leading-none" style={{ backgroundColor: teamColors.primary, color: teamColors.text }}>{player.number}</span>}
       </div>
 
       <div className="relative z-10 mt-1 w-full min-w-0 truncate px-0.5 text-center text-[8px] font-black leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] sm:text-[9px]">{player.shortName || player.name}</div>
