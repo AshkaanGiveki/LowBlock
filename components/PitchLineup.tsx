@@ -72,37 +72,30 @@ export function PitchLineup({ lineups, match, language, t, incidents }: LineupPr
         </button>
       </div>
 
-      {/* Perspective pitch */}
-      <div className="relative isolate w-full overflow-hidden rounded-[28px] border border-[#b7ff4d]/20 bg-[#020504] p-2 shadow-[0_25px_80px_rgba(0,0,0,0.5)] sm:p-4">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(183,255,77,0.12),transparent_48%),linear-gradient(180deg,#07100c,#010202)]" />
-        <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-[#020504] [perspective:1000px]">
-          <div className="absolute inset-0 origin-bottom [transform:rotateX(8deg)] [clip-path:polygon(12%_2%,88%_2%,100%_98%,0_98%)] bg-[#030806] shadow-[inset_0_0_70px_rgba(0,0,0,0.9),0_0_40px_rgba(183,255,77,0.08)]">
-            <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(105deg,transparent_0%,rgba(183,255,77,0.04)_48%,transparent_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.018)_0,rgba(255,255,255,0.018)_1px,transparent_1px,transparent_18px)]" />
-            <div className="absolute inset-[3%_5%] border border-white/55" />
-            <div className="absolute inset-x-[5%] top-1/2 border-t border-white/45" />
-            <div className="absolute left-1/2 top-1/2 h-[17%] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#b7ff4d]/70 shadow-[0_0_18px_rgba(183,255,77,0.14)]" />
-            <div className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#b7ff4d] shadow-[0_0_12px_#b7ff4d]" />
-            <div className="absolute inset-x-[28%] bottom-[3%] h-[18%] border border-white/55 border-b-0" />
-            <div className="absolute inset-x-[39%] bottom-[3%] h-[8%] border border-[#b7ff4d]/70 border-b-0" />
-            <div className="absolute inset-x-[28%] top-[3%] h-[18%] border border-white/55 border-t-0" />
-            <div className="absolute inset-x-[39%] top-[3%] h-[8%] border border-[#b7ff4d]/70 border-t-0" />
-            <div className="absolute left-1/2 bottom-[3%] h-1 w-14 -translate-x-1/2 rounded-full bg-white/70 shadow-[0_0_12px_rgba(255,255,255,0.4)]" />
-            <div className="absolute left-1/2 top-[3%] h-1 w-14 -translate-x-1/2 rounded-full bg-white/70 shadow-[0_0_12px_rgba(255,255,255,0.4)]" />
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSide}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-[7%_8%] flex flex-col justify-between py-3 sm:inset-[7%_9%] sm:py-5"
-              >
-                {renderPitchRows(currentTeam, isHome, incidents, language)}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+      {/* Generated transparent pitch + deliberately separated formation lanes */}
+      <div className="relative isolate w-full overflow-hidden rounded-[30px] border border-white/10 bg-[#050807] px-1 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.58)] sm:px-3 sm:py-5">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_48%,rgba(183,255,77,0.08),transparent_58%)]" />
+        <div className="relative aspect-[4/5] w-full">
+          <img
+            src="/images/pitch-field-v2.png"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+          />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSide}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-[10%_8%_11%] flex flex-col justify-between py-1 sm:inset-[10%_9%_11%] sm:py-2"
+            >
+              {renderPitchRows(currentTeam, isHome, incidents, language)}
+            </motion.div>
+          </AnimatePresence>
         </div>
-        <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-[0.35em] text-white/25">{isHome ? "Home shape" : "Away shape"}</div>
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-[0.35em] text-white/30">{isHome ? "Home formation" : "Away formation"}</div>
       </div>
 
       {/* Substitutes */}
@@ -156,7 +149,7 @@ function renderPitchRows(team: any, isHome: boolean, incidents: any[], language:
   const displayRows = [...rows].reverse(); 
 
   return displayRows.map((rowPlayers, rowIndex) => (
-    <div key={rowIndex} className="flex justify-evenly items-center w-full px-2 md:px-4">
+    <div key={rowIndex} className="flex w-full items-center justify-center gap-2 px-1 sm:gap-4 sm:px-3">
       {rowPlayers.map((player: Player) => (
         <PitchPlayer 
           key={player.id} 
@@ -188,10 +181,10 @@ function PitchPlayer({ player, isHome, incidents, language, rowCount }: { player
   const isSubIn = pIncidents.some((i) => i.type === "substitution" && (i.playerInName === player.name || i.playerInName === player.shortName));
   const isSubOut = pIncidents.some((i) => i.type === "substitution" && (i.playerOutName === player.name || i.playerOutName === player.shortName));
 
-  const maxWidth = rowCount <= 3 ? "max-w-[112px]" : rowCount <= 4 ? "max-w-[96px]" : "max-w-[76px]";
+  const cardWidth = rowCount <= 2 ? "w-[82px] sm:w-[100px]" : rowCount <= 3 ? "w-[68px] sm:w-[86px]" : rowCount <= 4 ? "w-[58px] sm:w-[74px]" : "w-[49px] sm:w-[64px]";
 
   return (
-    <div className="group relative flex flex-col items-center">
+    <div className={cn("group relative flex shrink-0 flex-col items-center", cardWidth)}>
       {/* Top Right: Goals/Assists/Pens */}
       {goals.length > 0 && (
         <div className="absolute -top-1.5 -right-1.5 flex flex-row-reverse gap-[-4px] z-20">
@@ -221,7 +214,7 @@ function PitchPlayer({ player, isHome, incidents, language, rowCount }: { player
 
       {/* Player card */}
       <div className={cn(
-        "relative z-10 flex h-10 w-10 items-center justify-center overflow-hidden rounded-[13px] border-2 bg-[#07100c] shadow-[0_7px_16px_rgba(0,0,0,0.65)] transition-transform duration-200 group-hover:-translate-y-1 sm:h-12 sm:w-12",
+        "relative z-10 flex h-8 w-8 items-center justify-center overflow-hidden rounded-[11px] border-2 bg-[#07100c] shadow-[0_7px_16px_rgba(0,0,0,0.65)] transition-transform duration-200 group-hover:-translate-y-1 sm:h-10 sm:w-10 sm:rounded-[13px]",
         isHome ? "border-[#b7ff4d]/80 shadow-[0_0_16px_rgba(183,255,77,0.22)]" : "border-white/70 shadow-[0_0_16px_rgba(255,255,255,0.14)]"
       )}>
         <div className={cn("absolute inset-x-0 bottom-0 h-1/2 opacity-80", isHome ? "bg-[#b7ff4d]/15" : "bg-white/10")} />
@@ -240,12 +233,11 @@ function PitchPlayer({ player, isHome, incidents, language, rowCount }: { player
       
       {/* Player label */}
       <div className={cn(
-        "relative z-10 mt-1 rounded-lg border bg-[#050907]/90 px-1.5 py-1 text-center shadow-[0_5px_12px_rgba(0,0,0,0.5)] backdrop-blur-sm",
-        maxWidth,
+        "relative z-10 mt-1 w-full min-w-0 rounded-lg border bg-[#050907]/95 px-1 py-1 text-center shadow-[0_5px_12px_rgba(0,0,0,0.5)] backdrop-blur-sm",
         isHome ? "border-[#b7ff4d]/35" : "border-white/25"
       )}>
-        <div className="truncate text-[9px] font-black leading-tight text-white sm:text-[10px]">{player.shortName || player.name}</div>
-        {player.position && <div className={cn("mt-0.5 text-[7px] font-bold uppercase tracking-wider", isHome ? "text-[#b7ff4d]/75" : "text-white/50")}>{player.position}</div>}
+        <div className="truncate text-[8px] font-black leading-tight text-white sm:text-[9px]">{player.shortName || player.name}</div>
+        {player.position && <div className={cn("mt-0.5 truncate text-[6px] font-bold uppercase tracking-wider", isHome ? "text-[#b7ff4d]/75" : "text-white/50")}>{player.position}</div>}
       </div>
     </div>
   );
