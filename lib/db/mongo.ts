@@ -164,6 +164,7 @@ export async function ensureIndexes() {
     db
       .collection("predictions")
       .createIndex({ userId: 1, matchId: 1 }, { unique: true }),
+    db.collection("predictions").createIndex({ matchId: 1 }),
     db
       .collection("predictionLockSnapshots")
       .createIndex({ predictionId: 1 }, { unique: true }),

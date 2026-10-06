@@ -29,7 +29,7 @@ export default async function PredictionsPage() {
           awayTeam: { id: number; name: string; logoUrl: string | null };
         }>("matches")
         .find({
-          provider: "football-api",
+          provider: { $in: ["football-api", "sportsapi"] },
           providerMatchId: { $in: predictions.map((item) => item.matchId) },
         })
         .toArray()

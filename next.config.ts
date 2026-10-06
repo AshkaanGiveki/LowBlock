@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "img.a.transfermarkt.technology" },
       { protocol: "https", hostname: "tmssl.akamaized.net" },
       { protocol: "https", hostname: "media.api-sports.io" },
+      { protocol: "https", hostname: "img.sofascore.com" },
     ],
   },
   poweredByHeader: false,

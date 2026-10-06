@@ -75,6 +75,7 @@ export function ClubRoundFixtures({
         <MatchAnalytics
           matchId={selected}
           clubId={clubId}
+          initialMatch={fixtures.find((m: any) => m.providerMatchId === selected)}
           onClose={() => setSelected(null)}
         />
       )}

@@ -126,6 +126,7 @@ export function RoundMatchGrid({
       {selected && (
         <MatchAnalytics
           matchId={selected}
+          initialMatch={fixtures.find((m: any) => m.providerMatchId === selected)}
           onClose={() => {
             setSelected(null);
             closeMatchRoute();

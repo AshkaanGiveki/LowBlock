@@ -116,12 +116,28 @@ export function PredictionHistory({ rows }: { rows: Row[] }) {
             {t("هنوز پیش‌بینی ندارید", "No predictions yet")}
           </div>
         )}
-        {selected && (
-          <MatchAnalytics
-            matchId={selected}
-            onClose={() => setSelected(null)}
-          />
-        )}
+        {selected && (() => {
+          const row = rows.find((r) => r.matchId === selected);
+          return (
+            <MatchAnalytics
+              matchId={selected}
+              initialMatch={
+                row
+                  ? {
+                      providerMatchId: row.matchId,
+                      homeTeam: row.homeTeam,
+                      awayTeam: row.awayTeam,
+                      homeGoals: row.actualHome,
+                      awayGoals: row.actualAway,
+                      kickoffAt: row.kickoffAt,
+                      status: row.actualHome != null ? "FINISHED" : "SCHEDULED",
+                    }
+                  : undefined
+              }
+              onClose={() => setSelected(null)}
+            />
+          );
+        })()}
       </div>
     </main>
   );

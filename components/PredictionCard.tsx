@@ -44,6 +44,8 @@ type Match = {
   elapsed?: number | null;
   homeGoals?: number | null;
   awayGoals?: number | null;
+  homePenaltyGoals?: number | null;
+  awayPenaltyGoals?: number | null;
   homeTeam: Team;
   awayTeam: Team;
 };
@@ -95,6 +97,49 @@ export function PredictionCard({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [liveMatch, setLiveMatch] = useState(match);
+  
+  // Real-time updates for PredictionCard
+  useEffect(() => {
+    setLiveMatch(match);
+  }, [match]);
+
+  useEffect(() => {
+    const status = String(liveMatch.status);
+    const shouldStream =
+      Boolean(status) &&
+      !["FINISHED", "CANCELLED", "POSTPONED", "VOID"].includes(status);
+    if (!shouldStream) return;
+
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`/api/matches/${liveMatch.providerMatchId}/live?stream=true`);
+
+      const applySnapshot = (data: any) => {
+        setLiveMatch((prev) => ({
+          ...prev,
+          homeGoals: data.score?.home ?? prev.homeGoals,
+          awayGoals: data.score?.away ?? prev.awayGoals,
+          status: data.score?.status ?? prev.status,
+          elapsed: data.score?.elapsed ?? prev.elapsed,
+        }));
+      };
+
+      eventSource.addEventListener("snapshot", (e) => {
+        try { applySnapshot(JSON.parse(e.data)); } catch {}
+      });
+
+      eventSource.addEventListener("update", (e) => {
+        try { applySnapshot(JSON.parse(e.data)); } catch {}
+      });
+
+    } catch {}
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
+  }, [liveMatch.providerMatchId, liveMatch.status]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
@@ -159,7 +204,6 @@ export function PredictionCard({
     leaveMatchRoute();
   };
   const open = () => {
-    if (!isMatchRoute) openMatchRoute(match.providerMatchId, pathname);
     if (locked) setAnalyticsOpen(true);
     else {
       setDrawerOpen(true);
@@ -212,6 +256,8 @@ export function PredictionCard({
       finished={finished}
       homeGoals={match.homeGoals}
       awayGoals={match.awayGoals}
+      homePenaltyGoals={match.homePenaltyGoals}
+      awayPenaltyGoals={match.awayPenaltyGoals}
       elapsed={match.elapsed}
       kickoff={kickoff}
       now={now}
@@ -280,7 +326,7 @@ export function PredictionCard({
             <span
               className={`rounded-full border px-2.5 py-1 ${live ? "border-red-400/50 bg-red-500/15 text-red-200" : "border-brand/30 bg-brand/10 text-brand"}`}
             >
-              {live || finished ? (
+              {live || finished || now >= kickoff ? (
                 statusText
               ) : (
                 <CountdownDisplay
@@ -413,6 +459,7 @@ export function PredictionCard({
         {analyticsOpen && (
           <MatchAnalytics
             matchId={match.providerMatchId}
+            initialMatch={match}
             onClose={closeAnalytics}
           />
         )}
@@ -426,6 +473,8 @@ function MatchStatusBadge({
   finished,
   homeGoals,
   awayGoals,
+  homePenaltyGoals,
+  awayPenaltyGoals,
   elapsed,
   kickoff,
   now,
@@ -435,6 +484,8 @@ function MatchStatusBadge({
   finished: boolean;
   homeGoals?: number | null;
   awayGoals?: number | null;
+  homePenaltyGoals?: number | null;
+  awayPenaltyGoals?: number | null;
   elapsed?: number | null;
   kickoff: number;
   now: number;
@@ -442,9 +493,12 @@ function MatchStatusBadge({
 }) {
   const result =
     homeGoals != null && awayGoals != null
-      ? `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}`
+      ? homePenaltyGoals != null && awayPenaltyGoals != null
+        ? `${formatNumber(homeGoals, language)}(${formatNumber(homePenaltyGoals, language)}) - (${formatNumber(awayPenaltyGoals, language)})${formatNumber(awayGoals, language)}`
+        : `${formatNumber(homeGoals, language)} - ${formatNumber(awayGoals, language)}`
       : "—";
-  if (live)
+  if (live) {
+    const isRealisticElapsed = elapsed != null && elapsed > 0 && elapsed <= 130;
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/12 px-3 py-1.5 text-red-100 shadow-[0_0_22px_rgba(248,113,113,.12)]">
         <span className="relative flex h-2.5 w-2.5">
@@ -453,13 +507,14 @@ function MatchStatusBadge({
         </span>
         <b className="tracking-[.12em]">LIVE</b>
         <strong className="text-sm text-white">{result}</strong>
-        {elapsed != null && (
+        {isRealisticElapsed && (
           <small className="rounded-md bg-white/10 px-1.5 py-0.5 font-black">
             {formatNumber(elapsed, language)}′
           </small>
         )}
       </span>
     );
+  }
   if (finished)
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-brand shadow-[0_0_22px_rgba(32,184,121,.1)]">
@@ -470,6 +525,14 @@ function MatchStatusBadge({
         <strong className="text-sm text-white">{result}</strong>
       </span>
     );
+  if (now >= kickoff) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <b className="text-[10px] font-bold">{language === "fa" ? "در حال برگزاری" : "STARTED"}</b>
+      </span>
+    );
+  }
   return (
     <span className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-brand">
       <CountdownDisplay
@@ -845,7 +908,7 @@ function InsightsToggle({
         aria-expanded={open}
         className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-[#0d1712] px-3 py-1.5 text-[10px] font-black text-brand shadow-[0_0_0_5px_#0d1712] transition hover:bg-brand/10"
       >
-        <span>{t("سابقه رودررو", "H2H history")}</span>
+        <span>{t("ترکیب تیم‌ها و اطلاعات بازی", "Match Lineups & Info")}</span>
         <ChevronDown
           size={14}
           className={

@@ -1,14 +1,21 @@
+import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { unstable_cache } from "next/cache";
+import type { ProviderName } from "./types";
+import { ensureSportsApiBackgroundService } from "./sportsapi/backgroundService";
 import {
   GLOBAL_LEAGUE_CODES,
+  IMPORTANT_NATIONAL_TEAM_QUERY_NAMES,
+  INTERNATIONAL_LEAGUE_CODES,
+  isEligibleInternationalFixture,
   IMPORTANT_NATIONAL_TEAM_NAMES,
   isFeaturedFixture,
 } from "@/lib/football/leagues";
+import { appDayBounds, appDateKey } from "./scheduleWindow";
 
 export type MatchRecord = {
   _id?: unknown;
-  provider: "football-api";
+  provider: ProviderName;
   providerMatchId: string;
   leagueCode: string;
   matchday: number;
@@ -32,8 +39,12 @@ const getCachedMatches = unstable_cache(
     to: number,
   ) => {
     const db = await getDb();
+    const activeProvider = getFootballProvider().name;
+    if (activeProvider === "sportsapi") {
+      ensureSportsApiBackgroundService();
+    }
     const query = {
-      provider: "football-api" as const,
+      provider: activeProvider,
       // Only expose records written from a verified Football API response.
       rawApiResponse: { $exists: true },
       // 207 is Switzerland's Super League, not Turkey's Super Cup (551).
@@ -42,13 +53,44 @@ const getCachedMatches = unstable_cache(
       kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
       ...(leagueCode ? { leagueCode } : {}),
       ...(matchday !== null ? { matchday } : {}),
+      $or: [
+        { leagueCode: { $nin: INTERNATIONAL_LEAGUE_CODES } },
+        { "homeTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+        { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+      ],
     };
-    return db
+    let rows = await db
       .collection<MatchRecord>("matches")
       .find(query)
       .sort({ kickoffAt: 1 })
-      .limit(limit)
+      .limit(Math.max(limit * 3, 100))
       .toArray();
+    rows = rows
+      .filter((row) =>
+        isEligibleInternationalFixture(
+          row.leagueCode,
+          row.homeTeam.name,
+          row.awayTeam.name,
+        ),
+      )
+      .slice(0, limit);
+
+    if (rows.length === 0 && activeProvider === "sportsapi") {
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        await getFootballProvider().syncDate(todayStr);
+        rows = await db
+          .collection<MatchRecord>("matches")
+          .find(query)
+          .sort({ kickoffAt: 1 })
+          .limit(limit)
+          .toArray();
+      } catch (err) {
+        console.error("[SportsAPI] Discovery on empty cached matches failed:", err);
+      }
+    }
+
+    return rows;
   },
   ["lowblock-matches"],
   { revalidate: 60, tags: ["matches"] },
@@ -89,9 +131,26 @@ export type MatchPageCursor = {
 };
 
 function todayBounds() {
-  const dateKey = new Date().toISOString().slice(0, 10);
-  const start = new Date(`${dateKey}T00:00:00.000Z`);
-  return { start, end: new Date(start.getTime() + 86_400_000) };
+  return appDayBounds();
+}
+
+/**
+ * A partially populated matches collection is not evidence that today's
+ * SportsAPI discovery completed. In particular, one live match can exist
+ * while the rest of the daily schedule is still missing. The persisted
+ * discovery record is the source of truth and keeps this fallback to one
+ * daily REST discovery instead of repeating it on every page request.
+ */
+async function ensureSportsApiTodayDiscovery(db: Awaited<ReturnType<typeof getDb>>) {
+  if (getFootballProvider().name !== "sportsapi") return;
+
+  const dateKey = appDateKey();
+  const discovery = await db
+    .collection("sportsApiDailyFixtures")
+    .findOne({ dateString: dateKey }, { projection: { dateString: 1 } });
+  if (discovery) return;
+
+  await getFootballProvider().syncDate(dateKey);
 }
 
 export async function getMatchesPage(
@@ -100,12 +159,24 @@ export async function getMatchesPage(
 ) {
   const db = await getDb();
   const bounds = todayBounds();
+  if (!cursor) {
+    try {
+      await ensureSportsApiTodayDiscovery(db);
+    } catch (err) {
+      console.error("[SportsAPI] Daily discovery check failed:", err);
+    }
+  }
   const query: any = {
-    provider: "football-api",
+    provider: getFootballProvider().name,
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
     kickoffAt: { $gte: bounds.start, $lt: bounds.end },
+    $or: [
+      { leagueCode: { $nin: INTERNATIONAL_LEAGUE_CODES } },
+      { "homeTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+      { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+    ],
   };
   const cursorKickoff = cursor ? new Date(cursor.kickoffAt) : null;
   if (cursor) {
@@ -129,6 +200,18 @@ export async function getMatchesPage(
               $or: [
                 { $in: ["$leagueCode", GLOBAL_LEAGUE_CODES] },
                 { $eq: ["$leagueCode", "FRIENDLY"] },
+                {
+                  $in: [
+                    "$homeTeam.name",
+                    IMPORTANT_NATIONAL_TEAM_NAMES,
+                  ],
+                },
+                {
+                  $in: [
+                    "$awayTeam.name",
+                    IMPORTANT_NATIONAL_TEAM_NAMES,
+                  ],
+                },
                 {
                   $in: [
                     "$rawApiResponse.teams.home.name",
@@ -173,26 +256,40 @@ export async function getMatchesPage(
     { $limit: pageSize + 1 },
     { $project: { globalPriority: 0 } },
   );
-  const matches = await db
+  let matches = await db
     .collection<MatchRecord>("matches")
     .aggregate<MatchRecord>(pipeline)
     .toArray();
+
   const hasMore = matches.length > pageSize;
   const page = hasMore ? matches.slice(0, -1) : matches;
-  const publicPage = page.map((match) => ({
-    provider: match.provider,
-    providerMatchId: match.providerMatchId,
-    leagueCode: match.leagueCode,
-    matchday: match.matchday,
-    kickoffAt: new Date(match.kickoffAt).toISOString(),
-    status: match.status,
-    elapsed: match.elapsed ?? null,
-    homeGoals: match.homeGoals,
-    awayGoals: match.awayGoals,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    seasonStartYear: match.seasonStartYear,
-  }));
+  const publicPage = page.map((match) => {
+    const homeLogo = match.homeTeam.logoUrl || (match.homeTeam as any).logo || (match.homeTeam.id ? `/api/team-image/${match.homeTeam.id}` : null);
+    const awayLogo = match.awayTeam.logoUrl || (match.awayTeam as any).logo || (match.awayTeam.id ? `/api/team-image/${match.awayTeam.id}` : null);
+
+    return {
+      provider: match.provider,
+      providerMatchId: match.providerMatchId,
+      leagueCode: match.leagueCode,
+      matchday: match.matchday,
+      kickoffAt: new Date(match.kickoffAt).toISOString(),
+      status: match.status,
+      elapsed: match.elapsed ?? null,
+      homeGoals: match.homeGoals,
+      awayGoals: match.awayGoals,
+      homeTeam: {
+        ...match.homeTeam,
+        logo: homeLogo,
+        logoUrl: homeLogo,
+      },
+      awayTeam: {
+        ...match.awayTeam,
+        logo: awayLogo,
+        logoUrl: awayLogo,
+      },
+      seasonStartYear: match.seasonStartYear,
+    };
+  });
   const last = publicPage.at(-1);
   return {
     matches: publicPage,
@@ -216,7 +313,7 @@ export async function getMatchesPage(
 export async function getMatch(providerMatchId: string) {
   const db = await getDb();
   return db.collection<MatchRecord>("matches").findOne({
-    provider: "football-api",
+    provider: getFootballProvider().name,
     providerMatchId,
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],

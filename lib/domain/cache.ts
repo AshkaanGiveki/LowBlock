@@ -11,8 +11,13 @@ export function invalidateCompetitionCaches() {
     "club-memberships",
     "tournaments",
     "seasons",
-  ])
-    revalidateTag(tag);
+  ]) {
+    try {
+      revalidateTag(tag);
+    } catch {
+      // Safe no-op outside Next.js request context
+    }
+  }
 }
 export function competitionTag(
   kind: "match" | "result" | "leaderboard" | "league" | "club",
