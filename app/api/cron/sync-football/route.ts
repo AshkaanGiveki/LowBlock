@@ -90,7 +90,7 @@ async function run(request: Request) {
       )
         .collection("syncRuns")
         .insertOne({
-          provider: "football-api",
+          provider: getFootballProvider().name,
           mode: env.FOOTBALL_API_MODE,
           startedAt,
           finishedAt: new Date(),

@@ -5,9 +5,13 @@ import type { ProviderName } from "./types";
 import { ensureSportsApiBackgroundService } from "./sportsapi/backgroundService";
 import {
   GLOBAL_LEAGUE_CODES,
+  IMPORTANT_NATIONAL_TEAM_QUERY_NAMES,
+  INTERNATIONAL_LEAGUE_CODES,
+  isEligibleInternationalFixture,
   IMPORTANT_NATIONAL_TEAM_NAMES,
   isFeaturedFixture,
 } from "@/lib/football/leagues";
+import { appDayBounds, appDateKey } from "./scheduleWindow";
 
 export type MatchRecord = {
   _id?: unknown;
@@ -49,13 +53,27 @@ const getCachedMatches = unstable_cache(
       kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
       ...(leagueCode ? { leagueCode } : {}),
       ...(matchday !== null ? { matchday } : {}),
+      $or: [
+        { leagueCode: { $nin: INTERNATIONAL_LEAGUE_CODES } },
+        { "homeTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+        { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+      ],
     };
     let rows = await db
       .collection<MatchRecord>("matches")
       .find(query)
       .sort({ kickoffAt: 1 })
-      .limit(limit)
+      .limit(Math.max(limit * 3, 100))
       .toArray();
+    rows = rows
+      .filter((row) =>
+        isEligibleInternationalFixture(
+          row.leagueCode,
+          row.homeTeam.name,
+          row.awayTeam.name,
+        ),
+      )
+      .slice(0, limit);
 
     if (rows.length === 0 && activeProvider === "sportsapi") {
       try {
@@ -113,9 +131,7 @@ export type MatchPageCursor = {
 };
 
 function todayBounds() {
-  const dateKey = new Date().toISOString().slice(0, 10);
-  const start = new Date(`${dateKey}T00:00:00.000Z`);
-  return { start, end: new Date(start.getTime() + 86_400_000) };
+  return appDayBounds();
 }
 
 /**
@@ -128,7 +144,7 @@ function todayBounds() {
 async function ensureSportsApiTodayDiscovery(db: Awaited<ReturnType<typeof getDb>>) {
   if (getFootballProvider().name !== "sportsapi") return;
 
-  const dateKey = new Date().toISOString().slice(0, 10);
+  const dateKey = appDateKey();
   const discovery = await db
     .collection("sportsApiDailyFixtures")
     .findOne({ dateString: dateKey }, { projection: { dateString: 1 } });
@@ -156,6 +172,11 @@ export async function getMatchesPage(
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
     kickoffAt: { $gte: bounds.start, $lt: bounds.end },
+    $or: [
+      { leagueCode: { $nin: INTERNATIONAL_LEAGUE_CODES } },
+      { "homeTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+      { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
+    ],
   };
   const cursorKickoff = cursor ? new Date(cursor.kickoffAt) : null;
   if (cursor) {

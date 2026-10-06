@@ -1,4 +1,5 @@
 import { getLeagueCodeFromSportsApi } from "../competitionMapping";
+import { getLeague, isFeaturedFixture } from "../leagues";
 import { getCanonicalTeamSync } from "../teams";
 import type {
   CanonicalMatch,
@@ -84,6 +85,18 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
 
   // If we can't map the league, we drop it (Competition filtering is strictly preserved)
   if (!leagueCode) return null;
+
+  // Keep the API-Football eligibility rule: for national-team international
+  // competitions, at least one side must be an important national team.
+  // Club competitions such as UCL remain unrestricted.
+  const league = getLeague(leagueCode);
+  const homeName = String(rawEvent.homeTeam?.name ?? "");
+  const awayName = String(rawEvent.awayTeam?.name ?? "");
+  if (
+    league?.kind === "INTERNATIONAL" &&
+    !isFeaturedFixture(leagueCode, homeName, awayName)
+  )
+    return null;
 
   const rawId = rawEvent.id || rawEvent.eventId;
   if (!rawId) return null;

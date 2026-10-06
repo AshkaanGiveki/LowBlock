@@ -9,6 +9,7 @@ import {
 import { rebuildRoundRecords } from "@/lib/football/roundLifecycle";
 import { invalidateCompetitionCaches } from "@/lib/domain/cache";
 import { syncMatchInsights } from "./matchInsights";
+import { providerDateKeys } from "../scheduleWindow";
 
 type Fixture = {
   fixture: {
@@ -25,6 +26,28 @@ type Fixture = {
   goals: { home: number | null; away: number | null };
   score: unknown;
 };
+
+type FixtureResponse = { errors: unknown; response: Fixture[] };
+
+async function requestFixtures(
+  params: Record<string, string>,
+): Promise<FixtureResponse> {
+  try {
+    return await apiRequest<Fixture>(params);
+  } catch (error) {
+    // Quota exhaustion must not prevent scoring fixtures already persisted in
+    // MongoDB. The next run can refresh provider data; this run can still
+    // rebuild scores and leaderboard materializations locally.
+    if (
+      error instanceof Error &&
+      error.message.startsWith("FOOTBALL_API_DAILY_LIMIT_REACHED")
+    ) {
+      console.warn("football_provider_quota_exhausted", { params });
+      return { errors: error.message, response: [] };
+    }
+    throw error;
+  }
+}
 
 function hasValidFixtureDate(f: Fixture) {
   return Number.isFinite(new Date(f.fixture.date).getTime());
@@ -153,7 +176,7 @@ async function saveDailyFixtures(
   dateKey: string,
   db: Awaited<ReturnType<typeof getDb>>,
 ) {
-  const result = await apiRequest<Fixture>({ date: dateKey, timezone: "UTC" });
+  const result = await requestFixtures({ date: dateKey, timezone: "UTC" });
   const byLeague = new Map<string, Map<number, Fixture>>();
   for (const league of LEAGUES) byLeague.set(league.code, new Map());
   for (const fixture of result.response) {
@@ -217,7 +240,7 @@ async function refreshStaleFixtures(db: Awaited<ReturnType<typeof getDb>>) {
   let requests = 0, updated = 0;
   for (const match of stale) {
     if ((await remainingApiRequests()) <= 0) break;
-    const result = await apiRequest<Fixture>({ id: String(match.providerMatchId), timezone: "UTC" });
+    const result = await requestFixtures({ id: String(match.providerMatchId), timezone: "UTC" });
     requests++;
     for (const fixture of result.response) {
       const league = LEAGUES.find((item) => item.apiLeagueId === fixture.league.id);
@@ -240,7 +263,7 @@ export async function syncFootballApi() {
   for (const league of LEAGUES) byLeague.set(league.code, new Map());
   if (env.FOOTBALL_API_MODE === "season") {
     for (const league of LEAGUES) {
-      const result = await apiRequest<Fixture>({
+    const result = await requestFixtures({
         league: String(league.apiLeagueId),
         season: String(env.FOOTBALL_API_SEASON ?? new Date().getUTCFullYear()),
         timezone: "UTC",
@@ -258,13 +281,9 @@ export async function syncFootballApi() {
           byLeague.get(league.code)?.set(fixture.fixture.id, fixture);
     }
   } else {
-    const currentDate = new Date();
-    const dateKeys = [
-      currentDate.toISOString().slice(0, 10),
-      new Date(currentDate.getTime() - 86400000).toISOString().slice(0, 10),
-    ];
+    const dateKeys = providerDateKeys();
     for (const date of dateKeys) {
-      const result = await apiRequest<Fixture>({ date, timezone: "UTC" });
+      const result = await requestFixtures({ date, timezone: "UTC" });
       listRequests++;
       for (const fixture of result.response) {
         const league = LEAGUES.find(
@@ -324,7 +343,7 @@ export async function syncFootballApi() {
       i += size
     ) {
       const ids = candidates.slice(i, i + size);
-      const result = await apiRequest<Fixture>({
+      const result = await requestFixtures({
         ids: ids.join("-"),
         timezone: "UTC",
       });

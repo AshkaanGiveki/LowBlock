@@ -26,6 +26,7 @@ import {
   startSportsApiBackgroundService,
   ensureSportsApiBackgroundService,
 } from "./backgroundService";
+import { providerDateKeys } from "../scheduleWindow";
 
 // In-memory season cache to avoid redundant season requests
 const seasonIdCache = new Map<number, { tournamentId?: number; id: number; name: string; year: string; cachedAt: number }>();
@@ -278,15 +279,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     let listRequests = 0;
 
     // 1. Sync daily window (yesterday, today, tomorrow) for live and real-time updates
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 86_400_000);
-    const tomorrow = new Date(today.getTime() + 86_400_000);
-
-    const dateKeys = [
-      yesterday.toISOString().slice(0, 10),
-      today.toISOString().slice(0, 10),
-      tomorrow.toISOString().slice(0, 10),
-    ];
+    const dateKeys = providerDateKeys();
 
     const dailyMatches = await this.getDailyMatches(dateKeys);
     if (dailyMatches.length > 0) {

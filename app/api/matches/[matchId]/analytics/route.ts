@@ -42,8 +42,15 @@ export async function GET(
       );
   }
 
-  // Fetch or retrieve latest match live details from MongoDB / SportsAPI
-  const liveDetails = await getOrFetchMatchDetails(matchId);
+  // SportsAPI match details are keyed by SportsAPI event ids. API-Football
+  // fixtures can have the same numeric id, but those ids refer to a different
+  // event namespace; fetching them from SportsAPI returns unrelated scores
+  // (for example 69-79 for a 1-0 football fixture). The match row is the
+  // canonical result for API-Football fixtures.
+  const liveDetails =
+    match.provider === "sportsapi"
+      ? await getOrFetchMatchDetails(matchId)
+      : null;
 
   const started =
     ["LIVE", "FINISHED", "SUSPENDED"].includes(String(match.status)) ||

@@ -6,6 +6,7 @@ import { consumeLinkToken } from "@/lib/platform/identity";
 import { ObjectId } from "mongodb";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
+import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
 
 export const runtime = "nodejs";
 
@@ -19,17 +20,23 @@ type TelegramMessage = {
   };
   chat?: { id?: number };
 };
-type TelegramUpdate = { update_id?: number; message?: TelegramMessage };
+type TelegramUpdate = { update_id?: number; message?: TelegramMessage; callback_query?: { id?: string; data?: string; from?: TelegramMessage["from"]; message?: TelegramMessage } };
 
 export async function POST(req: Request) {
   const update = (await req.json().catch(() => null)) as TelegramUpdate | null;
-  const message = update?.message;
+  const callback = update?.callback_query;
+  const message = update?.message ?? callback?.message;
   const text = typeof message?.text === "string" ? message.text.trim() : "";
   const chatId = message?.chat?.id;
-  const providerUserId = message?.from?.id;
+  const providerUserId = message?.from?.id ?? callback?.from?.id;
   if (chatId == null || providerUserId == null)
     return NextResponse.json({ ok: true });
   const from = message?.from ?? {};
+  if (callback?.data === "sportsapi_quota") {
+    if (callback.id) await answerCallback(callback.id);
+    await handleSportsApiQuota(String(chatId), String(providerUserId));
+    return NextResponse.json({ ok: true });
+  }
 
   if (
     isCommand(text, "sync_now") &&
@@ -111,6 +118,7 @@ export async function POST(req: Request) {
       "language",
       "group",
       "weekly",
+      "sportsapi_quota",
       "help",
     ].includes(command)
   ) {
@@ -171,12 +179,13 @@ type InlineKeyboard = {
       style?: "danger" | "success" | "primary";
       web_app?: { url: string };
       url?: string;
+      callback_data?: string;
     }>
   >;
 };
 
 const greenButton = <
-  T extends { text: string; web_app?: { url: string }; url?: string },
+  T extends { text: string; web_app?: { url: string }; url?: string; callback_data?: string },
 >(
   button: T,
 ) => ({ ...button, style: "success" as const });
@@ -214,6 +223,10 @@ async function handleCommand(
         : "Bot language changed to English. ✅",
       mainKeyboard(nextLanguage),
     );
+    return;
+  }
+  if (command === "sportsapi_quota") {
+    await handleSportsApiQuota(chatId, providerUserId, language);
     return;
   }
   if (command === "weekly") {
@@ -379,6 +392,9 @@ async function handleCommand(
         ],
       ],
     },
+    sportsapi_quota: {
+      inline_keyboard: [[greenButton({ text: language === "fa" ? "📡 سهمیه SportsApi" : "📡 SportsApi quota", callback_data: "sportsapi_quota" })]],
+    },
     help: mainKeyboard(language),
   };
   const messages: Record<string, [string, string]> = {
@@ -409,6 +425,10 @@ async function handleCommand(
     language: [
       "زبان پیام‌های ربات از تنظیمات زبان LowBlock خوانده می‌شود.",
       "The bot language follows your language setting in LowBlock.",
+    ],
+    sportsapi_quota: [
+      "📡 سهمیه روزانه SportsApi در ادامه نمایش داده می‌شود.",
+      "📡 Your SportsApi daily quota is shown below.",
     ],
     help: [
       "دستورهای LowBlock:\n/matches — مسابقه‌های امروز\n/my_predictions — پیش‌بینی‌های من\n/results — نتایج\n/leaderboard — جدول جهانی\n/weekly — جدول هفتگی\n/group — جدول گروه\n/profile — پروفایل\n/reminders — یادآوری‌ها\n/language — زبان\n/help — راهنما",
@@ -449,6 +469,12 @@ function mainKeyboard(language: "fa" | "en"): InlineKeyboard {
       ],
       [
         greenButton({
+          text: language === "fa" ? "📡 سهمیه SportsApi" : "📡 SportsApi quota",
+          callback_data: "sportsapi_quota",
+        }),
+      ],
+      [
+        greenButton({
           text: language === "fa" ? "👤 پروفایل" : "👤 Profile",
           web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/profile` },
         }),
@@ -456,6 +482,29 @@ function mainKeyboard(language: "fa" | "en"): InlineKeyboard {
     ],
   };
 }
+async function handleSportsApiQuota(chatId: string, providerUserId: string, language?: "fa" | "en") {
+  const identity = await getTelegramIdentity(providerUserId);
+  if (!identity?.userId) {
+    await send(chatId, "Connect your Telegram account to LowBlock first.", connectKeyboard());
+    return;
+  }
+  const selectedLanguage = language ?? await userLanguage(identity.userId);
+  const quota = await getSportsApiQuota();
+  const remaining = quota.remaining == null ? "unavailable" : String(quota.remaining);
+  const limit = quota.limit == null ? "unavailable" : String(quota.limit);
+  await send(chatId, selectedLanguage === "fa"
+    ? `📡 سهمیه روزانه SportsApi\n\nباقی‌مانده: ${remaining}\nکل سهمیه: ${limit}\nمصرف ثبت‌شده امروز: ${quota.used}`
+    : `📡 SportsApi daily quota\n\nRemaining: ${remaining}\nDaily limit: ${limit}\nRecorded requests today: ${quota.used}`, mainKeyboard(selectedLanguage));
+}
+
+async function answerCallback(callbackQueryId: string) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ callback_query_id: callbackQueryId }),
+  });
+}
+
 async function getTelegramIdentity(providerUserId: string) {
   return (await getDb())
     .collection<any>("externalIdentities")

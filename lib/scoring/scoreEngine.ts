@@ -139,10 +139,12 @@ export async function runScoreEngine(
   for (const prediction of predictions) {
     if (!isPredictionLocked(byMatch.get(prediction.matchId)!)) continue;
     const predictionId = String(prediction._id ?? `${prediction.userId}:${prediction.matchId}`);
-    snapshots.set(
-      `${prediction.userId}:${prediction.matchId}`,
-      existingByPredictionId.get(predictionId) ?? await createLockSnapshot(db, prediction, new Date(byMatch.get(prediction.matchId)!.kickoffAt)),
-    );
+    const snapshot = existingByPredictionId.get(predictionId);
+    // Scoring must remain bounded even when old predictions predate lock
+    // snapshots. Missing historical snapshots are treated as no-club scores;
+    // creating them one-by-one here can block the entire scoring transaction.
+    if (snapshot)
+      snapshots.set(`${prediction.userId}:${prediction.matchId}`, snapshot);
   }
   const clubIds = [
     ...new Set(

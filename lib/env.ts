@@ -41,7 +41,11 @@ const schema = z.object({
   QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
   APP_TIMEZONE: z.string().default("UTC"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-  FOOTBALL_DATA_PROVIDER: z.enum(["current", "sportsapi"]).default("sportsapi"),
+    // `current` and `football-api` are retained as backwards-compatible
+    // aliases for the API-Football provider. `sportsapi` is the default.
+    FOOTBALL_DATA_PROVIDER: z
+      .enum(["sportsapi", "api-football", "football-api", "current"])
+      .default("sportsapi"),
   FOOTBALL_DATA_PROVIDER_SHADOW: z.enum(["none", "sportsapi"]).default("none"),
   FOOTBALL_API_KEY: z.string().optional(),
   FOOTBALL_API_BASE_URL: z
@@ -70,6 +74,7 @@ const schema = z.object({
     .url()
     .default("https://www.transfermarkt.com"),
   SPORTSAPI_API_KEY: z.string().optional(),
+  SPORTSAPI_DAILY_LIMIT: z.coerce.number().int().positive().optional(),
   SPORTSAPI_BASE_URL: z
     .string()
     .url()
@@ -142,6 +147,7 @@ export const env = schema.parse({
   FOOTBALL_API_SEASON: process.env.FOOTBALL_API_SEASON,
   TRANSFERMARKT_BASE_URL: process.env.TRANSFERMARKT_BASE_URL,
   SPORTSAPI_API_KEY: process.env.SPORTSAPI_API_KEY,
+  SPORTSAPI_DAILY_LIMIT: process.env.SPORTSAPI_DAILY_LIMIT,
   SPORTSAPI_BASE_URL: process.env.SPORTSAPI_BASE_URL,
   SPORTSAPI_WS_URL: process.env.SPORTSAPI_WS_URL,
   SPORTSAPI_WS_ENABLED: process.env.SPORTSAPI_WS_ENABLED,

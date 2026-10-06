@@ -703,8 +703,46 @@ export const IMPORTANT_NATIONAL_TEAM_NAMES = [
 "Romania",
  ] as const;
 const IMPORTANT_NATIONAL_TEAMS = new Set<string>(IMPORTANT_NATIONAL_TEAM_NAMES);
+const NATIONAL_TEAM_ALIASES: Record<string, string> = {
+  turkiye: "Turkey",
+  turkey: "Turkey",
+  "north macedonia": "FYR Macedonia",
+  macedonia: "FYR Macedonia",
+  "czech republic": "Czechia",
+  "republic of ireland": "Rep. Of Ireland",
+  "ireland republic": "Rep. Of Ireland",
+  "bosnia and herzegovina": "Bosnia and Herzegovina",
+  "bosnia herzegovina": "Bosnia and Herzegovina",
+  "dr congo": "Congo DR",
+  "democratic republic of the congo": "Congo DR",
+  "united states": "USA",
+  "korea republic": "South Korea",
+  "republic of korea": "South Korea",
+};
+export const IMPORTANT_NATIONAL_TEAM_QUERY_NAMES = [
+  ...IMPORTANT_NATIONAL_TEAM_NAMES,
+  ...Object.keys(NATIONAL_TEAM_ALIASES),
+  ...Object.values(NATIONAL_TEAM_ALIASES),
+  "Türkiye",
+  "North Macedonia",
+  "Czech Republic",
+  "Republic of Ireland",
+  "Bosnia & Herzegovina",
+  "DR Congo",
+  "Korea Republic",
+] as const;
+function normalizeNationalTeamName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 export function isImportantNationalTeam(name: string) {
-  return IMPORTANT_NATIONAL_TEAMS.has(name);
+  const normalized = normalizeNationalTeamName(name);
+  const canonical = NATIONAL_TEAM_ALIASES[normalized] ?? name;
+  return IMPORTANT_NATIONAL_TEAMS.has(canonical);
 }
 export function isQualityInternationalFriendly(home: string, away: string) {
   return isImportantNationalTeam(home) && isImportantNationalTeam(away);
@@ -715,4 +753,17 @@ export function isFeaturedFixture(
   away: string,
 ) {
   return isImportantNationalTeam(home) || isImportantNationalTeam(away);
+}
+
+export const INTERNATIONAL_LEAGUE_CODES: readonly string[] = LEAGUES.filter(
+  (league) => league.kind === "INTERNATIONAL",
+).map((league) => league.code);
+
+export function isEligibleInternationalFixture(
+  leagueCode: string,
+  home: string,
+  away: string,
+) {
+  return !INTERNATIONAL_LEAGUE_CODES.includes(leagueCode) ||
+    isFeaturedFixture(leagueCode, home, away);
 }

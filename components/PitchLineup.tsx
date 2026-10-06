@@ -85,11 +85,12 @@ export function PitchLineup({ lineups, match, language, t, incidents }: LineupPr
           <div className="no-scrollbar flex gap-4 overflow-x-auto px-2 pb-2">
             {currentTeam.substitutes.map((sub: Player) => (
               <div key={sub.id} className="flex w-12 shrink-0 flex-col items-center">
-                <div className="relative mb-1 flex h-10 w-10 items-center justify-center overflow-visible rounded-full border border-white/20 bg-[#112a1e] shadow-sm">
-                  {sub.id && String(sub.id) !== "0" ? <img src={`/api/player-image/${sub.id}`} alt={sub.shortName || sub.name} className="h-full w-full object-cover object-top" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <span className="text-[10px] font-bold text-white/40">{sub.number || "?"}</span>}
-                  {incidents.filter((incident: any) => incident.isHome === isHome && (incident.playerInName === sub.name || incident.playerInName === sub.shortName || incident.playerOutName === sub.name || incident.playerOutName === sub.shortName)).map((incident: any, index: number) => {
+                <div className="relative mb-1 flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-[#112a1e] shadow-sm">
+                  {sub.id && String(sub.id) !== "0" ? <img src={`/api/player-image/${sub.id}`} alt={sub.shortName || sub.name} className="h-full w-full rounded-full object-cover object-top" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <span className="text-[10px] font-bold text-white/40">{sub.number || "?"}</span>}
+                  {incidents.filter((incident: any) => incidentMatchesPlayer(incident, sub, isHome)).map((incident: any, index: number) => {
                     const incoming = incident.playerInName === sub.name || incident.playerInName === sub.shortName;
-                    return <span key={`${incident.id}-${index}`} className={cn("absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border bg-[#07100c]/95 shadow-md", incoming ? "border-emerald-300/70" : "border-rose-300/70")}><IncidentIcon kind="substitution" direction={incoming ? "in" : "out"} /></span>;
+                    const kind = getIncidentKind(incident);
+                    return <span key={`${incident.id}-${index}`} title={kind} className={cn("absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border bg-[#07100c]/95 shadow-md", kind === "substitution" ? incoming ? "border-emerald-300/70" : "border-rose-300/70" : "border-white/30")}><IncidentIcon kind={kind} direction={incoming ? "in" : "out"} /></span>;
                   })}
                 </div>
                 <div className="w-full truncate text-center text-[9px] font-bold text-white/90">{sub.shortName || sub.name}</div>
@@ -119,19 +120,20 @@ function renderPitchRows(team: any, isHome: boolean, incidents: any[], language:
   }
 
   return [...rows].reverse().map((rowPlayers, rowIndex) => (
-    <div key={rowIndex} className="flex w-full items-center justify-center gap-2 px-1 sm:gap-4 sm:px-3">
+    <div key={rowIndex} dir="rtl" className="flex w-full items-center justify-center gap-2 px-1 sm:gap-4 sm:px-3">
       {rowPlayers.map((player: Player) => <PitchPlayer key={player.id} player={player} isHome={isHome} incidents={incidents} language={language} rowCount={rowPlayers.length} teamColors={teamColors} />)}
     </div>
   ));
 }
 
-type IncidentKind = "goal" | "assist" | "own_goal" | "penalty_miss" | "substitution" | "var" | "injury" | "other";
+type IncidentKind = "goal" | "assist" | "card" | "own_goal" | "penalty_miss" | "substitution" | "var" | "injury" | "other";
 
 function getIncidentKind(incident: any): IncidentKind {
   const text = `${incident?.type || ""} ${incident?.detail || ""} ${incident?.incidentClass || ""}`.toLowerCase();
   if (text.includes("own") && text.includes("goal")) return "own_goal";
   if ((text.includes("penalty") || text.includes("pen")) && (text.includes("miss") || text.includes("fail"))) return "penalty_miss";
   if (text.includes("assist")) return "assist";
+  if (text.includes("card")) return "card";
   if (text.includes("substitution") || text.includes("sub")) return "substitution";
   if (text.includes("var")) return "var";
   if (text.includes("injury")) return "injury";
@@ -140,13 +142,14 @@ function getIncidentKind(incident: any): IncidentKind {
 }
 
 function IncidentIcon({ kind, direction }: { kind: IncidentKind; direction?: "in" | "out" }) {
-  const color = kind === "goal" ? "#b7ff4d" : kind === "assist" ? "#7dd3fc" : kind === "own_goal" ? "#fcd34d" : kind === "penalty_miss" ? "#fda4af" : kind === "substitution" ? direction === "out" ? "#fb7185" : "#6ee7b7" : kind === "var" ? "#93c5fd" : "#d1d5db";
+  const color = kind === "goal" ? "#b7ff4d" : kind === "assist" ? "#7dd3fc" : kind === "card" ? "#fbbf24" : kind === "own_goal" ? "#fcd34d" : kind === "penalty_miss" ? "#fda4af" : kind === "substitution" ? direction === "out" ? "#fb7185" : "#6ee7b7" : kind === "var" ? "#93c5fd" : "#d1d5db";
   const label = kind.replace("_", " ");
   return (
     <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={label}>
       <title>{label}</title>
       {kind === "goal" && <><circle cx="12" cy="12" r="8" /><path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2z" /><path d="m12 7-2.8-2M15 9.2l3.2-1M13.9 12.7l2.2 3M10.1 12.7l-2.2 3M12 14.7v3.3" /></>}
       {kind === "assist" && <><path d="M5.2 14.4 8.7 12l-.4-5.5c-.1-.9.5-1.6 1.3-1.6 1.3 1.5 2.4 3.2 3.2 5l2.4 2.1 3.2 1.2c.9.3 1.5 1.1 1.3 2-.2.8-.9 1.3-1.8 1.3H6.2c-1.1 0-1.8-.6-1.8-1.4 0-.3.3-.6.8-.7Z" /><path d="m10 6.2 2.2 1M9.1 8.3l2.3 1M15.2 13.1l1.4-1.2M7.4 17.7v1.2M11.3 17.7v1.2M15.2 17.7v1.2" /></>}
+      {kind === "card" && <rect x="7" y="4" width="10" height="16" rx="1" />}
       {kind === "own_goal" && <><path d="M5 6h14M7 6v12h10V6M9 18l3-4 3 4" /><path d="M12 3v7M9.5 7.5 12 10l2.5-2.5" /></>}
       {kind === "penalty_miss" && <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="m7 7 10 10M17 7 7 17" /></>}
       {kind === "substitution" && <>{direction === "out" ? <><path d="M5 8h12" /><path d="m14 5 3 3-3 3" /><path d="M19 16H7" /><path d="m10 13-3 3 3 3" /></> : <><path d="M5 16h12" /><path d="m14 13 3 3-3 3" /><path d="M19 8H7" /><path d="m10 5-3 3 3 3" /></>}</>}
@@ -155,6 +158,14 @@ function IncidentIcon({ kind, direction }: { kind: IncidentKind; direction?: "in
       {kind === "other" && <><path d="m12 3 8 9-8 9-8-9z" /><circle cx="12" cy="12" r="1" /></>}
     </svg>
   );
+}
+
+function incidentMatchesPlayer(incident: any, player: Player, isHome: boolean) {
+  if (incident.isHome !== isHome) return false;
+  const names = [player.name, player.shortName].filter(Boolean).map(String);
+  return [incident.playerName, incident.playerInName, incident.playerOutName, incident.assistName]
+    .filter(Boolean)
+    .some((name) => names.includes(String(name)));
 }
 
 function PitchPlayer({ player, isHome, incidents, language, rowCount, teamColors }: { player: Player; isHome: boolean; incidents: any[]; language: string; rowCount: number; teamColors: TeamColors }) {

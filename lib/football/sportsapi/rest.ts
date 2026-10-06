@@ -10,6 +10,14 @@ export type SportsApiRestResponse<T> = {
   error?: { code: number; message: string };
 };
 
+export type SportsApiQuota = {
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  source: "provider-header" | "configured-limit" | "usage-only";
+  day: string;
+};
+
 const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 mins
 const DISCOVERY_CACHE_TTL_MS = env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED
   ? CACHE_TTL * 1000
@@ -21,6 +29,7 @@ async function trackRequest(
   durationMs: number,
   status: "OK" | "FAILED",
   error?: string,
+  quota?: { remaining?: number; limit?: number },
 ) {
   try {
     const db = await getDb();
@@ -31,7 +40,9 @@ async function trackRequest(
       status,
       error,
       timestamp: new Date(),
-      via: "rest"
+      via: "rest",
+      quotaRemaining: quota?.remaining,
+      quotaLimit: quota?.limit,
     });
   } catch (err) {
     console.error("[SportsAPI] Failed to track request:", err);
@@ -56,18 +67,48 @@ export async function fetchSportsApi<T>(
       signal: AbortSignal.timeout(15_000),
     });
     const body = (await response.json().catch(() => null)) as SportsApiRestResponse<T> | null;
+    const remaining = firstHeader(response.headers, ["x-ratelimit-remaining", "x-rate-limit-remaining", "x-requests-remaining", "x-quota-remaining"]);
+    const limit = firstHeader(response.headers, ["x-ratelimit-limit", "x-rate-limit-limit", "x-requests-limit", "x-quota-limit"]);
+    const quota = { ...(remaining == null ? {} : { remaining }), ...(limit == null ? {} : { limit }) };
     if (!response.ok || !body) {
       const message = body?.error?.message || `SportsAPI REST request failed (${response.status})`;
-      await trackRequest(path, params, performance.now() - startedAt, "FAILED", message);
+      await trackRequest(path, params, performance.now() - startedAt, "FAILED", message, quota);
       return { success: false, events: [], error: { code: response.status, message } };
     }
-    await trackRequest(path, params, performance.now() - startedAt, "OK");
+    await trackRequest(path, params, performance.now() - startedAt, "OK", undefined, quota);
     return body;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await trackRequest(path, params, performance.now() - startedAt, "FAILED", message);
     return { success: false, events: [], error: { code: 500, message } };
   }
+}
+
+function firstHeader(headers: Headers, names: string[]) {
+  for (const name of names) {
+    const value = headers.get(name);
+    if (value != null && /^\d+$/.test(value.trim())) return Number(value.trim());
+  }
+  return undefined;
+}
+
+export async function getSportsApiQuota(): Promise<SportsApiQuota> {
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: env.APP_TIMEZONE || "Asia/Tehran",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  const start = new Date(`${day}T00:00:00+03:30`);
+  const db = await getDb();
+  const used = await db.collection<any>("sportsApiRequests").countDocuments({
+    timestamp: { $gte: start, $lt: new Date(start.getTime() + 86_400_000) },
+  });
+  const latest = await db.collection<any>("sportsApiRequests").findOne(
+    { timestamp: { $gte: start } },
+    { sort: { timestamp: -1 }, projection: { quotaRemaining: 1, quotaLimit: 1 } },
+  );
+  const limit = latest?.quotaLimit ?? env.SPORTSAPI_DAILY_LIMIT ?? null;
+  const remaining = latest?.quotaRemaining ?? (limit == null ? null : Math.max(0, limit - used));
+  return { used, limit, remaining, source: latest?.quotaRemaining != null ? "provider-header" : limit == null ? "usage-only" : "configured-limit", day };
 }
 
 // In-memory cache for daily discovery to support all execution environments

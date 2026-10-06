@@ -28,6 +28,14 @@ describe("provider selection", () => {
     expect(provider.name).toBe("football-api");
   });
 
+  it("keeps api-football as an explicit backwards-compatible provider alias", () => {
+    process.env.FOOTBALL_DATA_PROVIDER = "api-football";
+    process.env.FOOTBALL_DATA_PROVIDER_SHADOW = "none";
+    resetProviderRegistry();
+
+    expect(getFootballProvider().name).toBe("football-api");
+  });
+
   it("selects sportsapi provider when FOOTBALL_DATA_PROVIDER is sportsapi", () => {
     process.env.FOOTBALL_DATA_PROVIDER = "sportsapi";
     process.env.FOOTBALL_DATA_PROVIDER_SHADOW = "none";

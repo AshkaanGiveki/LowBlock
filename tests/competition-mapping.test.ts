@@ -6,6 +6,7 @@ import {
   isSupportedSportsApiTournament,
   COMPETITION_MAPPINGS,
 } from "@/lib/football/competitionMapping";
+import { getLeague } from "@/lib/football/leagues";
 
 describe("competition mapping", () => {
   it("resolves Premier League by uniqueTournament.id", () => {
@@ -107,10 +108,20 @@ describe("competition mapping", () => {
   });
 
   it("has bidirectional mappings for all configured competitions", () => {
+    const codes = new Set<string>();
+    const sportsApiIds = new Set<number>();
+    const apiSportsIds = new Set<number>();
     for (const entry of COMPETITION_MAPPINGS) {
       expect(entry.code).toBeTruthy();
+      expect(getLeague(entry.code)).toBeTruthy();
       expect(entry.apiSportsId).toBeGreaterThan(0);
       expect(entry.sportsApiUniqueTournamentId).toBeGreaterThan(0);
+      expect(codes.has(entry.code)).toBe(false);
+      expect(sportsApiIds.has(entry.sportsApiUniqueTournamentId)).toBe(false);
+      expect(apiSportsIds.has(entry.apiSportsId)).toBe(false);
+      codes.add(entry.code);
+      sportsApiIds.add(entry.sportsApiUniqueTournamentId);
+      apiSportsIds.add(entry.apiSportsId);
       expect(getSportsApiUniqueTournamentId(entry.code)).toBe(
         entry.sportsApiUniqueTournamentId,
       );

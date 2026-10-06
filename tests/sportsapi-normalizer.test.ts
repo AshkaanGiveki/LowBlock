@@ -98,6 +98,25 @@ describe("sportsapi normalizer", () => {
     expect(normalizeSportsApiMatch(unmappedEvent)).toBeNull();
   });
 
+  it("filters international fixtures unless one side is an important national team", () => {
+    const base = {
+      ...sampleRawEvent,
+      tournament: {
+        uniqueTournament: { id: 10783, name: "UEFA Nations League" },
+        category: { name: "Europe" },
+      },
+      homeTeam: { id: 1, name: "Luxembourg" },
+      awayTeam: { id: 2, name: "Faroe Islands" },
+    };
+    expect(normalizeSportsApiMatch(base)).toBeNull();
+    expect(
+      normalizeSportsApiMatch({
+        ...base,
+        homeTeam: { id: 3, name: "Türkiye" },
+      }),
+    ).not.toBeNull();
+  });
+
   it("normalizes various match statuses accurately", () => {
     const testCases = [
       { status: { type: "finished" }, expected: "FINISHED" },

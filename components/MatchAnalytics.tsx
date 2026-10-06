@@ -48,7 +48,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
-type TabType = "lineups" | "stats" | "timeline" | "replay";
+type TabType = "lineups" | "stats" | "timeline" | "replay" | "predictions";
 
 type AnalyticsData = {
   match: any;
@@ -253,23 +253,34 @@ export function MatchAnalytics({
                     <TabButton
                       active={tab === "lineups"}
                       onClick={() => setTab("lineups")}
+                      icon={<Users size={18} strokeWidth={2.2} />}
                       label={t("ترکیب", "Lineup")}
                     />
                     <TabButton
                       active={tab === "stats"}
                       onClick={() => setTab("stats")}
+                      icon={<BarChart3 size={18} strokeWidth={2.2} />}
                       label={t("آمار بازی", "Stats")}
                     />
                     <TabButton
                       active={tab === "timeline"}
                       onClick={() => setTab("timeline")}
+                      icon={<CircleDot size={18} strokeWidth={2.2} />}
                       label={t("رویدادها", "Events")}
                       badge={incidents.length > 0 ? formatNumber(incidents.length, language) : undefined}
+                    />
+                    <TabButton
+                      active={tab === "predictions"}
+                      onClick={() => setTab("predictions")}
+                      icon={<Target size={18} strokeWidth={2.2} />}
+                      label={t("پیش‌بینی‌ها", "Predictions")}
+                      badge={data && data.total > 0 ? formatNumber(data.total, language) : undefined}
                     />
                     {["FINISHED", "FT", "AET"].includes(String(match.status)) && (
                       <TabButton
                         active={tab === "replay"}
                         onClick={() => setTab("replay")}
+                        icon={<Tv size={18} strokeWidth={2.2} />}
                         label={t("بازپخش", "Replay")}
                       />
                     )}
@@ -322,6 +333,14 @@ export function MatchAnalytics({
                             t={t}
                           />
                         )}
+
+                        {tab === "predictions" && (
+                          <PredictionsView
+                            data={data}
+                            number={number}
+                            t={t}
+                          />
+                        )}
                       </>
                     )}
                   </div>
@@ -339,13 +358,15 @@ export function MatchAnalytics({
   );
 }
 
-function TabButton({ active, onClick, label, badge }: any) {
+function TabButton({ active, onClick, label, icon, badge }: any) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={label}
+      title={label}
       className={cn(
-        "relative flex flex-1 items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold transition-all duration-300",
+        "relative flex min-w-[3.2rem] flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold transition-all duration-300",
         active ? "text-[#020705]" : "text-white/50 hover:text-white"
       )}
     >
@@ -357,7 +378,7 @@ function TabButton({ active, onClick, label, badge }: any) {
         />
       )}
       <span className="relative z-10 flex items-center gap-1.5">
-        {label}
+        {icon}
         {badge && (
           <span className={cn(
             "px-1.5 py-0.2 rounded-full text-[10px] font-extrabold",
@@ -666,6 +687,65 @@ function translateStatName(name: string, language: "fa" | "en") {
   return map[name] || name;
 }
 
+function PredictionsView({ data, number, t }: { data: AnalyticsData; number: (value: number | null | undefined) => string; t: (fa: string, en: string) => string }) {
+  const sortedUsers = [...(data.users ?? [])].sort(
+    (a, b) => Number(b.points ?? -1) - Number(a.points ?? -1),
+  );
+  const maxCount = Math.max(1, ...(data.distribution ?? []).map((item) => item.count));
+  const topPrediction = data.distribution?.[0];
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[24px] border border-[#1a382d] bg-gradient-to-br from-[#0b2117] to-[#07100c] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-[.18em] text-[#10b981]">{t("نبض جامعه", "COMMUNITY PULSE")}</p>
+            <h3 className="mt-2 text-xl font-black">{t("پیش‌بینی کاربران", "Player predictions")}</h3>
+          </div>
+          <span className="text-xs text-white/45">{number(data.total)} {t("بازیکن", "players")}</span>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <div className="rounded-2xl border border-white/[.06] bg-black/20 p-3">
+            <span className="text-[10px] font-bold text-white/45">{t("میانگین امتیاز", "Average points")}</span>
+            <b className="mt-1 block text-2xl font-black">{data.locked ? number(data.averagePoints) : "—"}</b>
+          </div>
+          <div className="rounded-2xl border border-white/[.06] bg-black/20 p-3">
+            <span className="text-[10px] font-bold text-white/45">{t("محبوب‌ترین نتیجه", "Top prediction")}</span>
+            <b className="mt-1 block text-2xl font-black">{topPrediction?.score?.replace("-", " – ") ?? "—"}</b>
+          </div>
+        </div>
+      </section>
+
+      {data.distribution?.length > 0 && (
+        <section className="rounded-[24px] border border-white/[.08] bg-white/[.025] p-5">
+          <h3 className="text-sm font-black">{t("توزیع نتایج", "Score distribution")}</h3>
+          <div className="mt-4 space-y-3">
+            {data.distribution.map((item) => (
+              <div key={item.score} className="grid grid-cols-[3.5rem_1fr_2.5rem] items-center gap-3">
+                <b className="rounded-lg border border-white/[.08] bg-black/20 px-2 py-1.5 text-center text-xs">{item.score.replace("-", " – ")}</b>
+                <div className="h-2 overflow-hidden rounded-full bg-white/[.06]"><div className="h-full rounded-full bg-gradient-to-r from-[#10b981] to-cyan-300" style={{ width: `${(item.count / maxCount) * 100}%` }} /></div>
+                <span className="text-end text-xs font-bold text-white/50">{Math.round((item.count / Math.max(data.total, 1)) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-[24px] border border-white/[.08] bg-white/[.025] p-5">
+        <div className="space-y-2">
+          {sortedUsers.length ? sortedUsers.map((user, index) => (
+            <div key={`${user.userId ?? user.username}-${index}`} className="flex items-center gap-3 rounded-2xl border border-white/[.05] bg-black/15 px-3 py-2.5">
+              <UserAvatar name={user.username ?? "Player"} avatarUrl={user.avatarUrl} isDefendingChampion={user.isDefendingChampion} className="h-9 w-9 text-xs" />
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{user.username ?? t("بازیکن", "Player")}</p><p className="text-[11px] text-white/40">{number(user.homeGoals)} – {number(user.awayGoals)}</p></div>
+              <span className="rounded-lg border border-[#10b981]/20 bg-[#10b981]/10 px-2 py-1 text-xs font-black text-[#6ee7b7]">{data.locked ? `${number(user.points)} pts` : "—"}</span>
+            </div>
+          )) : <p className="py-8 text-center text-sm text-white/40">{t("هنوز پیش‌بینی‌ای ثبت نشده است.", "No predictions yet.")}</p>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function translateStatNameComplete(name: string, language: "fa" | "en") {
   if (language !== "fa") return name;
   const key = String(name || "").trim().toLowerCase().replace(/[：:]/g, "").replace(/\s+/g, " ");
@@ -775,7 +855,7 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
   const allStats = statsGroups.flatMap((g: any) => g.items);
 
   const possessionStat = allStats.find((s: any) => s.name?.includes("Possession"));
-  const assistIncidents = (data?.liveDetails?.incidents || []).filter((incident: any) => incident.assistName);
+  const assistIncidents: any[] = [];
 
   return (
     <div className="space-y-6 pb-6">
@@ -790,7 +870,7 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
         </div>
       )}
 
-      {assistIncidents.length > 0 && (
+      {false && assistIncidents.length > 0 && (
         <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-400/[.04] p-4">
           <div className="mb-3 text-[11px] font-black uppercase tracking-wider text-cyan-300">{language === "fa" ? "پاس گل‌ها" : "Assists"}</div>
           <div className="space-y-2">
