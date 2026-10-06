@@ -12,7 +12,6 @@ import {
   getSportsApiDailyFixtures,
   getSportsApiTournamentSeasons,
   getSportsApiTournamentEvents,
-  getSportsApiLiveMatches,
 } from "./rest";
 import { normalizeSportsApiMatch } from "./normalizer";
 import { getSportsApiWsManager } from "./ws";

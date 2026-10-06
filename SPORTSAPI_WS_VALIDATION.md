@@ -13,7 +13,7 @@ This is deliberately a probe, not proof of lossless delivery. To prove that no e
 
 ## Free-plan operating mode
 
-The application defaults to `SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED=false` and `SPORTSAPI_DETAIL_REST_ENABLED=false`. The normal sync uses only yesterday, today, and tomorrow discovery (four REST requests because today also tries `/today`), persists that discovery cache in MongoDB for 24 hours, and then relies on WebSocket ingestion. WebSocket score deltas are expanded and merged into the local match state before persistence; rich snapshots update only the category they contain, so empty or `404` snapshots do not erase previously collected data.
+The application defaults to `SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED=false`. REST is used only for yesterday, today, and tomorrow fixture-list discovery (today may also try `/today`); match scores, incidents, statistics, lineups, odds, and replay state are received through WebSocket ingestion and persisted in MongoDB. WebSocket score deltas are expanded and merged into the local match state before persistence; rich snapshots update only the category they contain, so empty snapshots do not erase previously collected data.
 
 Official references:
 

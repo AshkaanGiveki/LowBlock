@@ -231,16 +231,4 @@ export async function getSportsApiTournamentEvents(
   return fetchSportsApi<any>(`/tournament/${tournamentId}/season/${seasonId}/events/${type}/${page}`);
 }
 
-/**
- * Fetches all currently active live matches.
- */
-export async function getSportsApiLiveMatches() {
-  return fetchSportsApi<any>("/live");
-}
 
-/**
- * Fetches specific match details (controlled recovery).
- */
-export async function getSportsApiMatchDetails(matchId: number | string) {
-  return fetchSportsApi<any>(`/match/${matchId}`);
-}
