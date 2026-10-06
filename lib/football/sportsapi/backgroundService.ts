@@ -1,9 +1,9 @@
 import { getSportsApiWsManager } from "./ws";
-import { getMatchMonitorService } from "./matchMonitor";
 import { getDb } from "@/lib/db/mongo";
 
 let isStarted = false;
 let refreshTimer: NodeJS.Timeout | null = null;
+let syncInFlight: Promise<void> | null = null;
 
 export function isSportsApiBackgroundServiceRunning(): boolean {
   return isStarted;
@@ -15,7 +15,7 @@ export function isSportsApiBackgroundServiceRunning(): boolean {
  *
  * Exclusively uses WebSocket streaming channels. ZERO REST quota is used.
  */
-export async function syncActiveMatchesSubscriptions(): Promise<void> {
+async function performActiveMatchSubscriptionSync(): Promise<void> {
   try {
     const db = await getDb();
     const now = Date.now();
@@ -34,7 +34,6 @@ export async function syncActiveMatchesSubscriptions(): Promise<void> {
       .project({ providerMatchId: 1, status: 1, homeTeam: 1, awayTeam: 1, kickoffAt: 1 })
       .toArray();
 
-    const monitor = getMatchMonitorService();
     const ws = getSportsApiWsManager();
 
     // Ensure connection is active
@@ -53,12 +52,18 @@ export async function syncActiveMatchesSubscriptions(): Promise<void> {
       ws.subscribeToChannel(`match:${matchId}:lineups`);
       ws.subscribeToChannel(`match:${matchId}:odds`);
 
-      // Seed snapshot from DB if exists
-      await monitor.loadSnapshotFromDb(matchId);
     }
   } catch (err) {
     console.error("[SportsApiBackground] Failed to sync match subscriptions from DB:", err);
   }
+}
+
+export function syncActiveMatchesSubscriptions(): Promise<void> {
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = performActiveMatchSubscriptionSync().finally(() => {
+    syncInFlight = null;
+  });
+  return syncInFlight;
 }
 
 /**

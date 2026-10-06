@@ -10,12 +10,10 @@ import {
   timingHeaders,
   withServerTiming,
 } from "@/lib/observability/serverTiming";
-import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backgroundService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  ensureSportsApiBackgroundService();
   const timings: Array<{ name: string; durationMs: number }> = [];
   try {
     const url = new URL(request.url);

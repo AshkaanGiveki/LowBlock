@@ -176,6 +176,7 @@ function personName(value: any): string | null {
 }
 
 function extractAssistName(incident: any): string | null {
+  if (!incident || typeof incident !== "object") return null;
   return personName(
     incident.assist1 ??
       incident.assist2 ??
@@ -298,11 +299,14 @@ class MatchMonitorService {
         if (existing.incidents && existing.incidents.length > 0) {
           const rawIncidents = collectRawIncidents(existing.rawProviderPayload?.incidents);
           const rawById = new Map(rawIncidents.map((incident) => [String(incident.id), incident]));
-          snapshot.incidents = existing.incidents.map((incident: LiveIncident) => ({
+          snapshot.incidents = existing.incidents.map((incident: LiveIncident) => {
+            const rawIncident = rawById.get(String(incident.id));
+            return {
             ...incident,
-            assistName: incident.assistName || extractAssistName(rawById.get(String(incident.id))),
-            isPenaltyShootout: incident.isPenaltyShootout || isPenaltyShootoutIncident(rawById.get(String(incident.id))),
-          }));
+            assistName: incident.assistName || extractAssistName(rawIncident),
+            isPenaltyShootout: incident.isPenaltyShootout || isPenaltyShootoutIncident(rawIncident),
+            };
+          });
           reconcileScoreFromIncidents(snapshot, snapshot.incidents);
         }
         if (existing.stats && existing.stats.length > 0) snapshot.stats = existing.stats;
