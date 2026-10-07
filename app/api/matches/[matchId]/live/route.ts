@@ -31,8 +31,9 @@ export async function GET(
     return NextResponse.json(snapshot);
   }
 
-  // Pre-load from DB so the initial frame contains full lineups, stats, and incidents
-  const initial = await monitor.loadSnapshotFromDb(matchId);
+  // Send the in-process WebSocket snapshot immediately. Hydrate the persisted
+  // details asynchronously so opening the drawer never waits on Mongo.
+  const initial = monitor.getSnapshot(matchId);
 
   // Server-Sent Events (SSE) Stream
   const encoder = new TextEncoder();
@@ -44,6 +45,14 @@ export async function GET(
       controller.enqueue(
         encoder.encode(`event: snapshot\ndata: ${JSON.stringify(initial)}\n\n`),
       );
+
+      monitor.loadSnapshotFromDb(matchId).then((snapshot) => {
+        try {
+          controller.enqueue(
+            encoder.encode(`event: update\ndata: ${JSON.stringify(snapshot)}\n\n`),
+          );
+        } catch {}
+      }).catch(() => undefined);
 
       // Subscribe to real-time events
       cleanupSubscription = monitor.subscribeToMatch(matchId, (snapshot) => {

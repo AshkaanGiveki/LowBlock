@@ -59,6 +59,7 @@ type AnalyticsData = {
   averagePoints: number;
   distribution: Array<{ score: string; count: number }>;
   users: Array<any>;
+  predictionsLoaded?: boolean;
 };
 
 export function MatchAnalytics({
@@ -77,9 +78,27 @@ export function MatchAnalytics({
   const [tab, setTab] = useState<TabType>("lineups");
   const [visible, setVisible] = useState(true);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [predictionsLoading, setPredictionsLoading] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
 
   const query = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
+  const loadPredictions = () => {
+    if (!data || data.predictionsLoaded || predictionsLoading) return;
+    setPredictionsLoading(true);
+    const separator = query ? "&" : "?";
+    fetch(`/api/matches/${matchId}/analytics${query}${separator}includePredictions=true`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((next) => {
+        if (next) setData((current) => current ? { ...current, ...next, liveDetails: current.liveDetails ?? next.liveDetails } : next);
+      })
+      .catch(() => undefined)
+      .finally(() => setPredictionsLoading(false));
+  };
+
+  const selectTab = (next: TabType) => {
+    setTab(next);
+    if (next === "predictions") loadPredictions();
+  };
   const number = (value: number | null | undefined) =>
     formatNumber(Number(value ?? 0), language, { maximumFractionDigits: 1 });
   const score = (
@@ -252,26 +271,26 @@ export function MatchAnalytics({
                   <div className="mt-6 flex rounded-2xl border border-[#1a382d] bg-[#07100c] p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,.02)] overflow-x-auto no-scrollbar">
                     <TabButton
                       active={tab === "lineups"}
-                      onClick={() => setTab("lineups")}
+                      onClick={() => selectTab("lineups")}
                       icon={<Users size={18} strokeWidth={2.2} />}
                       label={t("ترکیب", "Lineup")}
                     />
                     <TabButton
                       active={tab === "stats"}
-                      onClick={() => setTab("stats")}
+                      onClick={() => selectTab("stats")}
                       icon={<BarChart3 size={18} strokeWidth={2.2} />}
                       label={t("آمار بازی", "Stats")}
                     />
                     <TabButton
                       active={tab === "timeline"}
-                      onClick={() => setTab("timeline")}
+                      onClick={() => selectTab("timeline")}
                       icon={<CircleDot size={18} strokeWidth={2.2} />}
                       label={t("رویدادها", "Events")}
                       badge={incidents.length > 0 ? formatNumber(incidents.length, language) : undefined}
                     />
                     <TabButton
                       active={tab === "predictions"}
-                      onClick={() => setTab("predictions")}
+                      onClick={() => selectTab("predictions")}
                       icon={<Target size={18} strokeWidth={2.2} />}
                       label={t("پیش‌بینی‌ها", "Predictions")}
                       badge={data && data.total > 0 ? formatNumber(data.total, language) : undefined}
@@ -279,7 +298,7 @@ export function MatchAnalytics({
                     {["FINISHED", "FT", "AET"].includes(String(match.status)) && (
                       <TabButton
                         active={tab === "replay"}
-                        onClick={() => setTab("replay")}
+                        onClick={() => selectTab("replay")}
                         icon={<Tv size={18} strokeWidth={2.2} />}
                         label={t("بازپخش", "Replay")}
                       />
@@ -335,11 +354,13 @@ export function MatchAnalytics({
                         )}
 
                         {tab === "predictions" && (
-                          <PredictionsView
-                            data={data}
-                            number={number}
-                            t={t}
-                          />
+                          predictionsLoading || !data.predictionsLoaded ? (
+                            <div className="flex h-[300px] items-center justify-center text-xs font-bold text-white/50">
+                              {t("در حال دریافت پیش‌بینی‌ها...", "Loading predictions...")}
+                            </div>
+                          ) : (
+                            <PredictionsView data={data} number={number} t={t} />
+                          )
                         )}
                       </>
                     )}

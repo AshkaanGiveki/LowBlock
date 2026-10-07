@@ -121,7 +121,7 @@ export function PredictionCard({
           homeGoals: data.score?.home ?? prev.homeGoals,
           awayGoals: data.score?.away ?? prev.awayGoals,
           status: data.score?.status ?? prev.status,
-          elapsed: data.score?.elapsed ?? prev.elapsed,
+          elapsed: data.score?.elapsed !== undefined ? data.score.elapsed : prev.elapsed,
         }));
       };
 
@@ -150,11 +150,11 @@ export function PredictionCard({
     return () => window.clearTimeout(timer);
   }, [authToast, router]);
   const kickoff = new Date(match.kickoffAt).getTime();
-  const hasResult = match.homeGoals != null && match.awayGoals != null;
-  const finished = match.status === "FINISHED" || match.status === "FT";
+  const hasResult = liveMatch.homeGoals != null && liveMatch.awayGoals != null;
+  const finished = liveMatch.status === "FINISHED" || liveMatch.status === "FT";
   const started =
     !finished &&
-    (match.status === "LIVE" || match.status === "SUSPENDED" || now >= kickoff);
+    (liveMatch.status === "LIVE" || liveMatch.status === "SUSPENDED" || now >= kickoff);
   const live = LIVE_SCORE_UI_ENABLED && started;
   const locked = started || finished;
   useEffect(() => {
@@ -254,11 +254,11 @@ export function PredictionCard({
     <MatchStatusBadge
       live={live}
       finished={finished}
-      homeGoals={match.homeGoals}
-      awayGoals={match.awayGoals}
-      homePenaltyGoals={match.homePenaltyGoals}
-      awayPenaltyGoals={match.awayPenaltyGoals}
-      elapsed={match.elapsed}
+      homeGoals={liveMatch.homeGoals}
+      awayGoals={liveMatch.awayGoals}
+      homePenaltyGoals={liveMatch.homePenaltyGoals}
+      awayPenaltyGoals={liveMatch.awayPenaltyGoals}
+      elapsed={liveMatch.elapsed}
       kickoff={kickoff}
       now={now}
       language={language}

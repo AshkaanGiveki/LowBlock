@@ -166,7 +166,8 @@ function providerPeriodStart(event: any): number | null {
     event?.statusTime?.timestamp ??
     event?.currentPeriodStartTimestamp;
   const numeric = Number(timestamp);
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return numeric > 1e11 ? numeric / 1000 : numeric;
 }
 
 function personName(value: any): string | null {
@@ -330,6 +331,19 @@ class MatchMonitorService {
           snapshot.score.status = matchRecord.status || "SCHEDULED";
         }
         snapshot.score.elapsed ??= matchRecord.elapsed ?? null;
+        if (snapshot.score.status === "LIVE") {
+          const periodStart = providerPeriodStart(matchRecord.rawApiResponse);
+          if (periodStart) {
+            const calculated = Math.floor(
+              (Date.now() / 1000 - periodStart) / 60,
+            );
+            snapshot.score.elapsed = Math.min(130, Math.max(1, calculated));
+          } else if (snapshot.score.elapsed === 1) {
+            // A persisted fallback value of 1 is not trustworthy. Do not
+            // show a false minute until the provider supplies a clock anchor.
+            snapshot.score.elapsed = null;
+          }
+        }
       }
     } catch (err) {
       console.error("[MatchMonitor] Error loading snapshot from DB:", err);
@@ -439,9 +453,9 @@ class MatchMonitorService {
         snapshot.score.elapsed = 90;
       } else if (snapshot.score.status === "SCHEDULED") {
         snapshot.score.elapsed = null;
-      } else if (ev.time?.currentPeriodStartTimestamp) {
+      } else if (providerPeriodStart(ev)) {
         const calc = Math.floor(
-          (Date.now() / 1000 - ev.time.currentPeriodStartTimestamp) / 60,
+          (Date.now() / 1000 - providerPeriodStart(ev)!) / 60,
         );
         snapshot.score.elapsed = Math.min(130, Math.max(1, calc));
       }
@@ -644,10 +658,6 @@ class MatchMonitorService {
             (Date.now() / 1000 - providerPeriodStart(ev)!) / 60,
           );
           snap.score.elapsed = Math.min(130, Math.max(1, calc));
-        } else if (snap.score.status === "LIVE" && snap.score.elapsed == null) {
-          // Some delta messages carry status/score but omit the clock anchor.
-          // Keep the scoreboard visibly live until a timestamped update arrives.
-          snap.score.elapsed = 1;
         }
 
         this.broadcast(matchId, snap);

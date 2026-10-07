@@ -174,12 +174,15 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
       const baseMinutes = isSecondHalf ? 45 : 0;
       const timestamp = rawEvent.time?.currentPeriodStartTimestamp || rawEvent.statusTime?.timestamp;
       if (timestamp) {
-        const calc = baseMinutes + Math.floor((Date.now() / 1000 - timestamp) / 60);
+        const timestampSeconds = Number(timestamp) > 1e11 ? Number(timestamp) / 1000 : Number(timestamp);
+        const calc = baseMinutes + Math.floor((Date.now() / 1000 - timestampSeconds) / 60);
         canonicalElapsed = Math.min(130, Math.max(1, calc));
       } else if (isSecondHalf) {
         canonicalElapsed = 46;
       } else {
-        canonicalElapsed = 1;
+        // Do not manufacture minute 1 when the provider omits its clock
+        // anchor. The live monitor fills it from a later update.
+        canonicalElapsed = null;
       }
     }
   }

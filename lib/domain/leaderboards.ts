@@ -40,12 +40,13 @@ function materializedScope(scope: LeaderboardScope) {
   // those scopes from predictionScores so the league filter is applied at read
   // time instead of trusting potentially stale aggregate rows.
   if (!scope.leagueCode) return null;
-  if (scope.clubId)
-    return scope.leagueCode
-      ? `CLUB:${scope.clubId}:LEAGUE:${scope.leagueCode}:${scope.seasonStartYear}`
-      : scope.matchday != null
-        ? `CLUB:${scope.clubId}:ROUND:${scope.leagueCode ?? ""}:${scope.seasonStartYear}:${scope.matchday}`
-        : `CLUB:${scope.clubId}:OVERALL:${scope.seasonStartYear}`;
+  if (scope.clubId) {
+    if (scope.matchday != null)
+      return `CLUB:${scope.clubId}:ROUND:${scope.leagueCode ?? ""}:${scope.seasonStartYear}:${scope.matchday}`;
+    if (scope.leagueCode)
+      return `CLUB:${scope.clubId}:LEAGUE:${scope.leagueCode}:${scope.seasonStartYear}`;
+    return `CLUB:${scope.clubId}:OVERALL:${scope.seasonStartYear}`;
+  }
   if (scope.leagueCode)
     return scope.matchday != null
       ? `ROUND:${scope.leagueCode}:${scope.seasonStartYear}:${scope.matchday}`
