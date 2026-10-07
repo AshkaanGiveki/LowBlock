@@ -1304,7 +1304,7 @@ function EventCard({ incident, isHome, teamTitle, teamLogo, language, t }: any) 
   // SUBSTITUTION CARD
   if (type === "substitution") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0c1410] to-[#060a08] p-3.5 shadow-md">
+      <div className="overflow-visible rounded-2xl border border-white/10 bg-gradient-to-br from-[#0c1410] to-[#060a08] p-3.5 shadow-md">
         {/* Team Chip & Category */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -1325,7 +1325,7 @@ function EventCard({ incident, isHome, teamTitle, teamLogo, language, t }: any) 
               <ArrowUp size={12} />
             </span>
             <div className="min-w-0 flex-1">
-              <span className="text-xs font-bold text-white truncate block">
+              <span className="text-xs font-bold leading-snug text-white break-words whitespace-normal block">
                 {incident.playerInName || t("بازیکن ورودی", "Incoming Player")}
               </span>
             </div>
@@ -1341,7 +1341,7 @@ function EventCard({ incident, isHome, teamTitle, teamLogo, language, t }: any) 
                 <ArrowDown size={12} />
               </span>
               <div className="min-w-0 flex-1">
-                <span className="text-xs font-medium text-white/60 truncate block">
+                <span className="text-xs font-medium leading-snug text-white/60 break-words whitespace-normal block">
                   {incident.playerOutName}
                 </span>
               </div>
