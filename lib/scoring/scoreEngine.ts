@@ -121,16 +121,33 @@ export async function runScoreEngine(
   const byMatch = new Map(
     matches.map((match) => [match.providerMatchId, match]),
   );
-  const predictions = await db
-    .collection<Prediction>("predictions")
-    .find({
-      matchId: { $in: matches.map((match) => match.providerMatchId) },
-      userId: { $ne: "guest" },
-    })
-    .toArray();
+  // Keep the provider-match lookup bounded. A single large `$in` query can
+  // exceed the database connection/socket budget when the season contains a
+  // large number of finished fixtures, causing the score pass to abort before
+  // any leaderboard rows are rebuilt. Chunking makes the run retryable and
+  // prevents a few older matches from being silently left unscored.
+  const predictions: Prediction[] = [];
+  const matchIds = matches.map((match) => match.providerMatchId);
+  for (let index = 0; index < matchIds.length; index += 100) {
+    const batch = await db
+      .collection<Prediction>("predictions")
+      .find({
+        matchId: { $in: matchIds.slice(index, index + 100) },
+        userId: { $ne: "guest" },
+      })
+      .toArray();
+    predictions.push(...batch);
+  }
   const now = new Date();
   const predictionIds = predictions.map((prediction) => String(prediction._id ?? `${prediction.userId}:${prediction.matchId}`));
-  const existingSnapshots = await db.collection<any>("predictionLockSnapshots").find({ predictionId: { $in: predictionIds } }).toArray();
+  const existingSnapshots: any[] = [];
+  for (let index = 0; index < predictionIds.length; index += 100) {
+    const batch = await db
+      .collection<any>("predictionLockSnapshots")
+      .find({ predictionId: { $in: predictionIds.slice(index, index + 100) } })
+      .toArray();
+    existingSnapshots.push(...batch);
+  }
   const existingByPredictionId = new Map(existingSnapshots.map((snapshot) => [String(snapshot.predictionId), snapshot]));
   const snapshots = new Map<
     string,

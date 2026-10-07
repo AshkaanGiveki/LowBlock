@@ -18,8 +18,14 @@ function directUri() {
 const mongoOptions = {
   serverSelectionTimeoutMS: 10_000,
   connectTimeoutMS: 10_000,
-  socketTimeoutMS: 10_000,
-  waitQueueTimeoutMS: 10_000,
+  // Full score/leaderboard rebuilds can legitimately stream several thousand
+  // prediction rows. Ten seconds is short enough to abort a healthy query and
+  // leave finished matches without score rows.
+  socketTimeoutMS: 60_000,
+  // Index initialization runs several operations concurrently. Allow queued
+  // work to wait for a pool slot instead of aborting a score rebuild before it
+  // reaches the scoring engine.
+  waitQueueTimeoutMS: 60_000,
   retryWrites: true,
   monitorCommands: true,
 } as const;
@@ -75,15 +81,13 @@ async function connect() {
   const fallback = directUri();
   const client =
     globalForMongo.mongo ??
-    instrumentMongoClient(
-      new MongoClient(fallback ?? env.MONGODB_URI, mongoOptions),
-    );
+    instrumentMongoClient(new MongoClient(env.MONGODB_URI, mongoOptions));
   try {
     return await client.connect();
   } catch (error) {
     if (!fallback) throw error;
     const srv = instrumentMongoClient(
-      new MongoClient(env.MONGODB_URI, mongoOptions),
+      new MongoClient(fallback, mongoOptions),
     );
     await srv.connect();
     return srv;
@@ -116,25 +120,34 @@ export async function withMongoTransaction<T>(
   const db = await getDb();
   const client = globalForMongo.mongo;
   if (!client) throw new Error("Mongo client is not connected");
-  const session = client.startSession();
-  try {
-    session.startTransaction({
-      readConcern: { level: "snapshot" },
-      writeConcern: { w: "majority" },
-      maxCommitTimeMS: 10_000,
-    });
-    const result = await operation(db, session);
-    await session.commitTransaction({ timeoutMS: 10_000 });
-    return result;
-  } catch (error) {
-    if (session.inTransaction())
-      await session
-        .abortTransaction({ timeoutMS: 10_000 })
-        .catch(() => undefined);
-    throw error;
-  } finally {
-    await session.endSession();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const session = client.startSession();
+    try {
+      session.startTransaction({
+        readConcern: { level: "snapshot" },
+        writeConcern: { w: "majority" },
+        maxCommitTimeMS: 60_000,
+      });
+      const result = await operation(db, session);
+      await session.commitTransaction({ timeoutMS: 60_000 });
+      return result;
+    } catch (error) {
+      if (session.inTransaction())
+        await session
+          .abortTransaction({ timeoutMS: 60_000 })
+          .catch(() => undefined);
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable =
+        /write conflict|TransientTransactionError|UnknownTransactionCommitResult|temporarily unavailable/i.test(
+          message,
+        );
+      if (!retryable || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    } finally {
+      await session.endSession();
+    }
   }
+  throw new Error("Mongo transaction failed after retries");
 }
 export async function ensureIndexes() {
   const db = await getDb();
@@ -174,6 +187,12 @@ export async function ensureIndexes() {
     db
       .collection("predictionScores")
       .createIndex({ userId: 1, matchId: 1 }, { unique: true }),
+    db
+      .collection("predictionScores")
+      .createIndex(
+        { matchId: 1, clubIdAtLock: 1 },
+        { name: "prediction_scores_match_club" },
+      ),
     db
       .collection("predictionScores")
       .createIndex({
@@ -216,6 +235,9 @@ export async function ensureIndexes() {
       .createIndex({ leagueSeasonId: 1, number: 1 }, { unique: true }),
     db.collection("rounds").createIndex({ status: 1 }),
     db.collection("footballApiQuota").createIndex({ day: 1 }, { unique: true }),
+    db
+      .collection("matchDetails")
+      .createIndex({ matchId: 1 }, { name: "match_details_match" }),
     db
       .collection("matchInsights")
       .createIndex({ matchId: 1 }, { unique: true }),

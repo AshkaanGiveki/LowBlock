@@ -4,7 +4,8 @@ import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { isPredictionLocked } from "@/lib/domain/predictionLock";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
-import { getOrFetchMatchDetails } from "@/lib/football/sportsapi/matchDetails";
+import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
+import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backgroundService";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export async function GET(
   const { matchId } = await params;
   const url = new URL(req.url);
   const clubId = url.searchParams.get("clubId");
+  const includePredictions = url.searchParams.get("includePredictions") === "true";
   const db = await getDb();
   const viewer = await currentUserId();
   const match = await db
@@ -25,6 +27,14 @@ export async function GET(
     });
   if (!match)
     return NextResponse.json({ error: "match not found" }, { status: 404 });
+
+  let viewerClubId: string | null = null;
+  if (viewer) {
+    const membership = await db
+      .collection<any>("clubMemberships")
+      .findOne({ userId: viewer, leftAt: null }, { projection: { clubId: 1 } });
+    viewerClubId = membership?.clubId ? String(membership.clubId) : null;
+  }
 
   if (clubId) {
     if (!viewer || !ObjectId.isValid(clubId))
@@ -47,10 +57,15 @@ export async function GET(
   // event namespace; fetching them from SportsAPI returns unrelated scores
   // (for example 69-79 for a 1-0 football fixture). The match row is the
   // canonical result for API-Football fixtures.
-  const liveDetails =
-    match.provider === "sportsapi"
-      ? await getOrFetchMatchDetails(matchId)
-      : null;
+  let liveDetails = null;
+  if (match.provider === "sportsapi") {
+    // Return the in-process WebSocket snapshot immediately. The SSE stream
+    // hydrates it from Mongo asynchronously after the drawer is visible.
+    ensureSportsApiBackgroundService();
+    const monitor = getMatchMonitorService();
+    monitor.subscribeMatchChannels(matchId);
+    liveDetails = monitor.getSnapshot(matchId);
+  }
 
   const started =
     ["LIVE", "FINISHED", "SUSPENDED"].includes(String(match.status)) ||
@@ -64,27 +79,29 @@ export async function GET(
   const distribution = new Map<string, number>();
 
   // Only reveal community predictions once the match has kicked off (or in clubs if locked)
-  if (started && (locked || clubId)) {
-    const predictions = await db
-      .collection<any>("predictions")
-      .find({ matchId, userId: { $ne: "guest" } })
-      .toArray();
+  const predictionClubId = clubId || viewerClubId;
+  if (includePredictions && started && (locked || predictionClubId)) {
     const scoreRows = await db
       .collection<any>("predictionScores")
-      .find({ matchId })
+      .find({ matchId, ...(predictionClubId ? { clubIdAtLock: predictionClubId } : {}) }, {
+        projection: { userId: 1, clubIdAtLock: 1, points: 1 },
+      })
+      .toArray();
+    const eligibleUserIds = predictionClubId
+      ? [...new Set(scoreRows.map((score) => String(score.userId)))]
+      : null;
+    const predictions = await db
+      .collection<any>("predictions")
+      .find({
+        matchId,
+        userId: { $ne: "guest", ...(eligibleUserIds ? { $in: eligibleUserIds } : {}) },
+      }, { projection: { userId: 1, homeGoals: 1, awayGoals: 1 } })
       .toArray();
     const scoreByUser = new Map(scoreRows.map((score) => [score.userId, score]));
-    const eligibleUserIds = clubId
-      ? new Set(
-          scoreRows
-            .filter((score) => score.clubIdAtLock === clubId)
-            .map((score) => String(score.userId)),
-        )
-      : null;
     visiblePredictions =
-      clubId && locked
+      predictionClubId && locked
         ? predictions.filter((prediction) =>
-            eligibleUserIds?.has(String(prediction.userId)),
+            eligibleUserIds?.includes(String(prediction.userId)),
           )
         : predictions;
     const ids = visiblePredictions
@@ -138,6 +155,7 @@ export async function GET(
     match: {
       id: match.providerMatchId || matchId,
       providerMatchId: match.providerMatchId || matchId,
+      provider: match.provider,
       homeTeam: {
         ...match.homeTeam,
         logo: homeLogo,
@@ -172,5 +190,6 @@ export async function GET(
       .map(([score, count]) => ({ score, count }))
       .sort((a, b) => b.count - a.count),
     users: userRows,
+    predictionsLoaded: includePredictions,
   });
 }
