@@ -81,29 +81,49 @@ export async function GET(
   // Only reveal community predictions once the match has kicked off (or in clubs if locked)
   const predictionClubId = clubId || viewerClubId;
   if (includePredictions && started && (locked || predictionClubId)) {
+    const predictions = await db
+      .collection<any>("predictions")
+      .find(
+        { matchId, userId: { $ne: "guest" } },
+        { projection: { userId: 1, homeGoals: 1, awayGoals: 1 } },
+      )
+      .toArray();
+
+    visiblePredictions = predictions;
+    if (predictionClubId && predictions.length) {
+      // Group visibility is based on the users' active membership, not on
+      // predictionScores. Live matches do not have scores yet, and older
+      // scores may not have a historical club snapshot.
+      const predictionUserIds = [
+        ...new Set(predictions.map((prediction) => String(prediction.userId))),
+      ];
+      const memberships = await db
+        .collection<any>("clubMemberships")
+        .find(
+          { clubId: predictionClubId, userId: { $in: predictionUserIds }, leftAt: null },
+          { projection: { userId: 1 } },
+        )
+        .toArray();
+      const groupUserIds = new Set(
+        memberships.map((membership) => String(membership.userId)),
+      );
+      visiblePredictions = predictions.filter((prediction) =>
+        groupUserIds.has(String(prediction.userId)),
+      );
+    }
+
     const scoreRows = await db
       .collection<any>("predictionScores")
-      .find({ matchId, ...(predictionClubId ? { clubIdAtLock: predictionClubId } : {}) }, {
+      .find({
+        matchId,
+        ...(predictionClubId
+          ? { userId: { $in: visiblePredictions.map((prediction) => String(prediction.userId)) } }
+          : {}),
+      }, {
         projection: { userId: 1, clubIdAtLock: 1, points: 1 },
       })
       .toArray();
-    const eligibleUserIds = predictionClubId
-      ? [...new Set(scoreRows.map((score) => String(score.userId)))]
-      : null;
-    const predictions = await db
-      .collection<any>("predictions")
-      .find({
-        matchId,
-        userId: { $ne: "guest", ...(eligibleUserIds ? { $in: eligibleUserIds } : {}) },
-      }, { projection: { userId: 1, homeGoals: 1, awayGoals: 1 } })
-      .toArray();
     const scoreByUser = new Map(scoreRows.map((score) => [score.userId, score]));
-    visiblePredictions =
-      predictionClubId && locked
-        ? predictions.filter((prediction) =>
-            eligibleUserIds?.includes(String(prediction.userId)),
-          )
-        : predictions;
     const ids = visiblePredictions
       .map((prediction) => prediction.userId)
       .filter((id: string) => ObjectId.isValid(id))

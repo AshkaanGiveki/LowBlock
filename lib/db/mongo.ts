@@ -195,6 +195,12 @@ export async function ensureIndexes() {
       ),
     db
       .collection("predictionScores")
+      .createIndex(
+        { matchId: 1, userId: 1, points: 1 },
+        { name: "prediction_scores_match_user_points" },
+      ),
+    db
+      .collection("predictionScores")
       .createIndex({
         seasonStartYear: 1,
         leagueCode: 1,
@@ -217,6 +223,12 @@ export async function ensureIndexes() {
         },
       ),
     db.collection("clubMemberships").createIndex({ clubId: 1, leftAt: 1 }),
+    db
+      .collection("clubMemberships")
+      .createIndex(
+        { clubId: 1, leftAt: 1, userId: 1 },
+        { name: "club_membership_active_users" },
+      ),
     db
       .collection("clubJoinRequests")
       .createIndex({ userId: 1, clubId: 1, status: 1 }, { unique: true }),
