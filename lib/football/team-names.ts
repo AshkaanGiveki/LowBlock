@@ -1,3 +1,33 @@
+/**
+ * Older releases committed Persian literals after a UTF-8/Windows-1252
+ * decoding mistake (for example `Ø§Ø±Ø³Ù†Ø§Ù„`). Keep the large legacy map
+ * usable while we migrate the database by repairing those values at the
+ * boundary. Correct Persian literals pass through unchanged.
+ */
+const CP1252_EXTENDED: Record<number, number> = {
+  0x20ac: 0x80, 0x201a: 0x82, 0x192: 0x83, 0x201e: 0x84,
+  0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87, 0x2c6: 0x88,
+  0x2030: 0x89, 0x160: 0x8a, 0x2039: 0x8b, 0x152: 0x8c,
+  0x17d: 0x8e, 0x2018: 0x91, 0x2019: 0x92, 0x201c: 0x93,
+  0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+  0x2dc: 0x98, 0x2122: 0x99, 0x161: 0x9a, 0x203a: 0x9b,
+  0x153: 0x9c, 0x17e: 0x9e, 0x178: 0x9f,
+};
+
+export function repairPersianText(value: string): string {
+  if (!value || !/[ØÙÛÃÂâ]/.test(value)) return value;
+  try {
+    const bytes = Uint8Array.from([...value].map((char) => {
+      const code = char.charCodeAt(0);
+      return CP1252_EXTENDED[code] ?? (code <= 0xff ? code : 0x3f);
+    }));
+    const repaired = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return repaired.includes("�") ? value : repaired;
+  } catch {
+    return value;
+  }
+}
+
 const FA: Record<number, string> = {
   8666: "1874 نورثویچ",
   8674: "اببای های",
@@ -1400,20 +1430,26 @@ export function teamName(
   language: "fa" | "en",
   id: number,
   sourceName: string,
+  provider?: "football-api" | "sportsapi",
+  canonicalFaName?: string,
 ) {
   if (language !== "fa" || !sourceName) return sourceName;
+  if (canonicalFaName) return repairPersianText(canonicalFaName);
 
   // 1. Direct match by exact or lowercase name
   const exact = NAMES_FA[sourceName] || NAMES_FA[sourceName.toLowerCase()];
-  if (exact) return exact;
+  if (exact) return repairPersianText(exact);
 
   // 2. Normalized slug match
   const clean = cleanTeamName(sourceName);
-  if (NAMES_FA_BY_SLUG[clean]) return NAMES_FA_BY_SLUG[clean];
+  if (NAMES_FA_BY_SLUG[clean]) return repairPersianText(NAMES_FA_BY_SLUG[clean]);
 
   // 3. Check legacy FA by ID only if not using SportsAPI (to avoid ID collisions)
-  if (typeof process !== "undefined" && process.env.FOOTBALL_DATA_PROVIDER !== "sportsapi" && FA[id]) {
-    return FA[id];
+  const allowLegacyId = provider
+    ? provider === "football-api"
+    : typeof process === "undefined" || process.env.FOOTBALL_DATA_PROVIDER !== "sportsapi";
+  if (allowLegacyId && FA[id]) {
+    return repairPersianText(FA[id]);
   }
 
   return sourceName;

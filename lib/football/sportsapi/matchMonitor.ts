@@ -680,12 +680,27 @@ class MatchMonitorService {
   }
 
   private lastDbSync = new Map<string, number>();
+  private persistInFlight = new Map<string, Promise<void>>();
+  private scoredFinishedMatches = new Set<string>();
 
   private async persistMatchState(matchId: string, snapshot: LiveMatchSnapshot) {
     const now = Date.now();
     const last = this.lastDbSync.get(matchId) || 0;
     if (now - last < 5_000) return; // Debounce 5s
     this.lastDbSync.set(matchId, now);
+
+    // WebSocket deltas can arrive concurrently. Never let several Mongo
+    // persistence jobs for the same match pile up behind one another.
+    if (this.persistInFlight.has(matchId)) return;
+
+    const persistJob = this.persistMatchStateInternal(matchId, snapshot).finally(() => {
+      this.persistInFlight.delete(matchId);
+    });
+    this.persistInFlight.set(matchId, persistJob);
+    await persistJob;
+  }
+
+  private async persistMatchStateInternal(matchId: string, snapshot: LiveMatchSnapshot) {
 
     try {
       const db = await getDb();
@@ -748,7 +763,8 @@ class MatchMonitorService {
       );
 
       // 3. Trigger score engine if match is newly finished
-      if (snapshot.score.status === "FINISHED") {
+      if (snapshot.score.status === "FINISHED" && !this.scoredFinishedMatches.has(matchId)) {
+        this.scoredFinishedMatches.add(matchId);
         try {
           const { runScoreEngine } = await import("@/lib/scoring/scoreEngine");
           await runScoreEngine();

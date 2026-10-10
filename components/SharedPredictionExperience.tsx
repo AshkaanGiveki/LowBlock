@@ -14,8 +14,8 @@ type Match = {
   providerMatchId: string;
   kickoffAt: string;
   status: string;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
 };
 type Prediction = { homeGoals: number; awayGoals: number };
 type Winner = {

@@ -15,8 +15,8 @@ type Fixture = {
   status: string;
   homeGoals: number | null;
   awayGoals: number | null;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
 };
 
 export function RoundMatchGrid({
@@ -158,7 +158,7 @@ function Team({
         />
       </span>
       <span className="mt-2 block truncate text-[11px] font-bold">
-        {teamName(language, team.id, team.name)}
+        {teamName(language, team.id, team.name, undefined, team.faName)}
       </span>
     </div>
   );

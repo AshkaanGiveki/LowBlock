@@ -50,6 +50,7 @@ export class SportsApiWebSocketManager {
   }
 
   public connect() {
+    if (!isSportsApiRealtimeEnabled()) return;
     const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
     if (!apiKey) return;
     if ((this.ws !== null && this.ws.readyState === 1) || this.isConnecting) return;
@@ -160,6 +161,15 @@ export class SportsApiWebSocketManager {
       this.connect();
     }, delay);
   }
+}
+
+/**
+ * Realtime is intentionally disabled on Vercel unless explicitly enabled.
+ * Long-lived WebSocket connections are multiplied across serverless
+ * instances and can exhaust the MongoDB connection/pool budget.
+ */
+export function isSportsApiRealtimeEnabled(): boolean {
+  return process.env.VERCEL !== "1" || process.env.SPORTSAPI_REALTIME_ENABLED === "true";
 }
 
 // Global singleton for server/client contexts

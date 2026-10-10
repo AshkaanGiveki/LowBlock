@@ -10,6 +10,7 @@ import { rebuildRoundRecords } from "@/lib/football/roundLifecycle";
 import { invalidateCompetitionCaches } from "@/lib/domain/cache";
 import { syncMatchInsights } from "./matchInsights";
 import { providerDateKeys } from "../scheduleWindow";
+import { ensureCentralTeam } from "../centralTeams";
 
 type Fixture = {
   fixture: {
@@ -123,6 +124,11 @@ async function saveFixtures(
       });
     return valid;
   });
+  const centralIds = new Map<string, string>();
+  await Promise.all(validFixtures.flatMap((f) => [f.teams.home, f.teams.away]).map(async (team) => {
+    const centralId = await ensureCentralTeam({ provider: "football-api", providerTeamId: team.id, sourceName: team.name, logoUrl: team.logo });
+    centralIds.set(String(team.id), centralId);
+  }));
   const ops = validFixtures.map((f) => ({
     updateOne: {
       filter: {
@@ -132,6 +138,8 @@ async function saveFixtures(
       update: {
         $set: {
           ...normalized(f, leagueCode),
+          "homeTeam.centralTeamId": centralIds.get(String(f.teams.home.id)),
+          "awayTeam.centralTeamId": centralIds.get(String(f.teams.away.id)),
           rawApiResponse: f,
           apiDataType: detail ? "fixture-detail" : "current-window",
           ...(detail ? { detailsUpdatedAt: new Date() } : {}),

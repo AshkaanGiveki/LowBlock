@@ -10,8 +10,8 @@ import { LocalDateTime } from "@/components/LocalDateTime";
 type Match = {
   matchId: string;
   kickoffAt: string;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
   predictedHome: number | null;
   predictedAway: number | null;
   actualHome: number | null;
@@ -108,6 +108,7 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                         <Team
                           id={match.homeTeam.id}
                           name={match.homeTeam.name}
+                          faName={match.homeTeam.faName}
                           logo={match.homeTeam.logoUrl}
                           language={language}
                         />
@@ -117,6 +118,7 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                         <Team
                           id={match.awayTeam.id}
                           name={match.awayTeam.name}
+                          faName={match.awayTeam.faName}
                           logo={match.awayTeam.logoUrl}
                           language={language}
                         />
@@ -160,11 +162,13 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
 function Team({
   id,
   name,
+  faName,
   logo,
   language,
 }: {
   id: number;
   name: string;
+  faName?: string;
   logo: string | null;
   language: "fa" | "en";
 }) {
@@ -176,7 +180,7 @@ function Team({
         className="mx-auto h-8 w-8 object-contain"
       />
       <span className="mt-1 block truncate text-[10px] font-bold">
-        {teamName(language, id, name)}
+        {teamName(language, id, name, undefined, faName)}
       </span>
     </div>
   );

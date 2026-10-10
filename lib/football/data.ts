@@ -23,8 +23,8 @@ export type MatchRecord = {
   elapsed?: number | null;
   homeGoals: number | null;
   awayGoals: number | null;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; centralTeamId?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; centralTeamId?: string; logoUrl: string | null };
   seasonStartYear: number;
   rawApiResponse?: unknown;
 };
@@ -259,6 +259,11 @@ export async function getMatchesPage(
 
   const hasMore = matches.length > pageSize;
   const page = hasMore ? matches.slice(0, -1) : matches;
+  const centralIds = [...new Set(page.flatMap((match) => [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId]).filter(Boolean))];
+  const centralRows = centralIds.length
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.fa": 1 } }).toArray()
+    : [];
+  const centralFa = new Map(centralRows.map((row) => [row.centralTeamId, row.names?.fa]));
   const publicPage = page.map((match) => {
     const homeLogo = match.homeTeam.logoUrl || (match.homeTeam as any).logo || (match.homeTeam.id ? `/api/team-image/${match.homeTeam.id}` : null);
     const awayLogo = match.awayTeam.logoUrl || (match.awayTeam as any).logo || (match.awayTeam.id ? `/api/team-image/${match.awayTeam.id}` : null);
@@ -275,11 +280,13 @@ export async function getMatchesPage(
       awayGoals: match.awayGoals,
       homeTeam: {
         ...match.homeTeam,
+        faName: centralFa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName,
         logo: homeLogo,
         logoUrl: homeLogo,
       },
       awayTeam: {
         ...match.awayTeam,
+        faName: centralFa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName,
         logo: awayLogo,
         logoUrl: awayLogo,
       },
@@ -308,13 +315,24 @@ export async function getMatchesPage(
 
 export async function getMatch(providerMatchId: string) {
   const db = await getDb();
-  return db.collection<MatchRecord>("matches").findOne({
+  const match = await db.collection<MatchRecord>("matches").findOne({
     provider: getFootballProvider().name,
     providerMatchId,
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
   });
+  if (!match) return null;
+  const ids = [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId].filter(Boolean);
+  const rows = ids.length
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1 } }).toArray()
+    : [];
+  const fa = new Map(rows.map((row) => [row.centralTeamId, row.names?.fa]));
+  return {
+    ...match,
+    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName },
+    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName },
+  };
 }
 
 export async function getPredictions(matchIds: string[], userId = "guest") {

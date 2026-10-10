@@ -11,8 +11,8 @@ type Fixture = {
   status: string;
   homeGoals: number | null;
   awayGoals: number | null;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
 };
 export function ClubRoundFixtures({
   fixtures,
@@ -100,7 +100,7 @@ function Team({
         className="mx-auto h-10 w-10 object-contain"
       />
       <span className="mt-2 block truncate text-xs font-bold">
-        {teamName(language, team.id, team.name)}
+        {teamName(language, team.id, team.name, undefined, team.faName)}
       </span>
     </div>
   );

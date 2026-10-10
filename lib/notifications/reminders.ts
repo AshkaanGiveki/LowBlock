@@ -51,8 +51,20 @@ export async function processMatchReminder(matchId: string) {
     .findOne({ providerMatchId: matchId });
   if (!match || match.status !== "SCHEDULED")
     return { sent: 0, skipped: "match" };
+  const centralIds = [match.homeTeam?.centralTeamId, match.awayTeam?.centralTeamId].filter(Boolean);
+  const centralRows = centralIds.length
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.fa": 1 } }).toArray()
+    : [];
+  const centralFa = new Map(centralRows.map((row) => [row.centralTeamId, row.names?.fa]));
+  const displayMatch = {
+    ...match,
+    homeTeam: { ...match.homeTeam, faName: centralFa.get(match.homeTeam?.centralTeamId) || match.homeTeam?.faName },
+    awayTeam: { ...match.awayTeam, faName: centralFa.get(match.awayTeam?.centralTeamId) || match.awayTeam?.faName },
+  };
   const delta = new Date(match.kickoffAt).getTime() - Date.now();
-  if (delta < 1200000 || delta > 2400000) return { sent: 0, skipped: "stale" };
+  // QStash may deliver a little early or retry after a transient delay. Only
+  // reject jobs that are already past kickoff or clearly scheduled too early.
+  if (delta <= 0 || delta > 2700000) return { sent: 0, skipped: "stale" };
   const identities = await db
     .collection<any>("externalIdentities")
     .aggregate([
@@ -125,7 +137,7 @@ export async function processMatchReminder(matchId: string) {
       const result = await sendPlatform(
         provider,
         String(identity.chatId || identity.providerUserId),
-        match,
+        displayMatch,
         language,
       );
       await db

@@ -13,8 +13,8 @@ import { LocalShortDate } from "@/components/LocalDateTime";
 type H2HMeeting = {
   fixtureId: string;
   date: string;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
   homeGoals: number;
   awayGoals: number;
   league: string;
@@ -145,8 +145,8 @@ function LineupsCard({
   t: (fa: string, en: string) => string;
 }) {
   const [side, setSide] = useState<"home" | "away">("home");
-  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name);
-  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name);
+  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name, undefined, match.homeTeam?.faName);
+  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name, undefined, match.awayTeam?.faName);
   const activeLineup = side === "home" ? lineups.home : lineups.away;
 
   return (
@@ -351,13 +351,13 @@ function H2HCard({
                 className="h-7 w-7 shrink-0"
               />
               <span className="min-w-0 flex-1 truncate text-[11px] font-bold">
-                {teamName(language, item.homeTeam.id, item.homeTeam.name)}
+                {teamName(language, item.homeTeam.id, item.homeTeam.name, undefined, item.homeTeam.faName)}
               </span>
               <b className="shrink-0 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-[11px]">
                 {n(item.homeGoals)} - {n(item.awayGoals)}
               </b>
               <span className="min-w-0 flex-1 truncate text-end text-[11px] font-bold">
-                {teamName(language, item.awayTeam.id, item.awayTeam.name)}
+                {teamName(language, item.awayTeam.id, item.awayTeam.name, undefined, item.awayTeam.faName)}
               </span>
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/[.05] p-1">
                 <TeamCrest

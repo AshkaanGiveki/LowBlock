@@ -1,4 +1,4 @@
-import { getSportsApiWsManager } from "./ws";
+import { getSportsApiWsManager, isSportsApiRealtimeEnabled } from "./ws";
 import { getDb } from "@/lib/db/mongo";
 
 let isStarted = false;
@@ -72,6 +72,16 @@ export function syncActiveMatchesSubscriptions(): Promise<void> {
  * periodic refresh loops.
  */
 export function startSportsApiBackgroundService(): void {
+  // Vercel functions are short-lived and may be instantiated concurrently.
+  // A process-local interval/WebSocket here creates one DB subscription scan
+  // per warm instance and amplifies Mongo pressure during live matches.
+  // Match-specific SSE handlers still subscribe to the required channels.
+  if (!isSportsApiRealtimeEnabled()) {
+    return;
+  }
+  if (process.env.VERCEL === "1" && process.env.SPORTSAPI_BACKGROUND_ENABLED !== "true") {
+    return;
+  }
   if (isStarted) return;
   isStarted = true;
 
