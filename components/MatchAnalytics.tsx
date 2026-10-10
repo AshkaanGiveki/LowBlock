@@ -75,7 +75,7 @@ export function MatchAnalytics({
 }) {
   const { language, t } = useLanguage();
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [tab, setTab] = useState<TabType>("lineups");
+  const [tab, setTab] = useState<TabType>("predictions");
   const [visible, setVisible] = useState(true);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
@@ -99,6 +99,14 @@ export function MatchAnalytics({
     setTab(next);
     if (next === "predictions") loadPredictions();
   };
+
+  // Predictions are the default drawer view, so load them automatically on
+  // first open instead of waiting for a tab click.
+  useEffect(() => {
+    if (tab === "predictions" && data && !data.predictionsLoaded && !predictionsLoading) {
+      loadPredictions();
+    }
+  }, [tab, data, predictionsLoading]);
   const number = (value: number | null | undefined) =>
     formatNumber(Number(value ?? 0), language, { maximumFractionDigits: 1 });
   const score = (
@@ -120,13 +128,6 @@ export function MatchAnalytics({
       .then((next) => {
         if (!cancelled && next) {
           setData(next);
-          if (["LIVE", "SUSPENDED"].includes(String(next.match?.status))) {
-            if (next.liveDetails?.incidents?.length) {
-              setTab("timeline");
-            } else if (next.liveDetails?.stats?.length) {
-              setTab("stats");
-            }
-          }
         }
       })
       .catch(() => undefined);

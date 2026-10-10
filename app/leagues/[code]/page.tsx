@@ -11,6 +11,7 @@ import { LeagueStandings } from "@/components/LeagueStandings";
 import { LeagueLogo } from "@/components/LeagueLogo";
 import { LeaguePageSwitcher } from "@/components/LeaguePageSwitcher";
 import { Suspense } from "react";
+import { selectActiveRound } from "@/lib/football/rounds";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,7 @@ export default async function LeaguePage({
       active: boolean;
       completed: boolean;
       live: boolean;
+      nextKickoffAt: number | null;
     }
   >();
   for (const match of docs) {
@@ -86,6 +88,7 @@ export default async function LeaguePage({
       active: false,
       completed: true,
       live: false,
+      nextKickoffAt: null,
     };
     item.count++;
     item.completed = item.completed && match.status === "FINISHED";
@@ -95,6 +98,14 @@ export default async function LeaguePage({
       item.live ||
       (match.status === "SCHEDULED" &&
         new Date(match.kickoffAt).getTime() > Date.now());
+    const kickoff = new Date(match.kickoffAt).getTime();
+    if (
+      match.status === "SCHEDULED" &&
+      kickoff > Date.now() &&
+      (item.nextKickoffAt == null || kickoff < item.nextKickoffAt)
+    ) {
+      item.nextKickoffAt = kickoff;
+    }
     grouped.set(match.matchday, item);
   }
   const storedRounds = await db
@@ -106,23 +117,17 @@ export default async function LeaguePage({
     storedRounds.length
       ? storedRounds.map((round) => ({
           number: Number(round.number),
-          count: Number(
-            round.eligibleFixtures ??
-              grouped.get(Number(round.number))?.count ??
-              0,
-          ),
+          count: grouped.get(Number(round.number))?.count ?? 0,
           active: round.status === "LIVE" || round.status === "UPCOMING",
           live: round.status === "LIVE",
           completed: round.status === "FINAL",
+          nextKickoffAt: grouped.get(Number(round.number))?.nextKickoffAt ?? null,
         }))
       : [...grouped.values()]
   )
     .filter((round) => round.count > 0)
     .sort((a, b) => a.number - b.number);
-  const activeNumber =
-    rounds.filter((round) => round.active).at(-1)?.number ??
-    rounds.find((round) => !round.completed)?.number ??
-    rounds.at(-1)?.number;
+  const activeNumber = selectActiveRound(rounds);
   return (
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-6xl">
