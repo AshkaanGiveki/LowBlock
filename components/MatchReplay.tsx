@@ -35,8 +35,8 @@ export function MatchReplay({ match, incidents, language, t }: ReplayProps) {
     return (a.addedTime || 0) - (b.addedTime || 0);
   });
 
-  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
-  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
+  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name, undefined, match.homeTeam.faName);
+  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name, undefined, match.awayTeam.faName);
 
   // Playback Logic
   useEffect(() => {

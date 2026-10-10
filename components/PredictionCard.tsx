@@ -35,7 +35,7 @@ import { BadgeMinus } from "lucide-react";
 import { DrawerCompetitionMeta } from "./DrawerCompetitionMeta";
 import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
 
-type Team = { id: number; name: string; logoUrl: string | null };
+type Team = { id: number; name: string; faName?: string; logoUrl: string | null };
 type Match = {
   providerMatchId: string;
   leagueCode?: string;
@@ -65,7 +65,7 @@ type Props = {
     awayGoals: number;
   }) => Promise<void>;
 };
-type DrawerTeam = { id?: number; name: string; logo: string | null };
+type DrawerTeam = { id?: number; name: string; faName?: string; logo: string | null };
 
 export function PredictionCard({
   match,
@@ -180,8 +180,8 @@ export function PredictionCard({
     match.providerMatchId,
     pathname,
   ]);
-  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
-  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
+  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name, undefined, match.homeTeam.faName);
+  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name, undefined, match.awayTeam.faName);
   const competition = match.leagueCode
     ? getLeague(match.leagueCode)
     : undefined;
@@ -940,7 +940,7 @@ function DrawerTeamCard({
         <TeamCrest name={team.name} logo={team.logo} />
       </div>
       <p className="mt-3 line-clamp-2 min-h-8 text-xs font-bold text-white/80">
-        {team.id ? teamName(language, team.id, team.name) : team.name}
+        {team.id ? teamName(language, team.id, team.name, undefined, team.faName) : team.name}
       </p>
       <div className="prediction-score-controls mt-5 flex items-center justify-center gap-2">
         <button

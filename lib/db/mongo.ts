@@ -165,6 +165,10 @@ export async function ensureIndexes() {
     db
       .collection("teams")
       .createIndex({ provider: 1, providerTeamId: 1 }, { unique: true }),
+    db.collection("centralTeams").createIndex({ centralTeamId: 1 }, { unique: true }),
+    db.collection("centralTeams").createIndex({ "providerIds.football-api": 1 }, { sparse: true, unique: true }),
+    db.collection("centralTeams").createIndex({ "providerIds.sportsapi": 1 }, { sparse: true, unique: true }),
+    db.collection("centralTeams").createIndex({ aliases: 1 }),
     db
       .collection("matches")
       .createIndex({ provider: 1, providerMatchId: 1 }, { unique: true }),

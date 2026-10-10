@@ -17,6 +17,8 @@ export type CanonicalStatus =
 
 export type CanonicalTeam = {
   id: number;
+  /** Stable LowBlock identity; provider IDs remain in id/provider fields for compatibility. */
+  centralTeamId?: string;
   name: string;
   faName?: string;
   logoUrl: string | null;

@@ -23,8 +23,8 @@ export type MatchRecord = {
   elapsed?: number | null;
   homeGoals: number | null;
   awayGoals: number | null;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; centralTeamId?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; centralTeamId?: string; logoUrl: string | null };
   seasonStartYear: number;
   rawApiResponse?: unknown;
 };

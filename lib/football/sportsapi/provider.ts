@@ -26,6 +26,7 @@ import {
   ensureSportsApiBackgroundService,
 } from "./backgroundService";
 import { providerDateKeys } from "../scheduleWindow";
+import { ensureCentralTeam } from "../centralTeams";
 
 // In-memory season cache to avoid redundant season requests
 const seasonIdCache = new Map<number, { tournamentId?: number; id: number; name: string; year: string; cachedAt: number }>();
@@ -36,8 +37,17 @@ export class SportsApiFootballProvider implements FootballDataProvider {
   private async saveMatches(db: any, matches: CanonicalMatch[]): Promise<number> {
     if (!matches.length) return 0;
 
+    const centralIds = new Map<string, string>();
+    await Promise.all(matches.flatMap((match) => [match.homeTeam, match.awayTeam]).map(async (team) => {
+      const providerTeamId = String(team.id);
+      const centralId = await ensureCentralTeam({ provider: "sportsapi", providerTeamId, sourceName: team.name, logoUrl: team.logoUrl });
+      centralIds.set(providerTeamId, centralId);
+    }));
+
     const ops = matches.map((match) => {
       const { createdAt, _id, ...matchData } = match as any;
+      matchData.homeTeam = { ...matchData.homeTeam, centralTeamId: centralIds.get(String(match.homeTeam.id)) };
+      matchData.awayTeam = { ...matchData.awayTeam, centralTeamId: centralIds.get(String(match.awayTeam.id)) };
       return {
         updateOne: {
           filter: {

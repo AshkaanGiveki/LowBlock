@@ -6,7 +6,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { teamName } from "@/lib/football/team-names";
 import { LocalDate } from "@/components/LocalDateTime";
 
-type Team = { id: number; name: string; logoUrl?: string | null };
+type Team = { id: number; name: string; faName?: string; logoUrl?: string | null };
 type Row = {
   matchId: string;
   kickoffAt: string;
@@ -61,7 +61,7 @@ export function PublicPredictionHistory({ username }: { username: string }) {
   useEffect(() => {
     load();
   }, [username]);
-  const name = (team: Team) => teamName(language, team.id, team.name);
+  const name = (team: Team) => teamName(language, team.id, team.name, undefined, team.faName);
   return (
     <section className="mt-4 rounded-3xl border border-white/10 bg-[#101512] p-5">
       <div className="flex items-center justify-between">

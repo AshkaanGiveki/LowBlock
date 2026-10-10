@@ -1431,8 +1431,10 @@ export function teamName(
   id: number,
   sourceName: string,
   provider?: "football-api" | "sportsapi",
+  canonicalFaName?: string,
 ) {
   if (language !== "fa" || !sourceName) return sourceName;
+  if (canonicalFaName) return repairPersianText(canonicalFaName);
 
   // 1. Direct match by exact or lowercase name
   const exact = NAMES_FA[sourceName] || NAMES_FA[sourceName.toLowerCase()];

@@ -9,8 +9,8 @@ import { LocalDateTime } from "@/components/LocalDateTime";
 type Row = {
   matchId: string;
   kickoffAt: string;
-  homeTeam: { id: number; name: string; logoUrl: string | null };
-  awayTeam: { id: number; name: string; logoUrl: string | null };
+  homeTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
+  awayTeam: { id: number; name: string; faName?: string; logoUrl: string | null };
   predictedHome: number;
   predictedAway: number;
   actualHome: number | null;
@@ -69,6 +69,7 @@ export function PredictionHistory({ rows }: { rows: Row[] }) {
                   <Team
                     id={row.homeTeam.id}
                     name={row.homeTeam.name}
+                    faName={row.homeTeam.faName}
                     logo={row.homeTeam.logoUrl}
                     language={language}
                   />
@@ -78,6 +79,7 @@ export function PredictionHistory({ rows }: { rows: Row[] }) {
                   <Team
                     id={row.awayTeam.id}
                     name={row.awayTeam.name}
+                    faName={row.awayTeam.faName}
                     logo={row.awayTeam.logoUrl}
                     language={language}
                   />
@@ -145,11 +147,13 @@ export function PredictionHistory({ rows }: { rows: Row[] }) {
 function Team({
   id,
   name,
+  faName,
   logo,
   language,
 }: {
   id: number;
   name: string;
+  faName?: string;
   logo: string | null;
   language: "fa" | "en";
 }) {
@@ -159,7 +163,7 @@ function Team({
         <TeamCrest name={name} logo={logo} />
       </span>
       <b className="min-h-8 max-w-24 truncate text-xs leading-4">
-        {teamName(language, id, name)}
+        {teamName(language, id, name, undefined, faName)}
       </b>
     </div>
   );

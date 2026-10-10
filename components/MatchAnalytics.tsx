@@ -417,8 +417,8 @@ function TabButton({ active, onClick, label, icon, badge }: any) {
  * 1. HEADER WITH RESILIENT TEAM CRESTS
  * ========================================================================= */
 function MatchHeader({ match, language, number, score, t }: any) {
-  const home = teamName(language, match.homeTeam?.id, match.homeTeam?.name);
-  const away = teamName(language, match.awayTeam?.id, match.awayTeam?.name);
+  const home = teamName(language, match.homeTeam?.id, match.homeTeam?.name, undefined, match.homeTeam?.faName);
+  const away = teamName(language, match.awayTeam?.id, match.awayTeam?.name, undefined, match.awayTeam?.faName);
   const finished = ["FINISHED", "FT"].includes(String(match.status));
   const live =
     !finished &&
@@ -522,8 +522,8 @@ function LineupsView({ lineups, match, language, t, incidents }: any) {
     );
   }
 
-  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
-  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
+  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name, undefined, match.homeTeam.faName);
+  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name, undefined, match.awayTeam.faName);
 
   const currentTeam = activeSide === "home" ? lineups.home : lineups.away;
   const isHome = activeSide === "home";
@@ -870,8 +870,8 @@ function StatsView({ statsGroups, match, language, t, data, number, score }: any
     );
   }
 
-  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name);
-  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name);
+  const homeName = teamName(language, match.homeTeam.id, match.homeTeam.name, undefined, match.homeTeam.faName);
+  const awayName = teamName(language, match.awayTeam.id, match.awayTeam.name, undefined, match.awayTeam.faName);
 
   const allStats = statsGroups.flatMap((g: any) => g.items);
 
@@ -980,8 +980,8 @@ function CommentaryView({ incidents, match, language, t }: any) {
     );
   }
 
-  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name);
-  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name);
+  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name, undefined, match.homeTeam?.faName);
+  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name, undefined, match.awayTeam?.faName);
   const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
   const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
 

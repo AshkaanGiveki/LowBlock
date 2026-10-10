@@ -48,8 +48,8 @@ export default async function MatchPage({ params }: Props) {
     userId ?? "guest",
   );
   const league = getLeague(match.leagueCode);
-  const home = teamName("en", match.homeTeam.id, match.homeTeam.name);
-  const away = teamName("en", match.awayTeam.id, match.awayTeam.name);
+  const home = teamName("en", match.homeTeam.id, match.homeTeam.name, undefined, match.homeTeam.faName);
+  const away = teamName("en", match.awayTeam.id, match.awayTeam.name, undefined, match.awayTeam.faName);
   const eventJsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
