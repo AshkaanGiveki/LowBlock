@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
 import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backgroundService";
+import { isSportsApiRealtimeEnabled } from "@/lib/football/sportsapi/ws";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,6 +25,16 @@ export async function GET(
   const wantsStream =
     acceptHeader.includes("text/event-stream") ||
     url.searchParams.get("stream") === "true";
+
+  // Emergency protection: do not open long-lived SSE streams while realtime
+  // WebSocket fan-out is disabled in Vercel. Return the persisted snapshot so
+  // the match page remains usable without adding connection pressure.
+  if (wantsStream && !isSportsApiRealtimeEnabled()) {
+    const snapshot = await monitor.loadSnapshotFromDb(matchId);
+    return NextResponse.json(snapshot, {
+      headers: { "X-Realtime-Disabled": "true" },
+    });
+  }
 
   if (!wantsStream) {
     // Return instant snapshot JSON populated from DB / in-memory cache

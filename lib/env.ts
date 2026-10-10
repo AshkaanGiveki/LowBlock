@@ -108,6 +108,7 @@ const schema = z.object({
   SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED: z
     .preprocess((value) => value === "true" || value === true, z.boolean())
     .default(false),
+  SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES: z.string().default("SA1"),
 });
 export const env = schema.parse({
   MONGODB_URI: process.env.MONGODB_URI,
@@ -158,6 +159,8 @@ export const env = schema.parse({
     process.env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL,
   SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED:
     process.env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED,
+  SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES:
+    process.env.SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES,
 });
 export function validateProductionEnv() {
   if (process.env.NODE_ENV !== "production") return;

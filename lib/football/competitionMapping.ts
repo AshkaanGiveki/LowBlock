@@ -190,7 +190,7 @@ export const COMPETITION_MAPPINGS: readonly CompetitionMappingEntry[] = [
   {
     code: "IR1",
     apiSportsId: 290,
-    sportsApiUniqueTournamentId: 955,
+    sportsApiUniqueTournamentId: 915,
     expectedCategories: ["Iran", "iran"],
     slugs: ["persian-gulf-pro-league", "pro-league"],
     aliases: ["Persian Gulf Pro League", "Iran Pro League"],
@@ -198,7 +198,7 @@ export const COMPETITION_MAPPINGS: readonly CompetitionMappingEntry[] = [
   {
     code: "SA1",
     apiSportsId: 307,
-    sportsApiUniqueTournamentId: 954,
+    sportsApiUniqueTournamentId: 955,
     expectedCategories: ["Saudi Arabia", "saudi-arabia"],
     slugs: ["saudi-pro-league"],
     aliases: ["Saudi Pro League", "Saudi Professional League"],

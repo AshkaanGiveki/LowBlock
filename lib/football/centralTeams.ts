@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db/mongo";
 import { repairPersianText, teamName } from "./team-names";
+import { reviewedPersianTeamName } from "./persian-team-names";
 import type { ProviderName } from "./types";
 
 export type CentralTeamRecord = {
@@ -22,6 +23,8 @@ export function centralTeamId(team: { centralTeamId?: string; provider: Provider
 }
 
 function initialFaName(provider: ProviderName, id: string, name: string) {
+  const reviewed = reviewedPersianTeamName(name);
+  if (reviewed) return reviewed;
   const candidates = [name, name.replace(/^(ssc|fc|afc|cf)\s+/i, ""), name.replace(/\s+hotspur$/i, "")];
   for (const candidate of candidates) {
     const translated = repairPersianText(teamName("fa", Number(id), candidate, provider));

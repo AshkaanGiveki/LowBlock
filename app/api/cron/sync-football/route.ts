@@ -15,19 +15,9 @@ async function run(request: Request) {
   const startedAt = new Date();
   const attempt = Number(new URL(request.url).searchParams.get("retry") ?? "0");
   try {
-    const provider = getFootballProvider();
-    const result = await provider.sync();
-    
-    // Shadow execution
-    const shadow = getProviderRegistry().getShadow();
-    if (shadow) {
-      try {
-        await shadow.sync();
-      } catch (shadowError) {
-        console.error("shadow_sync_failed", shadowError);
-      }
-    }
-    
+    // Schedule from the already persisted fixture set before the provider sync.
+    // Sync/score rebuilds can be expensive and may hit Vercel's function limit;
+    // reminders must not depend on those later stages completing first.
     let remindersScheduled = 0;
     let channelReminderScheduled = 0;
     let channelDailyPostsScheduled = 0;
@@ -41,6 +31,35 @@ async function run(request: Request) {
       notificationError = error instanceof Error ? error.message : "unknown";
       console.error("notification_scheduling_failed", {
         error: notificationError,
+        phase: "before_sync",
+      });
+    }
+
+    const provider = getFootballProvider();
+    const result = await provider.sync();
+    
+    // Shadow execution
+    const shadow = getProviderRegistry().getShadow();
+    if (shadow) {
+      try {
+        await shadow.sync();
+      } catch (shadowError) {
+        console.error("shadow_sync_failed", shadowError);
+      }
+    }
+    
+    // Run a second pass after sync so newly discovered or rescheduled fixtures
+    // are covered as well. The first pass protects reminders if sync times out.
+    try {
+      const scheduled = await scheduleFootballNotifications();
+      remindersScheduled += scheduled.remindersScheduled;
+      channelReminderScheduled += scheduled.channelReminderScheduled;
+      channelDailyPostsScheduled += scheduled.channelDailyPostsScheduled;
+    } catch (error) {
+      notificationError ??= error instanceof Error ? error.message : "unknown";
+      console.error("notification_scheduling_failed", {
+        error: error instanceof Error ? error.message : "unknown",
+        phase: "after_sync",
       });
     }
     return NextResponse.json({

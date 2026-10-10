@@ -18,6 +18,8 @@
     "migrate:central-teams": "tsx scripts/migrate-central-teams.ts",
     "audit:central-teams": "tsx scripts/audit-central-teams.ts",
     "merge:central-teams": "tsx scripts/merge-central-teams.ts",
+    "backfill:central-team-persian": "tsx scripts/backfill-central-team-persian-names.ts",
+    "report:today-predictions": "tsx scripts/report-today-predictions.ts",
     "rebuild:leaderboards": "tsx scripts/rebuild-leaderboards.ts",
     "validate:env": "tsx scripts/validate-env.ts",
     "probe:sportsapi-ws": "tsx scripts/probe-sportsapi-websocket.ts",
