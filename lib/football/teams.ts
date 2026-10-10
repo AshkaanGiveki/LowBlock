@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/mongo";
-import { NAMES_FA } from "./team-names";
+import { NAMES_FA, repairPersianText, teamName } from "./team-names";
 
 export type CanonicalTeamRecord = {
   _id?: unknown;
@@ -25,6 +25,12 @@ export const cleanTeamSlug = (s: string): string =>
     .replace(/\b(fc|afc|cf|1899|football club|sc)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
 
+function resolvePersianName(name: string, provider: string, providerTeamId?: string | number) {
+  const fromDictionary = teamName("fa", Number(providerTeamId), name, provider as "football-api" | "sportsapi");
+  if (fromDictionary !== name) return fromDictionary;
+  return repairPersianText(NAMES_FA[name.toLowerCase()] || NAMES_FA[cleanTeamSlug(name)] || name);
+}
+
 // In-memory cache for sub-millisecond lookups
 const byProviderKey = new Map<string, CanonicalTeamRecord>();
 const bySlug = new Map<string, CanonicalTeamRecord>();
@@ -43,7 +49,7 @@ export async function initTeamRegistry() {
     for (const row of rows) {
       const name = row.name || row.sourceName || "Unknown";
       const slug = row.slug || cleanTeamSlug(name);
-      const faName = row.faName || NAMES_FA[name.toLowerCase()] || name;
+      const faName = resolvePersianName(name, row.provider || "football-api", row.providerTeamId);
       const logoUrl = row.logoUrl || row.crestUrl || null;
 
       const providerIds = row.providerIds || {};
@@ -104,10 +110,7 @@ export function getCanonicalTeamSync(params: {
   }
 
   // 2. Fallback to NAMES_FA static dictionary
-  const faName =
-    NAMES_FA[params.name.toLowerCase()] ||
-    NAMES_FA[slug] ||
-    params.name;
+  const faName = resolvePersianName(params.name, params.provider, params.providerTeamId);
 
   let logoUrl: string | null = null;
   const alpha2 = params.country?.alpha2?.toLowerCase();
@@ -193,10 +196,7 @@ export async function resolveCanonicalTeam(params: {
   }
 
   // 4. If not found in central registry, determine Persian name and logo locally
-  const faName =
-    NAMES_FA[params.name.toLowerCase()] ||
-    NAMES_FA[slug] ||
-    params.name;
+  const faName = resolvePersianName(params.name, params.provider, params.providerTeamId);
 
   let logoUrl: string | null = null;
   const alpha2 = params.country?.alpha2?.toLowerCase();
@@ -266,7 +266,7 @@ export async function migrateTeamsCollection() {
   for (const row of rows) {
     const name = row.sourceName || row.name || "Unknown";
     const slug = cleanTeamSlug(name);
-    const faName = row.faName || NAMES_FA[name.toLowerCase()] || NAMES_FA[slug] || name;
+    const faName = resolvePersianName(name, row.provider || "football-api", row.providerTeamId);
     const logoUrl = row.crestUrl || row.logoUrl || null;
     const providerIds = row.providerIds || {};
 

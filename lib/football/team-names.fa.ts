@@ -1,3 +1,5 @@
+import { repairPersianText } from "./team-names";
+
 export type TeamName = {
   sourceName: string;
   faName: string;
@@ -40,7 +42,7 @@ const normalize = (s: string) =>
     .replace(/[^a-z0-9آ-ی]/g, "");
 export function resolveTeamName(providerId: string, sourceName: string) {
   const exact = TEAM_NAMES_FA_BY_TRANSFERMARKT_ID[providerId];
-  if (exact) return exact.faName;
+  if (exact) return repairPersianText(exact.faName);
   const n = normalize(sourceName);
   const byName = Object.values(TEAM_NAMES_FA_BY_TRANSFERMARKT_ID).find(
     (x) =>

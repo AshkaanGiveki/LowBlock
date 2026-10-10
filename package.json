@@ -14,6 +14,7 @@
     "sync:insights": "tsx scripts/sync-insights.ts",
     "demo:award": "tsx scripts/demo-award.ts",
     "migrate:foundation": "tsx scripts/migrate-foundation.ts",
+    "migrate:team-names": "tsx scripts/migrate-team-names.ts",
     "rebuild:leaderboards": "tsx scripts/rebuild-leaderboards.ts",
     "validate:env": "tsx scripts/validate-env.ts",
     "probe:sportsapi-ws": "tsx scripts/probe-sportsapi-websocket.ts",
