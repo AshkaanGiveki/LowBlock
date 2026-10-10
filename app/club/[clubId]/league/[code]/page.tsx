@@ -11,6 +11,7 @@ import { ClubLeaderboard } from "@/components/ClubLeaderboard";
 import { T } from "@/components/LanguageProvider";
 import { LeagueLogo } from "@/components/LeagueLogo";
 import { Suspense } from "react";
+import { selectActiveRound } from "@/lib/football/rounds";
 
 export const dynamic = "force-dynamic";
 
@@ -57,8 +58,15 @@ export default async function ClubLeaguePage({
     active: round.status === "LIVE" || round.status === "UPCOMING",
     live: round.status === "LIVE",
     completed: round.status === "FINAL",
+    nextKickoffAt:
+      round.scheduledEnd && new Date(round.scheduledEnd).getTime() >= Date.now()
+        ? Math.max(
+            Date.now(),
+            new Date(round.scheduledStart ?? round.scheduledEnd).getTime(),
+          )
+        : null,
   }));
-  const lastActive = roundItems.filter((round) => round.active).at(-1)?.number;
+  const lastActive = selectActiveRound(roundItems);
   return (
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-5xl">
