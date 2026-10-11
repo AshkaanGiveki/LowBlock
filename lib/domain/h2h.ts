@@ -324,6 +324,9 @@ export async function calculateH2HStandings(db: Db, league: any) {
   type Standing = { userId: string; h2hPoints: number; wins: number; draws: number; losses: number; predictionPoints: number };
   const totals = new Map<string, Standing & { slateScores: Record<string, number> }>(ids.map((id: string) => [id, { userId: id, h2hPoints: 0, wins: 0, draws: 0, losses: 0, predictionPoints: 0, slateScores: {} }]));
   for (const slate of league.slates as H2HSlate[]) {
+    const slateMatches = slate.fixtureIds.map((matchId) => byMatch.get(matchId)).filter(Boolean);
+    const slateComplete = slateMatches.length === slate.fixtureIds.length && slateMatches.every((match: any) => match.homeGoals != null && match.awayGoals != null);
+    if (!slateComplete) continue;
     const slateScores = new Map<string, number>();
     for (const id of ids) {
       let score = 0;
@@ -358,7 +361,7 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
   const gold = await db.collection<any>("h2hGoldPicks").find({ leagueId: league._id, userId: viewerId }, { projection: { matchday: 1, matchId: 1 } }).toArray();
   const goldBySlate = new Map(gold.map((pick: any) => [Number(pick.matchday), String(pick.matchId)]));
   return {
-    id: String(league._id), clubId: league.clubId, weekKey: league.weekKey, startsAt: league.startsAt, endsAt: league.endsAt,
+    id: String(league._id), clubId: league.clubId, weekKey: league.weekKey, startsAt: league.startsAt, endsAt: league.endsAt, viewerId,
     status: league.status,
     players: league.players.map((id: string) => ({ userId: id, username: userById.get(id)?.username ?? "LowBlock Player", avatarUrl: userById.get(id)?.avatarUrl ?? null })),
     standings: standings.map(({ slateScores: _slateScores, ...row }: any) => ({ ...row, username: userById.get(row.userId)?.username ?? "LowBlock Player", avatarUrl: userById.get(row.userId)?.avatarUrl ?? null })),
