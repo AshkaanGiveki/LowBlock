@@ -72,7 +72,7 @@ export function DesktopNavigation() {
           {t("فضای رقابت", "COMPETE")}
         </div>
         <nav className="desktop-rail-nav">
-          {[...items, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Trophy, fa: "H2H", en: "H2H" }] : [])].map(({ href, icon: Icon, fa, en }) => (
+          {[...items, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Trophy, fa: "رو در رو", en: "Head to Head" }] : [])].map(({ href, icon: Icon, fa, en }) => (
             <Link
               href={href}
               key={href}

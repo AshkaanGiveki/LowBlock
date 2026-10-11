@@ -110,6 +110,7 @@ export function Nav() {
                       Predict: "پیش‌بینی",
                       Club: "باشگاه",
                       Leaderboard: "جدول امتیازات",
+                      H2H: "رو در رو",
                     } as Record<string, string>
                   )[label]
                 : label
