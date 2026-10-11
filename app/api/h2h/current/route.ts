@@ -10,6 +10,8 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
   if (!isH2HEnabled()) return NextResponse.json({ enabled: false, league: null });
   const db = await getDb();
+  const testLeague = await db.collection<any>("h2hLeagues").findOne({ weekKey: getH2HWeek().key, players: userId, testRound: true, status: "ACTIVE" });
+  if (testLeague) return NextResponse.json({ enabled: true, league: await publicH2HLeague(db, testLeague, userId), testRound: true });
   const membership = await db.collection<any>("clubMemberships").findOne({ userId, leftAt: null });
   if (!membership) return NextResponse.json({ enabled: true, league: null, reason: "NO_CLUB" });
   const week = getH2HWeek();

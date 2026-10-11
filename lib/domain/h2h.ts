@@ -291,7 +291,8 @@ export async function settleH2HLeagues(db: Db, weekKey = getH2HWeek().key) {
     const winner = standings[0];
     await db.collection("h2hStandings").deleteMany({ leagueId: league._id });
     if (standings.length) {
-      await db.collection("h2hStandings").insertMany(standings.map((row: any) => ({ ...row, leagueId: league._id, played: 7, totalSlatePoints: row.predictionPoints, normalizedAveragePoints: row.predictionPoints / 7, scoreDifference: row.wins - row.losses, exactPredictions: 0, goldSelections: 0, goldWins: 0, qualificationStatus: row.rank <= 7 ? "QUALIFIED" : "NOT_QUALIFIED", createdAt: new Date(), updatedAt: new Date() })));
+      const played = league.slates.length;
+      await db.collection("h2hStandings").insertMany(standings.map((row: any) => ({ ...row, leagueId: league._id, played, totalSlatePoints: row.predictionPoints, normalizedAveragePoints: played ? row.predictionPoints / played : 0, scoreDifference: row.wins - row.losses, exactPredictions: 0, goldSelections: 0, goldWins: 0, qualificationStatus: row.rank <= 7 ? "QUALIFIED" : "NOT_QUALIFIED", createdAt: new Date(), updatedAt: new Date() })));
       const operations = [] as any[];
       for (const slate of league.slates as H2HSlate[]) for (let i = 0; i < league.players.length; i++) for (let j = i + 1; j < league.players.length; j++) {
         const a = standings.find((row: any) => row.userId === String(league.players[i]));
