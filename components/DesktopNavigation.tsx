@@ -48,6 +48,7 @@ export function DesktopNavigation() {
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const { data: h2hConfig } = useQuery({ queryKey: ["h2h-config"], queryFn: () => fetch("/api/h2h/config").then((response) => response.json()), staleTime: 60_000 });
   const avatar = data?.me?.user?.avatarUrl ?? null;
   const clubImage = data?.club?.club?.imageUrl ?? null;
   const champion = Boolean(data?.me?.user?.isDefendingChampion);
@@ -71,7 +72,7 @@ export function DesktopNavigation() {
           {t("فضای رقابت", "COMPETE")}
         </div>
         <nav className="desktop-rail-nav">
-          {items.map(({ href, icon: Icon, fa, en }) => (
+          {[...items, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Trophy, fa: "H2H", en: "H2H" }] : [])].map(({ href, icon: Icon, fa, en }) => (
             <Link
               href={href}
               key={href}

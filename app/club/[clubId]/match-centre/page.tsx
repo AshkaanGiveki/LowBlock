@@ -9,6 +9,7 @@ import { LEAGUES } from "@/lib/football/leagues";
 import { T } from "@/components/LanguageProvider";
 import { LocaleChevron } from "@/components/LocaleChevron";
 import { BackButton } from "@/components/BackButton";
+import { env } from "@/lib/env";
 export const dynamic = "force-dynamic";
 export default async function ClubMatchCentre({
   params,
@@ -64,6 +65,18 @@ export default async function ClubMatchCentre({
             </Link>
           </div>
         </section>
+        {env.H2H_ENABLED && (
+          <Link
+            href="/h2h"
+            className="mt-5 flex items-center justify-between rounded-2xl border border-[#eacb70]/30 bg-[linear-gradient(135deg,rgba(234,203,112,.16),rgba(16,21,18,.96))] p-5 transition hover:-translate-y-0.5 hover:border-[#eacb70]/60"
+          >
+            <span>
+              <b className="block text-lg text-[#eacb70]">H2H · Head to Head</b>
+              <small className="mt-1 block text-white/55">Face seven Club members this week</small>
+            </span>
+            <LocaleChevron className="text-[#eacb70]" />
+          </Link>
+        )}
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {LEAGUES.map((league) => (
             <Link

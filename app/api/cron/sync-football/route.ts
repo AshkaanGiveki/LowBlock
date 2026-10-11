@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/mongo";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { Client } from "@upstash/qstash";
 import { qstashConfigStatus } from "@/lib/notifications/qstash";
+import { ensureCurrentH2HLeagues } from "@/lib/domain/h2h";
 
 async function run(request: Request) {
   if (
@@ -37,6 +38,14 @@ async function run(request: Request) {
 
     const provider = getFootballProvider();
     const result = await provider.sync();
+    let h2h: { enabled: boolean; created?: number; weekKey?: string } = { enabled: false };
+    if (env.H2H_ENABLED) {
+      try {
+        h2h = await ensureCurrentH2HLeagues(await getDb());
+      } catch (error) {
+        console.error("h2h_schedule_generation_failed", error);
+      }
+    }
     
     // Shadow execution
     const shadow = getProviderRegistry().getShadow();
@@ -73,6 +82,7 @@ async function run(request: Request) {
         ...qstashConfigStatus(),
         error: notificationError,
       },
+      h2h,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "sync failed";

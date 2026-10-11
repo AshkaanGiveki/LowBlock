@@ -40,6 +40,9 @@ const schema = z.object({
   QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
   QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
   APP_TIMEZONE: z.string().default("UTC"),
+  H2H_ENABLED: z
+    .preprocess((value) => value === "true" || value === true, z.boolean())
+    .default(false),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     // `current` and `football-api` are retained as backwards-compatible
     // aliases for the API-Football provider. `sportsapi` is the default.
@@ -134,6 +137,7 @@ export const env = schema.parse({
   QSTASH_CURRENT_SIGNING_KEY: process.env.QSTASH_CURRENT_SIGNING_KEY,
   QSTASH_NEXT_SIGNING_KEY: process.env.QSTASH_NEXT_SIGNING_KEY,
   APP_TIMEZONE: process.env.APP_TIMEZONE,
+  H2H_ENABLED: process.env.H2H_ENABLED,
   NEXT_PUBLIC_APP_URL: safeUrl(process.env.NEXT_PUBLIC_APP_URL),
   FOOTBALL_DATA_PROVIDER: process.env.FOOTBALL_DATA_PROVIDER,
   FOOTBALL_DATA_PROVIDER_SHADOW: process.env.FOOTBALL_DATA_PROVIDER_SHADOW,

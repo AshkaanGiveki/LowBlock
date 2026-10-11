@@ -1,0 +1,2 @@
+import { getDb, closeMongo } from "../lib/db/mongo";
+const db = await getDb(); const [weeks, leagues, ratings] = await Promise.all([db.collection("h2hWeeks").countDocuments(), db.collection("h2hLeagues").countDocuments(), db.collection("centralTeams").countDocuments({ h2hRating: { $gte: 1, $lte: 100 }, numericTeamId: { $gt: 0 } })]); console.log(JSON.stringify({ weeks, leagues, ratedNumericTeams: ratings })); await closeMongo();
