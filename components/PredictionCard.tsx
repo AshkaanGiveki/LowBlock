@@ -741,6 +741,7 @@ export function PredictionDrawer({
   saved,
   error,
   language,
+  forceVisible = false,
 }: {
   competition?: ReturnType<typeof getLeague>;
   included?: boolean;
@@ -759,6 +760,7 @@ export function PredictionDrawer({
   saved: boolean;
   error: string;
   language: "fa" | "en";
+  forceVisible?: boolean;
 }) {
   const t = (fa: string, en: string) => (language === "fa" ? fa : en);
   const display = (value: string) =>
@@ -772,7 +774,7 @@ export function PredictionDrawer({
         height: 0,
         transition: { duration: 0.3, ease: "easeInOut" },
       }}
-      className="fixed inset-x-0 bottom-0 z-[80] h-[100dvh] overflow-hidden md:hidden"
+      className={`fixed inset-x-0 bottom-0 z-[80] h-[100dvh] overflow-hidden ${forceVisible ? "" : "md:hidden"}`}
     >
       <button
         type="button"
