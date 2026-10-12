@@ -2,11 +2,44 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Crown, Swords } from "lucide-react";
-import { motion } from "motion/react";
 import { useLanguage, T } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import H2HHero from "@/components/H2HHero";
 import H2HRoundMatches from "@/components/H2HRoundMatches";
+
+function H2HStandings({ standings, viewerId }: { standings: any[]; viewerId: string }) {
+  return (
+    <section className="mt-8 max-w-2xl overflow-hidden rounded-2xl border border-white/[.08] bg-[#101512]">
+      <div className="flex items-center gap-2 border-b border-white/[.07] px-3 py-3 text-brand sm:px-4">
+        <Crown size={14} />
+        <h2 className="text-sm font-black"><T fa="جدول رتبه‌بندی" en="Standings" /></h2>
+      </div>
+      <div className="grid grid-cols-[22px_minmax(0,1fr)_24px_24px_24px_48px] items-center gap-1 border-b border-white/[.06] px-3 py-2 text-[8px] font-black uppercase tracking-[.12em] text-white/30 sm:grid-cols-[26px_minmax(0,1fr)_30px_30px_30px_56px] sm:gap-2 sm:px-4">
+        <span>#</span>
+        <span><T fa="بازیکن" en="Player" /></span>
+        <span className="text-center">W</span>
+        <span className="text-center">D</span>
+        <span className="text-center">L</span>
+        <span className="text-center"><T fa="امتیاز" en="PTS" /></span>
+      </div>
+      <div className="divide-y divide-white/[.05]">
+        {standings.map((row: any) => (
+          <div key={row.userId} className={`grid grid-cols-[22px_minmax(0,1fr)_24px_24px_24px_48px] items-center gap-1 px-3 py-2 sm:grid-cols-[26px_minmax(0,1fr)_30px_30px_30px_56px] sm:gap-2 sm:px-4 ${row.userId === viewerId ? "bg-brand/[.07]" : ""}`}>
+            <span className="text-xs font-black text-brand">{row.rank}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <UserAvatar name={row.username} avatarUrl={row.avatarUrl} className="h-7 w-7 shrink-0 text-[8px]" />
+              <span className="min-w-0 truncate text-[10px] font-bold text-white/80 sm:text-[11px]">{row.username}</span>
+            </div>
+            <span className="text-center text-[10px] font-bold text-white/70">{row.wins}</span>
+            <span className="text-center text-[10px] font-bold text-white/50">{row.draws}</span>
+            <span className="text-center text-[10px] font-bold text-white/50">{row.losses}</span>
+            <span className="justify-self-center rounded-lg bg-brand/15 px-2 py-1 text-[11px] font-black text-brand">{row.h2hPoints}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function H2HBoard() {
   const { t } = useLanguage();
@@ -38,7 +71,7 @@ export default function H2HBoard() {
     <H2HHero weekKey={league.weekKey} slateCount={league.slates.length} activeSlate={day} />
     <section className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-4 py-3.5 md:px-5"><button type="button" onClick={() => go(-1)} disabled={day <= 1} aria-label="Previous round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="راند هفتگی" en="WEEKLY ROUND" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="راند" en="Round" /> {day}</h2><p className="mt-0.5 text-[10px] text-white/35">{slate?.sourceDate ?? league.weekKey}</p></div><button type="button" onClick={() => go(1)} disabled={day >= league.slates.length} aria-label="Next round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
     <H2HRoundMatches round={round} />
-    <section className="mt-8 overflow-hidden rounded-3xl border border-white/[.08] bg-[#101512]"><div className="flex items-center gap-2 border-b border-white/[.07] px-5 py-4 text-brand"><Crown size={16} /><h2 className="font-black"><T fa="جدول رتبه‌بندی" en="Standings" /></h2><span className="ms-auto text-xs text-white/35">Pts · W · D · L</span></div><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm"><thead className="text-[10px] uppercase tracking-widest text-white/35"><tr><th className="px-5 py-3 text-left">#</th><th className="px-3 py-3 text-center"><T fa="بازیکن" en="Player" /></th><th className="px-3 py-3 text-right">Pts</th><th className="px-3 py-3 text-right">W</th><th className="px-3 py-3 text-right">D</th><th className="px-3 py-3 text-right">L</th><th className="px-5 py-3 text-right">Pred</th></tr></thead><tbody className="divide-y divide-white/[.06]">{league.standings.map((row: any) => <tr key={row.userId} className={row.userId === league.viewerId ? "bg-brand/[.06]" : ""}><td className="px-5 py-4 font-black text-brand">{row.rank}</td><td className="px-3 py-3"><div className="flex flex-col items-center gap-1"><UserAvatar name={row.username} avatarUrl={row.avatarUrl} className="h-9 w-9 text-[10px]" /><span className="max-w-[96px] truncate text-[10px] font-bold text-white/80">{row.username}</span>{row.userId === league.viewerId && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[8px] font-black text-brand"><T fa="شما" en="YOU" /></span>}</div></td><td className="px-3 py-4 text-right text-lg font-black">{row.h2hPoints}</td><td className="px-3 py-4 text-right text-white/60">{row.wins}</td><td className="px-3 py-4 text-right text-white/60">{row.draws}</td><td className="px-3 py-4 text-right text-white/60">{row.losses}</td><td className="px-5 py-4 text-right text-xs text-white/35">{row.predictionPoints ?? 0}</td></tr>)}</tbody></table></div></section>
+    <H2HStandings standings={league.standings} viewerId={league.viewerId} />
     {error && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
   </div></main>;
 }
