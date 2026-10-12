@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Crown, Swords } from "lucide-react";
-import { useLanguage, T } from "@/components/LanguageProvider";
+import Link from "next/link";
+import { ArrowRight, ChevronLeft, ChevronRight, Crown, Swords, UserPlus, UsersRound } from "lucide-react";
+import { T } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import H2HHero from "@/components/H2HHero";
 import H2HTodayMatches from "@/components/H2HTodayMatches";
@@ -44,8 +45,38 @@ function H2HStandings({ standings, viewerId }: { standings: any[]; viewerId: str
   );
 }
 
+function H2HAccessCard({ reason, clubMemberCount, observer = false }: { reason?: string; clubMemberCount?: number; observer?: boolean }) {
+  if (observer) return (
+    <section className="mt-5 flex max-w-5xl items-center gap-3 rounded-2xl border border-white/[.08] bg-[#101713] px-4 py-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand"><Swords size={17} /></span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[.16em] text-brand"><T fa="این هفته صعود نکردید" en="NOT QUALIFIED THIS WEEK" /></p>
+        <p className="mt-0.5 text-xs text-white/55"><T fa="رویارویی‌ها و جدول را دنبال کنید؛ در جدول باشگاه بهتر رقابت کنید تا برای تورنمنت H2H هفته بعد انتخاب شوید." en="Follow the matchups and standings, then climb your Club leaderboard to qualify for next week’s H2H tournament." /></p>
+      </div>
+      <Link href="/club" className="ms-auto inline-flex shrink-0 items-center rounded-lg border border-brand/25 bg-brand/10 px-2.5 py-1.5 text-[10px] font-black text-brand transition hover:bg-brand/20"><T fa="رقابت بیشتر" en="Compete harder" /></Link>
+    </section>
+  );
+
+  const noClub = reason === "NO_CLUB";
+  const tooSmall = reason === "CLUB_TOO_SMALL";
+  const icon = noClub ? <UserPlus size={20} /> : <UsersRound size={20} />;
+  return (
+    <section className="relative mt-6 max-w-2xl overflow-hidden rounded-[1.5rem] border border-brand/20 bg-[linear-gradient(135deg,rgba(32,184,121,.12),rgba(16,23,19,.96)_60%)] px-5 py-5">
+      <div className="pointer-events-none absolute -end-10 -top-16 h-36 w-36 rounded-full bg-brand/10 blur-3xl" />
+      <div className="relative flex items-start gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/25 bg-brand/10 text-brand">{icon}</span>
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-[.18em] text-brand">{noClub ? <T fa="باشگاهت را پیدا کن" en="FIND YOUR CLUB" /> : tooSmall ? <T fa="رقابت رو در رو" en="HEAD TO HEAD" /> : <T fa="رقابت این هفته" en="THIS WEEK’S H2H" />}</p>
+          <h2 className="mt-1 text-lg font-black text-white">{noClub ? <T fa="برای ورود به H2H به یک باشگاه بپیوندید" en="Join a club to enter H2H" /> : tooSmall ? <T fa="باشگاهت برای H2H هنوز بازیکن کافی ندارد" en="Your club needs more H2H players" /> : <T fa="گروه H2H این هفته در حال آماده‌سازی است" en="This week’s H2H group is being prepared" />}</h2>
+          <p className="mt-1.5 max-w-xl text-xs leading-6 text-white/55">{noClub ? <T fa="به یک باشگاه بپیوند تا با هم‌تیمی‌هایت برای بازی‌های طلایی و جدول رو در رو رقابت کنی." en="Join a club to compete with teammates for Gold Picks and a place in the H2H standings." /> : tooSmall ? <T fa={`برای فعال‌شدن H2H، حداقل ۸ عضو آماده رقابت لازم است. اکنون ${clubMemberCount ?? 0} عضو دارید؛ چند بازیکن دیگر دعوت کنید و رقابت را شروع کنید.`} en={`H2H needs at least 8 willing players. Your club has ${clubMemberCount ?? 0} member${clubMemberCount === 1 ? "" : "s"}; invite a few more and start the race.`} /> : <T fa="به‌محض آماده‌شدن گروه، رویارویی‌ها و جدول اینجا نمایش داده می‌شوند." en="The matchups and standings will appear here as soon as the group is ready." />}</p>
+          <Link href="/club" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-3.5 py-2 text-[11px] font-black text-[#06120c] transition hover:bg-brand/90"><T fa={noClub ? "پیدا کردن باشگاه" : "رفتن به باشگاه"} en={noClub ? "Find a club" : "Open club"} /><ArrowRight size={14} /></Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function H2HBoard() {
-  const { t } = useLanguage();
   const [data, setData] = useState<any>();
   const [day, setDay] = useState(1);
   const [error, setError] = useState("");
@@ -64,7 +95,7 @@ export default function H2HBoard() {
   if (!data) return <main className="min-h-screen bg-[#080b0a]" />;
   if (!data.enabled) return null;
   const league = data.league;
-  if (!league) return <main className="min-h-screen bg-[#080b0a] px-5 pb-28 pt-28"><div className="mx-auto max-w-xl rounded-[2rem] border border-white/10 bg-[#111714] p-10 text-center"><Swords className="mx-auto text-brand" size={38} /><h1 className="mt-5 text-3xl font-black">{t("رو در رو", "Head to Head")}</h1><p className="mt-3 text-sm text-white/50">{t("گروه این هفته هنوز آماده نشده است.", "This week's group is not ready yet.")}</p></div></main>;
+  if (!league) return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero weekKey={data.weekKey ?? ""} slateCount={7} activeSlate={1} progressSlate={1} /><H2HAccessCard reason={data.reason} clubMemberCount={data.clubMemberCount} /></div></main>;
 
   const round = league.h2hMatches?.find((item: any) => item.matchday === day);
   const slate = league.slates.find((item: any) => item.matchday === day);
@@ -74,7 +105,7 @@ export default function H2HBoard() {
 
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl">
     <H2HHero weekKey={league.weekKey} slateCount={league.slates.length} activeSlate={day} progressSlate={progressSlate} />
-    <H2HTodayMatches slates={league.slates} leagueId={league.id} />
+    {data.viewerIncluded ? <H2HTodayMatches slates={league.slates} leagueId={league.id} /> : <H2HAccessCard observer />}
     <section className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-4 py-3.5 md:px-5"><button type="button" onClick={() => go(-1)} disabled={day <= 1} aria-label="Previous round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="راند هفتگی" en="WEEKLY ROUND" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="راند" en="Round" /> {day}</h2><p className="mt-0.5 text-[10px] text-white/35">{slate?.sourceDate ?? league.weekKey}</p></div><button type="button" onClick={() => go(1)} disabled={day >= league.slates.length} aria-label="Next round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
     <H2HRoundMatches round={round} />
     <H2HStandings standings={league.standings} viewerId={league.viewerId} />
