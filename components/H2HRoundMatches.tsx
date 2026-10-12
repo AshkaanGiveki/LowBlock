@@ -21,31 +21,16 @@ function scoreCircle(points: number, highlighted: boolean, finished: boolean) {
   );
 }
 
-function MatchTeam({ team, align, language }: { team: any; align: "left" | "right"; language: "fa" | "en" }) {
-  const name = language === "fa" ? team?.faName || team?.name : team?.name;
+function MatchTeam({ team }: { team: any }) {
+  const name = team?.faName || team?.name;
   const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
-  return (
-    <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <TeamCrest name={name ?? "Team"} logo={logo} className="mx-auto h-9 w-9 rounded-xl" />
-      <p className="mt-1.5 truncate text-[10px] font-bold text-white/80">{name}</p>
-    </div>
-  );
+  return <TeamCrest name={name ?? "Team"} logo={logo} className="mx-auto h-6 w-6 rounded-lg" />;
 }
 
 function PlayerSide({ player, prediction, gold, align, language }: { player: any; prediction: any; gold: boolean; align: "left" | "right"; language: "fa" | "en" }) {
-  const text = (
-    <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <div className={`flex items-center gap-1.5 ${align === "right" ? "justify-end" : "justify-start"}`}>
-        <span className="truncate text-[10px] font-bold text-white/80">{player?.username}</span>
-        {gold && <span title={language === "fa" ? "انتخاب طلایی" : "Gold pick"} className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#e8c66a]/15 text-[#e8c66a]"><Sparkles size={9} /></span>}
-      </div>
-      <p className={`mt-0.5 text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>
-        {prediction ? predictionLabel(prediction) : <T fa="پیش‌بینی مخفی" en="Prediction hidden" />}
-      </p>
-    </div>
-  );
-  const avatar = <UserAvatar name={player?.username ?? "Player"} avatarUrl={player?.avatarUrl} className="h-7 w-7 text-[8px]" />;
-  return align === "right" ? <div className="flex min-w-0 items-center justify-end gap-1.5">{text}{avatar}</div> : <div className="flex min-w-0 items-center justify-start gap-1.5">{avatar}{text}</div>;
+  const avatar = <span title={gold ? (language === "fa" ? "انتخاب طلایی" : "Gold pick") : player?.username} className={`relative inline-flex rounded-full ${gold ? "ring-2 ring-[#e8c66a]/80 ring-offset-1 ring-offset-[#101713]" : ""}`}><UserAvatar name={player?.username ?? "Player"} avatarUrl={player?.avatarUrl} className="h-6 w-6 text-[7px]" />{gold && <span className="absolute -end-1 -top-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#e8c66a] text-[#241d08]"><Sparkles size={8} /></span>}</span>;
+  const predictionValue = <span className={`text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>{prediction ? predictionLabel(prediction) : "—"}</span>;
+  return align === "right" ? <div className="flex min-w-0 items-center justify-end gap-2">{predictionValue}{avatar}</div> : <div className="flex min-w-0 items-center justify-start gap-2">{avatar}{predictionValue}</div>;
 }
 
 function FixtureDetails({ fixture, match, language }: { fixture: any; match: any; language: "fa" | "en" }) {
@@ -55,29 +40,21 @@ function FixtureDetails({ fixture, match, language }: { fixture: any; match: any
   const winner = finished && playerAScore !== playerBScore ? (playerAScore > playerBScore ? "A" : "B") : null;
 
   return (
-    <div className="px-3 py-3">
-      <div className="rounded-xl border border-white/[.07] bg-white/[.025] px-3 py-2.5">
-        <div className="mb-2 flex items-center justify-center gap-2 text-[9px] text-white/35">
+    <div className="px-2.5 py-2">
+      <div className="rounded-lg border border-white/[.07] bg-white/[.025] px-2.5 py-1.5">
+        <div className="mb-1 flex items-center justify-center gap-2 text-[8px] text-white/30">
           <span className="uppercase tracking-[.14em]">{fixture.leagueCode}</span>
           <span className="h-1 w-1 rounded-full bg-white/20" />
           <LocalTime value={fixture.kickoffAt} />
         </div>
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <MatchTeam team={fixture.homeTeam} align="right" language={language} />
-          <div className="grid min-w-[56px] place-items-center">
-            <span className={`text-lg font-black tracking-wide ${finished ? "text-white" : "text-white/35"}`}>{finished ? `${fixture.homeGoals} : ${fixture.awayGoals}` : "—"}</span>
-            <span className="mt-0.5 text-[8px] font-bold uppercase tracking-[.14em] text-white/30"><T fa={finished ? "نتیجه نهایی" : "در انتظار نتیجه"} en={finished ? "Final result" : "Awaiting result"} /></span>
-          </div>
-          <MatchTeam team={fixture.awayTeam} align="left" language={language} />
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <MatchTeam team={fixture.homeTeam} />
+          <span className={`min-w-[44px] text-center text-base font-black tracking-wide ${finished ? "text-white" : "text-white/35"}`}>{finished ? `${fixture.homeGoals} : ${fixture.awayGoals}` : "—"}</span>
+          <MatchTeam team={fixture.awayTeam} />
         </div>
       </div>
 
-      <div className="mt-2.5 rounded-xl border border-white/[.06] bg-black/10 px-2.5 py-2.5">
-        <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <span className="text-right text-[8px] font-black uppercase tracking-[.16em] text-white/25"><T fa="بازیکن" en="Player" /></span>
-          <span className="text-center text-[8px] font-black uppercase tracking-[.16em] text-brand"><T fa="امتیاز" en="Points" /></span>
-          <span className="text-left text-[8px] font-black uppercase tracking-[.16em] text-white/25"><T fa="بازیکن" en="Player" /></span>
-        </div>
+      <div className="mt-1.5 rounded-lg border border-white/[.06] bg-black/10 px-2 py-2">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <PlayerSide player={match.playerA} prediction={fixture.predictions?.playerA} gold={Boolean(fixture.isGold?.playerA)} align="right" language={language} />
           <div className="flex items-center justify-center gap-1.5">
