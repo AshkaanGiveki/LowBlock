@@ -10,6 +10,18 @@ export type SportsApiRestResponse<T> = {
   error?: { code: number; message: string };
 };
 
+export type SportsApiDiscoveryManifest = {
+  dateString: string;
+  status: "COMPLETE" | "INCOMPLETE";
+  attempts: number;
+  schedule: { ok: boolean; count: number; tournamentCount: number; error?: string };
+  today: { attempted: boolean; ok: boolean; count: number; tournamentCount: number; error?: string };
+  mergedCount: number;
+  mergedTournamentCount: number;
+  missingEventIds: number;
+  checkedAt: Date;
+};
+
 export type SportsApiQuota = {
   used: number;
   limit: number | null;
@@ -210,6 +222,80 @@ export async function getSportsApiDailyFixtures(
   }
 
   return { success: false, events: [] };
+}
+
+function eventList(response: SportsApiRestResponse<any>) {
+  const value = response.events || response.data || (Array.isArray(response) ? response : []);
+  return Array.isArray(value) ? value : [];
+}
+
+function eventTournamentKey(event: any) {
+  return String(event?.tournament?.uniqueTournament?.id ?? event?.tournament?.id ?? event?.uniqueTournament?.id ?? event?.tournamentId ?? "");
+}
+
+/** Discovers and audits every date in a week before H2H slate generation. */
+export async function discoverSportsApiWeek(dateStrings: string[], options: { attempts?: number } = {}) {
+  const attempts = Math.max(1, options.attempts ?? 3);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const allEvents = new Map<string, any>();
+  const manifests: SportsApiDiscoveryManifest[] = [];
+
+  for (const dateString of [...new Set(dateStrings)]) {
+    const db = await getDb();
+    const persisted = await db.collection<any>("sportsApiDiscoveryManifests").findOne({ kind: "daily", dateString, status: "COMPLETE", "data.events": { $exists: true } });
+    if (persisted?.data?.events && Array.isArray(persisted.data.events)) {
+      for (const event of persisted.data.events) {
+        const id = String(event?.id ?? event?.eventId ?? "");
+        if (id) allEvents.set(id, event);
+      }
+      manifests.push(persisted as SportsApiDiscoveryManifest);
+      continue;
+    }
+    let finalManifest: SportsApiDiscoveryManifest | null = null;
+    let selectedEvents: any[] = [];
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const schedule = await fetchSportsApi<any>(`/schedule/${dateString}`);
+      const scheduleEvents = eventList(schedule);
+      const todayAttempted = dateString === todayStr;
+      const today = todayAttempted ? await fetchSportsApi<any>("/today") : null;
+      const todayEvents = today ? eventList(today) : [];
+      const scheduleIds = new Set(scheduleEvents.map((event) => String(event?.id ?? event?.eventId ?? "")).filter(Boolean));
+      const merged = [...scheduleEvents, ...todayEvents].filter((event, index, rows) => {
+        const id = String(event?.id ?? event?.eventId ?? "");
+        return id && rows.findIndex((other) => String(other?.id ?? other?.eventId ?? "") === id) === index;
+      });
+      const current: SportsApiDiscoveryManifest = {
+        dateString,
+        status: schedule.success !== false && (!todayAttempted || today?.success !== false) ? "COMPLETE" : "INCOMPLETE",
+        attempts: attempt,
+        schedule: { ok: schedule.success !== false, count: scheduleEvents.length, tournamentCount: new Set(scheduleEvents.map(eventTournamentKey).filter(Boolean)).size, error: schedule.error?.message },
+        today: { attempted: todayAttempted, ok: !todayAttempted || today?.success !== false, count: todayEvents.length, tournamentCount: new Set(todayEvents.map(eventTournamentKey).filter(Boolean)).size, error: today?.error?.message },
+        mergedCount: merged.length,
+        mergedTournamentCount: new Set(merged.map(eventTournamentKey).filter(Boolean)).size,
+        missingEventIds: todayAttempted ? todayEvents.filter((event) => !scheduleIds.has(String(event?.id ?? event?.eventId ?? ""))).length : 0,
+        checkedAt: new Date(),
+      };
+      finalManifest = current;
+      if (current.status === "COMPLETE") {
+        selectedEvents = merged;
+        break;
+      }
+      if (schedule.error?.code === 429 || today?.error?.code === 429) break;
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+    manifests.push(finalManifest!);
+    for (const event of selectedEvents) {
+      const id = String(event?.id ?? event?.eventId ?? "");
+      if (id) allEvents.set(id, event);
+    }
+    await db.collection("sportsApiDiscoveryManifests").updateOne({ kind: "daily", dateString }, { $set: { kind: "daily", ...finalManifest, data: selectedEvents.length ? { success: true, events: selectedEvents } : undefined, updatedAt: new Date() } }, { upsert: true });
+  }
+
+  const dates = [...new Set(dateStrings)];
+  const complete = manifests.length === dates.length && manifests.every((item) => item.status === "COMPLETE");
+  const db = await getDb();
+  await db.collection("sportsApiDiscoveryManifests").updateOne({ kind: "weekly", dates }, { $set: { kind: "weekly", dates, status: complete ? "COMPLETE" : "INCOMPLETE", manifests, checkedAt: new Date() } }, { upsert: true });
+  return { complete, events: Array.from(allEvents.values()), manifests };
 }
 
 /**

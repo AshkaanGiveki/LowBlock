@@ -168,6 +168,7 @@ export async function ensureIndexes() {
     db.collection("centralTeams").createIndex({ centralTeamId: 1 }, { unique: true }),
     db.collection("centralTeams").createIndex({ "providerIds.football-api": 1 }, { sparse: true, unique: true }),
     db.collection("centralTeams").createIndex({ "providerIds.sportsapi": 1 }, { sparse: true, unique: true }),
+    db.collection("centralTeams").createIndex({ numericTeamId: 1 }, { sparse: true, unique: true, name: "central_team_numeric_id" }),
     db.collection("centralTeams").createIndex({ aliases: 1 }),
     db
       .collection("matches")

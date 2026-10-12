@@ -1,7 +1,7 @@
 import { closeMongo, getDb } from "../lib/db/mongo";
 import { getH2HWeek, materializeH2HLeague, scoreH2HFixture } from "../lib/domain/h2h";
 
-const names = ["kaka", "mahyar", "ashkan", "raminowskiy"];
+const names = ["ashkan", "kaka", "mahyar", "raminowskiy"];
 async function main() {
   const db = await getDb();
   const allUsers = await db.collection<any>("users").find({}).toArray();

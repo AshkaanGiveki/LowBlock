@@ -4,13 +4,9 @@ import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { currentUserId } from "@/lib/auth/session";
 import { env } from "@/lib/env";
+import { providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import ratingsData from "@/data/h2h-team-ratings-review.json";
-
-export const H2H_ALLOWED_COMPETITION_CODES = [
-  "GB1", "ES1", "L1", "IT1", "FR1", "IR1", "SA1", "GB2", "TR1",
-  "UCL", "UEL", "FRIENDLY", "NATIONS", "ACLE",
-] as const;
 
 export const H2H_TOURNAMENT_WEIGHTS: Record<string, number> = {
   UCL: 1.20, GB1: 1.18, ES1: 1.16, IT1: 1.14, L1: 1.12, UEL: 1.12,
@@ -18,7 +14,6 @@ export const H2H_TOURNAMENT_WEIGHTS: Record<string, number> = {
   GB2: 1.05, IR1: 1.04, FRIENDLY: 1.00,
 };
 
-const allowed = new Set<string>(H2H_ALLOWED_COMPETITION_CODES);
 type RatingRow = { teamId?: string; centralTeamId?: string; rating: number };
 const ratings = new Map<string, number>(
   (ratingsData.teams as RatingRow[]).flatMap((row) => {
@@ -49,6 +44,21 @@ export type H2HSlate = {
   firstKickoffAt: Date;
   goldDeadline: Date;
 };
+
+export type H2HPairing = { playerA: string; playerB: string };
+
+/** One opponent per player per slate, with Seed 1 vs Seed 2 in the final slate. */
+export function buildH2HPairings(playerIds: string[], roundIndex: number): H2HPairing[] {
+  const ids = playerIds.map(String);
+  if (ids.length < 2 || ids.length % 2 !== 0) return [];
+  const rotating = ids.slice(1);
+  const shift = ((roundIndex % rotating.length) + rotating.length) % rotating.length;
+  const order = [ids[0], ...rotating.slice(rotating.length - shift), ...rotating.slice(0, rotating.length - shift)];
+  const pairings: H2HPairing[] = [];
+  for (let index = 0; index < order.length / 2; index++)
+    pairings.push({ playerA: order[index], playerB: order[order.length - 1 - index] });
+  return pairings;
+}
 
 export function isH2HEnabled() { return env.H2H_ENABLED; }
 
@@ -83,13 +93,11 @@ function kickoff(value: unknown) {
 
 export function scoreH2HFixture(match: any, ratingMap: Map<string, number> = ratings): number | null {
   const code = String(match.leagueCode ?? "");
-  if (!allowed.has(code)) return null;
   const homeId = String(match.homeTeam?.centralTeamId ?? "");
   const awayId = String(match.awayTeam?.centralTeamId ?? "");
-  const home = ratingMap.get(homeId);
-  const away = ratingMap.get(awayId);
-  const weight = H2H_TOURNAMENT_WEIGHTS[code];
-  if (!home || !away || !weight) return null;
+  const home = ratingMap.get(homeId) ?? 0;
+  const away = ratingMap.get(awayId) ?? 0;
+  const weight = H2H_TOURNAMENT_WEIGHTS[code] ?? 1;
   const score = (home + away) * weight;
   return score > 0 ? score : null;
 }
@@ -117,28 +125,15 @@ export function buildH2HSlates(matches: any[], week: H2HWeek, ratingMap: Map<str
     .sort((a, b) => a.date.getTime() - b.date.getTime() || b.score - a.score || a.id.localeCompare(b.id));
   const byDay = Array.from({ length: 7 }, () => [] as typeof candidates);
   for (const row of candidates) byDay[dayIndex(row.date, week.start)].push(row);
-  const used = new Set<string>();
   const slates: H2HSlate[] = [];
-  let cursor = 0;
   for (let matchday = 1; matchday <= 7; matchday++) {
-    while (cursor < 7 && byDay[cursor].every((row) => used.has(row.id))) cursor++;
-    if (cursor >= 7) break;
-    const pool: typeof candidates = [];
-    let end = cursor;
-    while (end < 7 && pool.filter((row) => !used.has(row.id)).length < 5) {
-      pool.push(...byDay[end]);
-      end++;
-    }
-    const available = pool.filter((row) => !used.has(row.id));
-    const remainingCandidates = candidates.length - used.size;
-    const remainingSlates = 7 - matchday;
-    if (available.length < 4 || remainingCandidates < 4 * (remainingSlates + 1)) break;
-    const sourceDay = dayKey(byDay[cursor].find((row) => !used.has(row.id))?.date ?? week.start);
-    const chosen = available
+    const dayCandidates = byDay[matchday - 1];
+    if (dayCandidates.length < 4) return [];
+    const sourceDay = dayKey(dayCandidates[0].date);
+    const chosen = [...dayCandidates]
       .sort((a, b) => b.score - a.score || a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id))
-      .slice(0, Math.min(5, available.length, Math.max(4, remainingCandidates - remainingSlates * 4)));
+      .slice(0, 5);
     chosen.sort((a, b) => a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
-    for (const row of chosen) used.add(row.id);
     const firstKickoffAt = chosen[0].date;
     slates.push({
       matchday,
@@ -155,12 +150,11 @@ export function buildH2HSlates(matches: any[], week: H2HWeek, ratingMap: Map<str
         awayRating: ratingMap.get(String(row.match.awayTeam?.centralTeamId ?? row.match.awayTeam?.teamId)) ?? 0,
         tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(row.match.leagueCode)],
         ratingVersion: "h2h-team-ratings-review",
-        selectionReason: "highest-score-with-seven-slate-reservation",
+      selectionReason: "highest-score-with-four-to-five-daily-target",
       })),
       firstKickoffAt,
       goldDeadline: firstKickoffAt,
     });
-    cursor = Math.min(6, cursor + 1);
   }
   return slates.length === 7 && slates.every((slate) => slate.fixtures.length >= 4) ? slates : [];
 }
@@ -174,6 +168,11 @@ async function memberIds(db: Db, clubId: string) {
 async function loadCentralH2HRatings(db: Db) {
   const rows = await db.collection<any>("centralTeams").find({ h2hRating: { $gte: 1, $lte: 100 } }, { projection: { centralTeamId: 1, h2hRating: 1 } }).toArray();
   return new Map(rows.map((row) => [String(row.centralTeamId), Number(row.h2hRating)]));
+}
+
+async function hasCompleteWeeklyDiscovery(db: Db, week: H2HWeek) {
+  const dates = providerWeekDateKeys(week.start);
+  return Boolean(await db.collection<any>("sportsApiDiscoveryManifests").findOne({ kind: "weekly", dates, status: "COMPLETE" }));
 }
 
 async function eligibleUsers(db: Db, ids: string[], weekKey: string) {
@@ -208,10 +207,11 @@ export async function createH2HLeague(db: Db, clubId: string, week: H2HWeek) {
   if (!isH2HEnabled()) return null;
   const existing = await db.collection<any>("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber: 1 });
   if (existing) return null;
+  if (!(await hasCompleteWeeklyDiscovery(db, week))) return null;
   const players = await selectH2HPlayers(db, clubId, week);
   if (players.length < 8) return null;
   const matches = await db.collection<any>("matches").find({
-    leagueCode: { $in: H2H_ALLOWED_COMPETITION_CODES }, kickoffAt: { $gte: week.start, $lt: week.end },
+    kickoffAt: { $gte: week.start, $lt: week.end },
   }).toArray();
   const slates = buildH2HSlates(matches, week, await loadCentralH2HRatings(db));
   if (!slates.length) return null;
@@ -268,8 +268,9 @@ export async function ensureCurrentH2HLeagues(db: Db) {
     const ordered = [...rows.map((row) => row.userId), ...allIds].filter((id, index, list) => allIds.includes(id) && !primaryIds.has(id) && list.indexOf(id) === index);
     for (let offset = 0, groupNumber = 2; offset + 8 <= ordered.length; offset += 8, groupNumber++) {
       if (await db.collection("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber })) continue;
+      if (!(await hasCompleteWeeklyDiscovery(db, week))) break;
       const players = ordered.slice(offset, offset + 8);
-      const matches = await db.collection<any>("matches").find({ leagueCode: { $in: H2H_ALLOWED_COMPETITION_CODES }, kickoffAt: { $gte: week.start, $lt: week.end } }).toArray();
+      const matches = await db.collection<any>("matches").find({ kickoffAt: { $gte: week.start, $lt: week.end } }).toArray();
       const slates = buildH2HSlates(matches, week, await loadCentralH2HRatings(db));
       if (!slates.length) break;
       const result = await db.collection("h2hLeagues").insertOne({ clubId, weekKey: week.key, startsAt: week.start, endsAt: week.end, groupNumber, players, slates, status: "ACTIVE", winnerUserId: null, cancelledReason: null, createdAt: new Date(), updatedAt: new Date() });
@@ -294,9 +295,9 @@ export async function settleH2HLeagues(db: Db, weekKey = getH2HWeek().key) {
       const played = league.slates.length;
       await db.collection("h2hStandings").insertMany(standings.map((row: any) => ({ ...row, leagueId: league._id, played, totalSlatePoints: row.predictionPoints, normalizedAveragePoints: played ? row.predictionPoints / played : 0, scoreDifference: row.wins - row.losses, exactPredictions: 0, goldSelections: 0, goldWins: 0, qualificationStatus: row.rank <= 7 ? "QUALIFIED" : "NOT_QUALIFIED", createdAt: new Date(), updatedAt: new Date() })));
       const operations = [] as any[];
-      for (const slate of league.slates as H2HSlate[]) for (let i = 0; i < league.players.length; i++) for (let j = i + 1; j < league.players.length; j++) {
-        const a = standings.find((row: any) => row.userId === String(league.players[i]));
-        const b = standings.find((row: any) => row.userId === String(league.players[j]));
+      for (const slate of league.slates as H2HSlate[]) for (const pairing of buildH2HPairings(league.players.map(String), slate.matchday - 1)) {
+        const a = standings.find((row: any) => row.userId === pairing.playerA);
+        const b = standings.find((row: any) => row.userId === pairing.playerB);
         const as = a?.slateScores?.[String(slate.matchday)] ?? 0; const bs = b?.slateScores?.[String(slate.matchday)] ?? 0;
         operations.push({ updateOne: { filter: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}` }, update: { $set: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}`, playerA: a?.userId, playerB: b?.userId, scoreA: as, scoreB: bs, winnerUserId: as === bs ? null : as > bs ? a?.userId : b?.userId, status: "FINAL", updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, upsert: true } });
       }
@@ -341,8 +342,8 @@ export async function calculateH2HStandings(db: Db, league: any) {
       totals.get(id)!.slateScores[String(slate.matchday)] = score;
       totals.get(id)!.predictionPoints += score;
     }
-    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
-      const a = totals.get(ids[i])!, b = totals.get(ids[j])!;
+    for (const pairing of buildH2HPairings(ids, slate.matchday - 1)) {
+      const a = totals.get(pairing.playerA)!, b = totals.get(pairing.playerB)!;
       const as = slateScores.get(a.userId)!, bs = slateScores.get(b.userId)!;
       if (as > bs) { a.h2hPoints += 3; a.wins++; b.losses++; }
       else if (bs > as) { b.h2hPoints += 3; b.wins++; a.losses++; }

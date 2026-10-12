@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import {
   getSportsApiDailyFixtures,
+  discoverSportsApiWeek,
   getSportsApiTournamentSeasons,
   getSportsApiTournamentEvents,
 } from "./rest";
@@ -25,7 +26,7 @@ import {
   startSportsApiBackgroundService,
   ensureSportsApiBackgroundService,
 } from "./backgroundService";
-import { appDateKey, providerDateKeys } from "../scheduleWindow";
+import { appDateKey, providerDateKeys, providerWeekDateKeys } from "../scheduleWindow";
 import { ensureCentralTeam } from "../centralTeams";
 
 // In-memory season cache to avoid redundant season requests
@@ -213,6 +214,19 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     return Array.from(matchesMap.values());
   }
 
+  async syncWeekDates(dateKeys: string[]) {
+    const db = await getDb();
+    const discovery = await discoverSportsApiWeek(dateKeys, { attempts: 3 });
+    if (!discovery.complete) {
+      throw new Error(`SportsAPI weekly discovery incomplete: ${discovery.manifests.filter((item) => item.status !== "COMPLETE").map((item) => item.dateString).join(", ")}`);
+    }
+    const matches = discovery.events
+      .map((event) => normalizeSportsApiMatch(event))
+      .filter((match): match is CanonicalMatch => Boolean(match));
+    const total = await this.saveMatches(db, matches);
+    return { total, matches, discovery };
+  }
+
   /**
    * Syncs upcoming and recent fixtures for all tournaments configured in LowBlock.
    * Caches seasons in DB and checks rate limits gracefully.
@@ -369,10 +383,17 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
     // 1. Sync daily window (yesterday, today, tomorrow) for live and real-time updates
     const dateKeys = providerDateKeys();
+    const weekKeys = providerWeekDateKeys();
+    const discovery = await discoverSportsApiWeek(weekKeys, { attempts: 3 });
+    if (!discovery.complete) {
+      throw new Error(`SportsAPI weekly discovery incomplete: ${discovery.manifests.filter((item) => item.status !== "COMPLETE").map((item) => item.dateString).join(", ")}`);
+    }
 
-    const dailyMatches = await this.getDailyMatches(dateKeys);
+    const dailyMatches = discovery.events
+      .map((event) => normalizeSportsApiMatch(event))
+      .filter((match): match is CanonicalMatch => Boolean(match));
     if (dailyMatches.length > 0) total += await this.saveMatches(db, dailyMatches);
-    listRequests += dateKeys.length;
+    listRequests += weekKeys.length;
 
     // Some provider-wide daily schedules omit entire competitions. Recover
     // only explicitly configured competitions without enabling the expensive
