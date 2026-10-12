@@ -15,21 +15,22 @@ function predictionLabel(prediction: any) {
 
 function scoreCircle(points: number, highlighted: boolean, finished: boolean) {
   return (
-    <span className={`grid h-8 min-w-8 place-items-center rounded-full px-1 text-[11px] font-black ${highlighted ? "bg-brand text-[#06120c] shadow-[0_0_16px_rgba(32,184,121,.28)]" : "border border-white/10 bg-white/[.06] text-white/75"}`}>
+    <span className={`grid h-8 min-w-8 place-items-center rounded-full px-1 text-[11px] font-black ${highlighted ? "bg-brand text-white shadow-[0_0_16px_rgba(32,184,121,.28)]" : "border border-white/10 bg-white/[.06] text-white/75"}`}>
       {finished ? points : "—"}
     </span>
   );
 }
 
-function MatchTeam({ team }: { team: any }) {
-  const name = team?.faName || team?.name;
+function MatchTeam({ team, side, language }: { team: any; side: "home" | "away"; language: "fa" | "en" }) {
+  const name = language === "fa" ? team?.faName || team?.name : team?.name;
   const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
-  return <TeamCrest name={name ?? "Team"} logo={logo} className="mx-auto h-6 w-6 rounded-lg" />;
+  const crest = <TeamCrest name={name ?? "Team"} logo={logo} className="h-5 w-5 rounded-lg" />;
+  return <div className={`flex min-w-0 items-center gap-2 ${side === "home" ? "justify-end" : "justify-start"}`}>{side === "home" ? <><span className="truncate whitespace-nowrap text-[10px] font-bold text-white/75">{name}</span>{crest}</> : <>{crest}<span className="truncate whitespace-nowrap text-[10px] font-bold text-white/75">{name}</span></>}</div>;
 }
 
 function PlayerSide({ player, prediction, gold, align, language }: { player: any; prediction: any; gold: boolean; align: "left" | "right"; language: "fa" | "en" }) {
   const avatar = <span title={gold ? (language === "fa" ? "انتخاب طلایی" : "Gold pick") : player?.username} className={`relative inline-flex rounded-full ${gold ? "ring-2 ring-[#e8c66a]/80 ring-offset-1 ring-offset-[#101713]" : ""}`}><UserAvatar name={player?.username ?? "Player"} avatarUrl={player?.avatarUrl} className="h-6 w-6 text-[7px]" />{gold && <span className="absolute -end-1 -top-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#e8c66a] text-[#241d08]"><Sparkles size={8} /></span>}</span>;
-  const predictionValue = <span className={`text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>{prediction ? predictionLabel(prediction) : "—"}</span>;
+  const predictionValue = <span className={`text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>{prediction ? predictionLabel(prediction) : <T fa="مخفی" en="Hidden" />}</span>;
   return align === "right" ? <div className="flex min-w-0 items-center justify-end gap-2">{predictionValue}{avatar}</div> : <div className="flex min-w-0 items-center justify-start gap-2">{avatar}{predictionValue}</div>;
 }
 
@@ -48,9 +49,9 @@ function FixtureDetails({ fixture, match, language }: { fixture: any; match: any
           <LocalTime value={fixture.kickoffAt} />
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <MatchTeam team={fixture.homeTeam} />
+          <MatchTeam team={fixture.homeTeam} side="home" language={language} />
           <span className={`min-w-[44px] text-center text-base font-black tracking-wide ${finished ? "text-white" : "text-white/35"}`}>{finished ? `${fixture.homeGoals} : ${fixture.awayGoals}` : "—"}</span>
-          <MatchTeam team={fixture.awayTeam} />
+          <MatchTeam team={fixture.awayTeam} side="away" language={language} />
         </div>
       </div>
 
