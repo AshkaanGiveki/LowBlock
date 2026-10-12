@@ -68,10 +68,12 @@ export default function H2HBoard() {
 
   const round = league.h2hMatches?.find((item: any) => item.matchday === day);
   const slate = league.slates.find((item: any) => item.matchday === day);
+  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const progressSlate = league.slates.find((item: any) => item.sourceDate === todayKey)?.matchday ?? league.slates.find((item: any) => item.sourceDate > todayKey)?.matchday ?? league.slates.length;
   const go = (direction: number) => setDay((current) => Math.min(league.slates.length, Math.max(1, current + direction)));
 
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl">
-    <H2HHero weekKey={league.weekKey} slateCount={league.slates.length} activeSlate={day} />
+    <H2HHero weekKey={league.weekKey} slateCount={league.slates.length} activeSlate={day} progressSlate={progressSlate} />
     <H2HTodayMatches slates={league.slates} leagueId={league.id} />
     <section className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-4 py-3.5 md:px-5"><button type="button" onClick={() => go(-1)} disabled={day <= 1} aria-label="Previous round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="راند هفتگی" en="WEEKLY ROUND" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="راند" en="Round" /> {day}</h2><p className="mt-0.5 text-[10px] text-white/35">{slate?.sourceDate ?? league.weekKey}</p></div><button type="button" onClick={() => go(1)} disabled={day >= league.slates.length} aria-label="Next round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
     <H2HRoundMatches round={round} />

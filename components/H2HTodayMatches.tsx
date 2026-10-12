@@ -50,7 +50,7 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
     const today = dayKey(new Date());
     return slates.find((slate) => slate.sourceDate === today) ?? null;
   }, [slates]);
-  const fixtures = todaySlate?.fixtures ?? [];
+  const fixtures = useMemo(() => [...(todaySlate?.fixtures ?? [])].sort((a: any, b: any) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime()), [todaySlate]);
 
   useEffect(() => {
     setGoldByMatch(Object.fromEntries(fixtures.map((fixture: any) => [fixture.matchId, Boolean(fixture.isGold)])));
@@ -127,7 +127,7 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
             const gold = Boolean(goldByMatch[fixture.matchId]);
             const competition = getLeague(fixture.leagueCode);
             return (
-              <article key={fixture.matchId} onClick={() => openDrawer(fixture)} className={`group flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 transition ${gold ? "border-[#e8c66a]/70 bg-[linear-gradient(135deg,rgba(232,198,106,.22),rgba(32,184,121,.06))] shadow-[0_10px_28px_rgba(232,198,106,.10)]" : "border-white/[.08] bg-[#101713] hover:border-brand/35 hover:bg-brand/[.05]"} ${started ? "cursor-default opacity-70" : "cursor-pointer"}`}>
+              <article key={fixture.matchId} onClick={() => openDrawer(fixture)} className={`group flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 transition ${gold ? "border-[#e8c66a]/45 bg-[#e8c66a]/[.07]" : "border-white/[.08] bg-[#101713] hover:border-brand/35 hover:bg-brand/[.05]"} ${started ? "cursor-default opacity-70" : "cursor-pointer"}`}>
                 {competition?.logo ? <img src={competition.logo} alt="" className="h-5 w-5 shrink-0 object-contain" /> : <span className="h-5 w-5 shrink-0 rounded-full bg-white/[.06]" />}
                 <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
                   <MatchTeam team={fixture.homeTeam} side="home" language={language} />
