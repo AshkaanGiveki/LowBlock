@@ -12,6 +12,7 @@ import {
   Home,
   Target,
   Trophy,
+  Swords,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -97,7 +98,7 @@ export function Nav() {
         )}
       </header>
       <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around xl:hidden">
-        {[...routes, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Trophy, label: "H2H" }] : [])].map(({ href, icon: Component, label }) => (
+        {[...routes, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Swords, label: "H2H" }] : [])].map(({ href, icon: Component, label }) => (
           <Link
             key={href}
             href={href}

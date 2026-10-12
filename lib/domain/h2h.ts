@@ -359,6 +359,27 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
   const userById = new Map(users.map((user) => [String(user._id), user]));
   const predictions = await db.collection<any>("predictions").find({ userId: viewerId, matchId: { $in: league.slates.flatMap((slate: H2HSlate) => slate.fixtureIds) } }, { projection: { matchId: 1, homeGoals: 1, awayGoals: 1 } }).toArray();
   const revealed = await db.collection<any>("predictions").find({ userId: { $in: league.players }, matchId: { $in: league.slates.flatMap((slate: H2HSlate) => slate.fixtureIds) } }, { projection: { userId: 1, matchId: 1, homeGoals: 1, awayGoals: 1 } }).toArray();
+  const matchRows = await db.collection<any>("matches").find({ provider: "sportsapi", providerMatchId: { $in: league.slates.flatMap((slate: H2HSlate) => slate.fixtureIds) } }, { projection: { providerMatchId: 1, status: 1, homeGoals: 1, awayGoals: 1 } }).toArray();
+  const matchById = new Map(matchRows.map((match) => [String(match.providerMatchId), match]));
+  const playerById = new Map(league.players.map((id: string) => [String(id), { userId: String(id), username: userById.get(String(id))?.username ?? "LowBlock Player", avatarUrl: userById.get(String(id))?.avatarUrl ?? null }]));
+  const predictionByKey = new Map(predictions.map((prediction: any) => [`${viewerId}:${String(prediction.matchId)}`, prediction]));
+  for (const prediction of revealed) predictionByKey.set(`${String(prediction.userId)}:${String(prediction.matchId)}`, prediction);
+  const h2hMatches = league.slates.map((slate: H2HSlate) => ({
+    matchday: slate.matchday,
+    pairings: buildH2HPairings(league.players.map(String), slate.matchday - 1).map((pairing) => {
+      const fixtureDetails = slate.fixtures.map((fixture) => {
+        const match = matchById.get(String(fixture.matchId));
+        const finished = ["FINISHED", "FT", "AET", "PEN"].includes(String(match?.status ?? "").toUpperCase()) || (match?.homeGoals != null && match?.awayGoals != null);
+        const aPrediction = predictionByKey.get(`${pairing.playerA}:${fixture.matchId}`);
+        const bPrediction = predictionByKey.get(`${pairing.playerB}:${fixture.matchId}`);
+        const scoreFor = (prediction: any) => finished ? calculatePredictionScore(prediction?.homeGoals ?? null, prediction?.awayGoals ?? null, match?.homeGoals ?? null, match?.awayGoals ?? null) : { points: 0, category: "NO_PREDICTION" as const };
+        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, predictions: { playerA: finished || pairing.playerA === viewerId ? aPrediction ?? null : null, playerB: finished || pairing.playerB === viewerId ? bPrediction ?? null : null }, scores: { playerA: scoreFor(aPrediction), playerB: scoreFor(bPrediction) } };
+      });
+      const scoreA = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerA.points, 0);
+      const scoreB = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerB.points, 0);
+      return { playerA: playerById.get(pairing.playerA), playerB: playerById.get(pairing.playerB), scoreA, scoreB, winner: scoreA === scoreB ? null : scoreA > scoreB ? pairing.playerA : pairing.playerB, fixtures: fixtureDetails };
+    }),
+  }));
   const gold = await db.collection<any>("h2hGoldPicks").find({ leagueId: league._id, userId: viewerId }, { projection: { matchday: 1, matchId: 1 } }).toArray();
   const goldBySlate = new Map(gold.map((pick: any) => [Number(pick.matchday), String(pick.matchId)]));
   return {
@@ -366,6 +387,7 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
     status: league.status,
     players: league.players.map((id: string) => ({ userId: id, username: userById.get(id)?.username ?? "LowBlock Player", avatarUrl: userById.get(id)?.avatarUrl ?? null })),
     standings: standings.map(({ slateScores: _slateScores, ...row }: any) => ({ ...row, username: userById.get(row.userId)?.username ?? "LowBlock Player", avatarUrl: userById.get(row.userId)?.avatarUrl ?? null })),
+    h2hMatches,
     slates: league.slates.map((slate: H2HSlate) => ({ ...slate, fixtures: slate.fixtures.map((fixture) => ({ ...fixture, kickoffAt: fixture.kickoffAt, prediction: predictions.find((p) => String(p.matchId) === fixture.matchId) ?? null, opponentPredictions: new Date() >= new Date(fixture.kickoffAt) ? revealed.filter((p) => String(p.matchId) === fixture.matchId && String(p.userId) !== viewerId) : [], isGold: goldBySlate.get(slate.matchday) === fixture.matchId })) })),
   };
 }
