@@ -80,6 +80,7 @@ export default function H2HBoard() {
   const [data, setData] = useState<any>();
   const [day, setDay] = useState(1);
   const [error, setError] = useState("");
+  const [now, setNow] = useState(Date.now());
   const initialized = useRef(false);
 
   const load = () => fetch("/api/h2h/current").then((response) => response.json()).then((next) => {
@@ -91,22 +92,22 @@ export default function H2HBoard() {
     }
   }).catch(() => setError("Could not load H2H"));
   useEffect(() => { load(); }, []);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
 
   if (!data) return <main className="min-h-screen bg-[#080b0a]" />;
   if (!data.enabled) return null;
   const league = data.league;
-  if (!league) return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero weekKey={data.weekKey ?? ""} slateCount={7} activeSlate={1} progressSlate={1} /><H2HAccessCard reason={data.reason} clubMemberCount={data.clubMemberCount} /></div></main>;
+  if (!league) return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><H2HAccessCard reason={data.reason} clubMemberCount={data.clubMemberCount} /></div></main>;
 
   const round = league.h2hMatches?.find((item: any) => item.matchday === day);
   const slate = league.slates.find((item: any) => item.matchday === day);
-  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const progressSlate = league.slates.find((item: any) => item.sourceDate === todayKey)?.matchday ?? league.slates.find((item: any) => item.sourceDate > todayKey)?.matchday ?? league.slates.length;
+  const progressSlate = league.slates.reduce((current: number, item: any) => new Date(item.firstKickoffAt).getTime() <= now ? Math.max(current, Number(item.matchday)) : current, 1);
   const go = (direction: number) => setDay((current) => Math.min(league.slates.length, Math.max(1, current + direction)));
 
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl">
-    <H2HHero weekKey={league.weekKey} slateCount={league.slates.length} activeSlate={day} progressSlate={progressSlate} />
+    <H2HHero slateCount={league.slates.length} activeSlate={day} progressSlate={progressSlate} />
     {data.viewerIncluded ? <H2HTodayMatches slates={league.slates} leagueId={league.id} /> : <H2HAccessCard observer />}
-    <section className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-4 py-3.5 md:px-5"><button type="button" onClick={() => go(-1)} disabled={day <= 1} aria-label="Previous round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="راند هفتگی" en="WEEKLY ROUND" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="راند" en="Round" /> {day}</h2><p className="mt-0.5 text-[10px] text-white/35">{slate?.sourceDate ?? league.weekKey}</p></div><button type="button" onClick={() => go(1)} disabled={day >= league.slates.length} aria-label="Next round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
+    <section dir="ltr" className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-4 py-3.5 md:px-5"><button type="button" onClick={() => go(-1)} disabled={day <= 1} aria-label="Previous round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div dir="auto" className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="راند هفتگی" en="WEEKLY ROUND" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="راند" en="Round" /> {day}</h2><p className="mt-0.5 text-[10px] text-white/35">{slate?.sourceDate ?? league.weekKey}</p></div><button type="button" onClick={() => go(1)} disabled={day >= league.slates.length} aria-label="Next round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
     <H2HRoundMatches round={round} />
     <H2HStandings standings={league.standings} viewerId={league.viewerId} />
     {error && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}

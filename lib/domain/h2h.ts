@@ -353,6 +353,35 @@ export async function calculateH2HStandings(db: Db, league: any) {
   return [...totals.values()].sort((a, b) => b.h2hPoints - a.h2hPoints || b.wins - a.wins || b.predictionPoints - a.predictionPoints || a.userId.localeCompare(b.userId)).map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
+export async function getViewerH2HTodayMatch(db: Db, userId: string, now = new Date()) {
+  const week = getH2HWeek(now);
+  const league = await db.collection<any>("h2hLeagues").findOne({ weekKey: week.key, players: userId, status: "ACTIVE" }, { projection: { _id: 1, players: 1, slates: 1 } });
+  if (!league) return null;
+
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const slate = (league.slates ?? []).find((item: any) => {
+    const kickoff = new Date(item.firstKickoffAt);
+    return new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(kickoff) === today;
+  });
+  if (!slate) return null;
+
+  const pairing = buildH2HPairings((league.players ?? []).map(String), Number(slate.matchday) - 1).find((item) => item.playerA === String(userId) || item.playerB === String(userId));
+  if (!pairing) return null;
+  const opponentId = pairing.playerA === String(userId) ? pairing.playerB : pairing.playerA;
+  const users = await db.collection<any>("users").find({ _id: { $in: [userId, opponentId].filter(ObjectId.isValid).map((id) => new ObjectId(id)) } }, { projection: { username: 1, avatarUrl: 1 } }).toArray();
+  const byId = new Map(users.map((user) => [String(user._id), user]));
+  const player = byId.get(String(userId));
+  const opponent = byId.get(opponentId);
+
+  return {
+    leagueId: String(league._id),
+    matchday: Number(slate.matchday),
+    startsAt: new Date(slate.firstKickoffAt).toISOString(),
+    player: { userId: String(userId), username: player?.username ?? "LowBlock Player", avatarUrl: player?.avatarUrl ?? null },
+    opponent: { userId: opponentId, username: opponent?.username ?? "LowBlock Player", avatarUrl: opponent?.avatarUrl ?? null },
+  };
+}
+
 export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
   const standings = await calculateH2HStandings(db, league);
   const users = await db.collection<any>("users").find({ _id: { $in: league.players.filter(ObjectId.isValid).map((id: string) => new ObjectId(id)) } }, { projection: { username: 1, avatarUrl: 1 } }).toArray();
@@ -377,8 +406,13 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
         const finished = ["FINISHED", "FT", "AET", "PEN"].includes(String(match?.status ?? "").toUpperCase()) || (match?.homeGoals != null && match?.awayGoals != null);
         const aPrediction = predictionByKey.get(`${pairing.playerA}:${fixture.matchId}`);
         const bPrediction = predictionByKey.get(`${pairing.playerB}:${fixture.matchId}`);
-        const scoreFor = (prediction: any) => finished ? calculatePredictionScore(prediction?.homeGoals ?? null, prediction?.awayGoals ?? null, match?.homeGoals ?? null, match?.awayGoals ?? null) : { points: 0, category: "NO_PREDICTION" as const };
-        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, predictions: { playerA: finished || pairing.playerA === viewerId ? aPrediction ?? null : null, playerB: finished || pairing.playerB === viewerId ? bPrediction ?? null : null }, scores: { playerA: scoreFor(aPrediction), playerB: scoreFor(bPrediction) } };
+        const scoreFor = (prediction: any, playerId: string) => {
+          if (!finished) return { points: 0, category: "NO_PREDICTION" as const };
+          const score = calculatePredictionScore(prediction?.homeGoals ?? null, prediction?.awayGoals ?? null, match?.homeGoals ?? null, match?.awayGoals ?? null);
+          const gold = goldByPlayerSlate.get(`${playerId}:${slate.matchday}`) === fixture.matchId;
+          return { ...score, points: score.points * (gold ? 2 : 1) };
+        };
+        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, predictions: { playerA: finished || pairing.playerA === viewerId ? aPrediction ?? null : null, playerB: finished || pairing.playerB === viewerId ? bPrediction ?? null : null }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
       });
       const scoreA = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerA.points, 0);
       const scoreB = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerB.points, 0);
