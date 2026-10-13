@@ -40,16 +40,10 @@ function formatKickoff(dateValue: string, language: "fa" | "en") {
   };
 }
 
-function MatchTeam({ team, language }: { team: any; language: "fa" | "en" }) {
+function teamDetails(team: any, language: "fa" | "en") {
   const name = language === "fa" ? team?.faName || team?.name : team?.name;
   const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
-
-  return (
-    <div className="flex min-w-0 flex-col items-center gap-1.5 text-center">
-      <TeamCrest name={name ?? "Team"} logo={logo} className="h-10 w-10 rounded-xl" />
-      <span className="line-clamp-2 min-h-[24px] max-w-[88px] text-[10px] font-bold leading-3 text-white/85">{name}</span>
-    </div>
-  );
+  return { name: name ?? "Team", logo };
 }
 
 export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; leagueId: string }) {
@@ -154,13 +148,15 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
             const competition = getLeague(fixture.leagueCode);
             const kickoff = formatKickoff(fixture.kickoffAt, language);
             const timer = countdownParts(startsAt - now, language);
+            const homeTeam = teamDetails(fixture.homeTeam, language);
+            const awayTeam = teamDetails(fixture.awayTeam, language);
 
             return (
               <article
                 key={fixture.matchId}
                 role="button"
                 tabIndex={started ? -1 : 0}
-                aria-label={`${fixture.homeTeam?.name ?? "Home"} vs ${fixture.awayTeam?.name ?? "Away"}`}
+                aria-label={`${homeTeam.name} vs ${awayTeam.name}`}
                 aria-disabled={started}
                 onClick={() => openDrawer(fixture)}
                 onKeyDown={(event) => {
@@ -169,22 +165,28 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
                     openDrawer(fixture);
                   }
                 }}
-                className={`group relative w-[218px] shrink-0 snap-start overflow-hidden rounded-2xl border transition ${gold ? "border-[#e8c66a]/70 bg-[#e8c66a]/[.09]" : "border-white/[.1] bg-[#101713] hover:border-brand/45 hover:bg-brand/[.05]"} ${started ? "cursor-default opacity-65" : "cursor-pointer"}`}
+                className={`group relative w-[218px] shrink-0 snap-start overflow-hidden rounded-2xl border bg-[#101713] transition ${gold ? "border-[#e8c66a]/70" : "border-white/[.1] hover:border-brand/45"} ${started ? "cursor-default opacity-65" : "cursor-pointer"}`}
+                style={{ backgroundImage: "radial-gradient(circle at 18% 12%, rgba(52, 206, 139, .13) 0, transparent 30%), radial-gradient(circle at 90% 30%, rgba(232, 198, 106, .08) 0, transparent 28%), linear-gradient(135deg, rgba(255,255,255,.025) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.025) 50%, rgba(255,255,255,.025) 75%, transparent 75%)", backgroundSize: "auto, auto, 18px 18px" }}
               >
                 <div className="p-3 pb-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] font-black uppercase tracking-[.12em] text-white/45">MATCHDAY {todaySlate.matchday}</span>
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="max-w-[72px] truncate text-[9px] font-bold text-white/55">{language === "fa" ? competition?.faName : competition?.enName}</span>
-                      {competition?.logo ? <img src={competition.logo} alt="" className="h-5 w-5 shrink-0 object-contain" /> : <span className="h-5 w-5 shrink-0 rounded-full bg-white/[.06]" />}
-                      <button type="button" aria-label={gold ? (language === "fa" ? "حذف انتخاب طلایی" : "Remove gold pick") : (language === "fa" ? "انتخاب به عنوان بازی طلایی" : "Choose as gold match")} aria-pressed={gold} disabled={started || goldBusy !== null} onClick={(event) => void chooseGold(event, fixture)} className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${gold ? "border-[#e8c66a] bg-[#e8c66a] text-[#241d08]" : "border-white/15 bg-white/[.035] text-white/35 hover:border-[#e8c66a]/70 hover:text-[#e8c66a]"}`}><Star size={14} fill={gold ? "currentColor" : "none"} /></button>
+                      {competition?.logo ? <img src={competition.logo} alt="" className="h-6 w-6 shrink-0 object-contain" /> : <span className="h-6 w-6 shrink-0 rounded-full bg-white/[.06]" />}
+                      <span className="max-w-[112px] truncate text-[9px] font-bold text-white/60">{language === "fa" ? competition?.faName : competition?.enName}</span>
                     </div>
+                    <button type="button" aria-label={gold ? (language === "fa" ? "حذف انتخاب طلایی" : "Remove gold pick") : (language === "fa" ? "انتخاب به عنوان بازی طلایی" : "Choose as gold match")} aria-pressed={gold} disabled={started || goldBusy !== null} onClick={(event) => void chooseGold(event, fixture)} className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${gold ? "border-[#e8c66a] bg-[#e8c66a] text-[#241d08]" : "border-white/15 bg-white/[.035] text-white/35 hover:border-[#e8c66a]/70 hover:text-[#e8c66a]"}`}><Star size={14} fill={gold ? "currentColor" : "none"} /></button>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-start gap-2">
-                    <MatchTeam team={fixture.homeTeam} language={language} />
-                    <span className="mt-4 text-[9px] font-black uppercase tracking-[.12em] text-white/25">VS</span>
-                    <MatchTeam team={fixture.awayTeam} language={language} />
+                  <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <div className="flex justify-center"><TeamCrest name={homeTeam.name} logo={homeTeam.logo} className="h-11 w-11 rounded-xl" /></div>
+                    <div className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-[#0b1510]/80 text-[9px] font-black uppercase tracking-[.08em] text-white/55 shadow-[0_0_0_4px_rgba(255,255,255,.025)]">VS</div>
+                    <div className="flex justify-center"><TeamCrest name={awayTeam.name} logo={awayTeam.logo} className="h-11 w-11 rounded-xl" /></div>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-white/[.08] bg-[#08110c]/55 px-3 py-2.5 text-center">
+                    <div className="truncate text-[11px] font-black leading-4 text-white/90">{homeTeam.name}</div>
+                    <div className="mx-auto my-1.5 h-px w-10 bg-white/10" />
+                    <div className="truncate text-[11px] font-bold leading-4 text-white/55">{awayTeam.name}</div>
                   </div>
 
                   <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold text-white/55">
@@ -199,13 +201,16 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
                 </div>
 
                 {!started && (
-                  <div className="grid grid-cols-4 gap-1.5 bg-[#0a0f0c]/90 px-3 py-2.5">
-                    {timer.map((unit) => (
-                      <div key={unit.label} className="text-center">
-                        <div className="text-[15px] font-black leading-none tabular-nums text-white">{unit.value}</div>
-                        <div className="mt-1 text-[8px] font-bold uppercase tracking-[.08em] text-white/40">{unit.label}</div>
-                      </div>
-                    ))}
+                  <div className="border-t border-white/[.08] bg-[#07100b]/90 px-3 py-2.5">
+                    <div className="mb-2 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-[.16em] text-brand/80"><Clock3 size={11} /> <T fa="زمان باقی‌مانده" en="STARTS IN" /></div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {timer.map((unit) => (
+                        <div key={unit.label} className="rounded-lg border border-white/[.08] bg-white/[.045] px-1 py-1.5 text-center">
+                          <div className="text-[15px] font-black leading-none tabular-nums text-white">{unit.value}</div>
+                          <div className="mt-1 text-[8px] font-bold uppercase tracking-[.08em] text-white/40">{unit.label}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </article>
