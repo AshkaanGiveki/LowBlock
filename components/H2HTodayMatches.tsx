@@ -8,9 +8,10 @@ import { T, useLanguage } from "@/components/LanguageProvider";
 import { TeamCrest } from "@/components/TeamCrest";
 import { getLeague } from "@/lib/football/leagues";
 import { formatNumber } from "@/lib/text";
+import vsIcon from "@/assets/icons/vs.png";
 
 const H2H_CARD_PATTERN = `url("data:image/svg+xml,<svg id='patternId' width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'><defs><pattern id='a' patternUnits='userSpaceOnUse' width='58' height='100.23' patternTransform='scale(2) rotate(0)'><rect x='0' y='0' width='100%' height='100%' fill='%23103022ff'/><path d='M12.127 73.813l.013 5.643 4.893-2.81zm-6.01-3.47l16.928 9.773-16.93 9.777zm-6.02-3.476l28.967 16.725L.13 100.262zm16.97 23.616l-.015 5.643-4.893-2.81zm6.01-3.472L6.148 96.786l16.93 9.776zM.128 100.261l28.935 16.669m16.874-23.67l-.013-5.644-4.894 2.81zm6.01 3.47L35.02 86.956l16.931-9.775zM29 83.482l28.936-16.669.032 33.393m-28.904 2.834l4.881-2.834-4.88-2.832zm0 6.94V90.433l16.932 9.773zm0 6.952V83.482l28.904 16.724zM58 13.915l-4.882 2.833L58 19.582zm0-6.94v19.548l-16.932-9.774zm0-6.951v33.448L29.096 16.748m0-13.89l4.88-2.833-4.88-2.833zm0 6.94V-9.749L46.026.025zm0 6.95v-33.449L58 .024zM16.94 23.696l-4.894-2.81-.014 5.643zm6.01-3.47L6.02 29.998V10.448zM0 33.472L.033.08 28.97 16.75m-5.99-29.92L6.053-3.393l16.93 9.776zM28.97 16.75L29-16.644.033.08m40.966 23.615l.013 5.643 4.893-2.81zm-6.01-3.47l16.928 9.774-16.93 9.775zm22.947 13.248L29 50.143l-.031-33.394M16.97 43.197l-.013-5.643-4.894 2.81zm6.01 3.47L6.053 36.894l16.93-9.776zM29 50.143L.032 33.419l28.936-16.67m16.937 57.008l-4.893-2.81-.014 5.644zm6.01-3.47L34.988 80.06v-19.55zM29 64.035l-4.88 2.832L29 69.7zm0-6.942v19.549L12.07 66.867zM.097 66.867L29 50.143v33.449m16.938-43.228l-.013 5.644-4.894-2.811zm6.01-3.47L35.02 46.667l16.931 9.777zM29 50.143l28.936 16.67.032-33.394M.097 52.975l4.88-2.832-4.88-2.833zm0 6.942V40.368l16.931 9.775zm0 6.95V33.42' stroke-linecap='square' stroke-width='1' stroke='%23182721ff' fill='none'/></pattern></defs><rect width='800%' height='800%' transform='translate(0,0)' fill='url(%23a)'/></svg>")`;
-const H2H_GOLD_CARD_PATTERN = H2H_CARD_PATTERN.replace("%23103022ff", "%234c3a13ff").replace("%23182721ff", "%236e571cff");
+const H2H_GOLD_CARD_PATTERN = H2H_CARD_PATTERN.replace("%23103022ff", "%e5b90bff").replace("%23182721ff", "%c3a428ff");
 
 function dayKey(date: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
@@ -46,7 +47,7 @@ function formatKickoff(dateValue: string, language: "fa" | "en") {
 function teamDetails(team: any, language: "fa" | "en") {
   const name = language === "fa" ? team?.faName || team?.name : team?.name;
   const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
-  return { name: name ?? "Team", logo };
+  return { name: language === "en" ? String(name ?? "Team").toUpperCase() : name ?? "Team", logo };
 }
 
 export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; leagueId: string }) {
@@ -153,6 +154,9 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
             const timer = countdownParts(startsAt - now, language);
             const homeTeam = teamDetails(fixture.homeTeam, language);
             const awayTeam = teamDetails(fixture.awayTeam, language);
+            const primaryText = gold ? "text-[#211b09]" : "text-white";
+            const secondaryText = gold ? "text-[#211b09]/70" : "text-white/70";
+            const mutedText = gold ? "text-[#211b09]/60" : "text-white/50";
 
             return (
               <article
@@ -175,42 +179,38 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       {competition?.logo ? <img src={competition.logo} alt="" className="h-6 w-6 shrink-0 object-contain" /> : <span className="h-6 w-6 shrink-0 rounded-full bg-white/[.06]" />}
-                      <span className="max-w-[112px] truncate text-[9px] font-bold text-white/60">{language === "fa" ? competition?.faName : competition?.enName}</span>
                     </div>
                     <button type="button" aria-label={gold ? (language === "fa" ? "حذف انتخاب طلایی" : "Remove gold pick") : (language === "fa" ? "انتخاب به عنوان بازی طلایی" : "Choose as gold match")} aria-pressed={gold} disabled={started || goldBusy !== null} onClick={(event) => void chooseGold(event, fixture)} className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${gold ? "border-[#e8c66a] bg-[#e8c66a] text-[#241d08]" : "border-white/15 bg-white/[.035] text-white/35 hover:border-[#e8c66a]/70 hover:text-[#e8c66a]"}`}><Star size={14} fill={gold ? "currentColor" : "none"} /></button>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                    <div className="flex justify-center"><TeamCrest name={homeTeam.name} logo={homeTeam.logo} className="h-11 w-11 rounded-xl" /></div>
-                    <div className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-[#0b1510]/80 text-[9px] font-black uppercase tracking-[.08em] text-white/55 shadow-[0_0_0_4px_rgba(255,255,255,.025)]">VS</div>
-                    <div className="flex justify-center"><TeamCrest name={awayTeam.name} logo={awayTeam.logo} className="h-11 w-11 rounded-xl" /></div>
+                  <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-0">
+                    <div className="flex justify-end"><TeamCrest name={homeTeam.name} logo={homeTeam.logo} className="h-11 w-11 rounded-xl" /></div>
+                    <img src={vsIcon.src} alt="" aria-hidden="true" className={`relative z-10 h-10 w-10 shrink-0 object-contain ${gold ? "" : "brightness-0 invert"}`} />
+                    <div className="flex justify-start"><TeamCrest name={awayTeam.name} logo={awayTeam.logo} className="h-11 w-11 rounded-xl" /></div>
                   </div>
 
-                  <div className="mt-3 rounded-xl border border-white/[.08] bg-[#08110c]/55 px-3 py-2.5 text-center">
-                    <div className="truncate text-[11px] font-black leading-4 text-white/90">{homeTeam.name}</div>
+                  <div className="mt-3 text-center">
+                    <div className={`truncate text-[13px] font-normal leading-5 ${primaryText}`}>{homeTeam.name}</div>
                     <div className="mx-auto my-1.5 h-px w-10 bg-white/10" />
-                    <div className="truncate text-[11px] font-bold leading-4 text-white/55">{awayTeam.name}</div>
+                    <div className={`truncate text-[13px] font-normal leading-5 ${secondaryText}`}>{awayTeam.name}</div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold text-white/55">
-                    <span className="inline-flex items-center gap-1"><CalendarDays size={12} className="text-white/35" />{kickoff.date}</span>
-                    <span className="h-1 w-1 rounded-full bg-white/20" />
-                    <span className="inline-flex items-center gap-1 tabular-nums"><Clock3 size={12} className="text-brand" />{kickoff.time}</span>
+                  <div className={`mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold ${secondaryText}`}>
+                    <span className="inline-flex items-center gap-1"><CalendarDays size={12} className={gold ? "text-[#211b09]/60" : "text-white/45"} />{kickoff.date}</span>
+                    <span className={`h-1 w-1 rounded-full ${gold ? "bg-[#211b09]/25" : "bg-white/25"}`} />
+                    <span className="inline-flex items-center gap-1 tabular-nums"><Clock3 size={12} className={gold ? "text-[#211b09]/65" : "text-white/75"} />{kickoff.time}</span>
                   </div>
 
-                  <div className="mt-3 rounded-full border border-white/10 bg-white/[.055] px-3 py-2 text-center text-[9px] font-black uppercase tracking-[.08em] text-white/75 transition group-hover:border-brand/35 group-hover:text-white">
-                    <T fa="پیش‌نمایش بازی" en="PRE-MATCH PREVIEW" />
-                  </div>
                 </div>
 
                 {!started && (
-                  <div className="border-t border-white/[.08] bg-[#07100b]/90 px-3 py-2.5">
-                    <div className="mb-2 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-[.16em] text-brand/80"><Clock3 size={11} /> <T fa="زمان باقی‌مانده" en="STARTS IN" /></div>
-                    <div className="grid grid-cols-4 gap-1.5">
+                  <div className={`border-t px-3 py-3 ${gold ? "border-[#211b09]/20 bg-[#e5b90b]/70" : "border-white/[.1] bg-[#06120d]/80"}`}>
+                    <div className={ `mb-2 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-[.16em] ${mutedText}` }><Clock3 size={11} /> <T fa="زمان باقی‌مانده" en="STARTS IN" /></div>
+                    <div className={`grid grid-cols-4 divide-x overflow-hidden rounded-xl border ${gold ? "divide-[#211b09]/15 border-[#211b09]/20 bg-[#211b09]/[.06]" : "divide-white/10 border-white/[.1] bg-black/10"}`}>
                       {timer.map((unit) => (
-                        <div key={unit.label} className="rounded-lg border border-white/[.08] bg-white/[.045] px-1 py-1.5 text-center">
-                          <div className="text-[15px] font-black leading-none tabular-nums text-white">{unit.value}</div>
-                          <div className="mt-1 text-[8px] font-bold uppercase tracking-[.08em] text-white/40">{unit.label}</div>
+                        <div key={unit.label} className="px-1 py-2 text-center">
+                          <div className={`text-[17px] font-light leading-none tracking-[-.04em] tabular-nums ${primaryText}`}>{unit.value}</div>
+                          <div className={`mt-1.5 text-[8px] font-medium uppercase tracking-[.12em] ${mutedText}`}>{unit.label}</div>
                         </div>
                       ))}
                     </div>
