@@ -34,7 +34,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function LeaguePage({
+async function LeagueData({
   params,
 }: {
   params: Promise<{ code: string }>;
@@ -168,5 +168,28 @@ export default async function LeaguePage({
         </Suspense>
       </div>
     </main>
+  );
+}
+
+function LeagueLoading() {
+  return (
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
+      <div className="mx-auto max-w-6xl animate-pulse space-y-5">
+        <div className="h-10 w-32 rounded-xl bg-white/[.06]" />
+        <div className="h-36 rounded-[2rem] bg-white/[.06]" />
+        <div className="h-20 rounded-2xl bg-white/[.06]" />
+        <div className="h-[620px] rounded-[2rem] bg-white/[.06]" />
+      </div>
+    </main>
+  );
+}
+
+export default function LeaguePage(props: {
+  params: Promise<{ code: string }>;
+}) {
+  return (
+    <Suspense fallback={<LeagueLoading />}>
+      <LeagueData {...props} />
+    </Suspense>
   );
 }

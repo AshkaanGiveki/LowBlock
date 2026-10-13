@@ -78,9 +78,10 @@ export async function GET(
   let userRows: any[] = [];
   const distribution = new Map<string, number>();
 
-  // Only reveal community predictions once the match has kicked off (or in clubs if locked)
+  // Presence can be shown before kickoff, but exact scores and score
+  // distributions stay hidden until the prediction lock is active.
   const predictionClubId = clubId || viewerClubId;
-  if (includePredictions && started && (locked || predictionClubId)) {
+  if (includePredictions) {
     const predictions = await db
       .collection<any>("predictions")
       .find(
@@ -139,9 +140,11 @@ export async function GET(
       : [];
     const names = new Map(users.map((user) => [String(user._id), user]));
 
-    for (const prediction of visiblePredictions) {
-      const key = `${prediction.homeGoals}-${prediction.awayGoals}`;
-      distribution.set(key, (distribution.get(key) ?? 0) + 1);
+    if (locked) {
+      for (const prediction of visiblePredictions) {
+        const key = `${prediction.homeGoals}-${prediction.awayGoals}`;
+        distribution.set(key, (distribution.get(key) ?? 0) + 1);
+      }
     }
     const championId = await getDefendingChampionUserId(db);
     userRows = visiblePredictions.map((prediction) => {
@@ -152,8 +155,9 @@ export async function GET(
         avatarUrl: names.get(prediction.userId)?.avatarUrl ?? null,
         isDefendingChampion: prediction.userId === championId,
         submitted: true,
-        homeGoals: prediction.homeGoals,
-        awayGoals: prediction.awayGoals,
+        hasPrediction: true,
+        homeGoals: locked ? prediction.homeGoals : null,
+        awayGoals: locked ? prediction.awayGoals : null,
         points: locked ? Number(score?.points ?? 0) : null,
       };
     });

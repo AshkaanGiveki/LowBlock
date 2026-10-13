@@ -758,7 +758,7 @@ function PredictionsView({ data, number, t }: { data: AnalyticsData; number: (va
           {sortedUsers.length ? sortedUsers.map((user, index) => (
             <div key={`${user.userId ?? user.username}-${index}`} className="flex items-center gap-3 rounded-2xl border border-white/[.05] bg-black/15 px-3 py-2.5">
               <UserAvatar name={user.username ?? "Player"} avatarUrl={user.avatarUrl} isDefendingChampion={user.isDefendingChampion} className="h-9 w-9 text-xs" />
-              <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{user.username ?? t("بازیکن", "Player")}</p><p className="text-[11px] text-white/40">{number(user.homeGoals)} – {number(user.awayGoals)}</p></div>
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{user.username ?? t("بازیکن", "Player")}</p><p className="text-[11px] text-white/40">{data.locked ? `${number(user.homeGoals)} – ${number(user.awayGoals)}` : t("مخفی", "Hidden")}</p></div>
               <span className="rounded-lg border border-[#10b981]/20 bg-[#10b981]/10 px-2 py-1 text-xs font-black text-[#6ee7b7]">{data.locked ? `${number(user.points)} pts` : "—"}</span>
             </div>
           )) : <p className="py-8 text-center text-sm text-white/40">{t("هنوز پیش‌بینی‌ای ثبت نشده است.", "No predictions yet.")}</p>}

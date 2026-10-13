@@ -18,6 +18,7 @@ type Match = {
   actualAway: number | null;
   points: number | null;
   revealed: boolean;
+  hasPrediction: boolean;
 };
 type Player = {
   userId: string;
@@ -25,6 +26,7 @@ type Player = {
   avatarUrl: string | null;
   isDefendingChampion?: boolean;
   points: number;
+  predictionCount?: number;
   predictions: Match[];
 };
 
@@ -59,7 +61,7 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                 <span className="flex-1">
                   <b className="block">{player.username}</b>
                   <small className="text-[var(--muted)]">
-                    {n(player.predictions.length)}{" "}
+                    {n(player.predictionCount ?? player.predictions.filter((match) => match.hasPrediction).length)}{" "}
                     <T fa="پیش‌بینی" en="predictions" />
                   </small>
                 </span>
@@ -90,7 +92,9 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                           locale={language === "fa" ? "fa-IR" : "en-GB"}
                         />{" "}
                         <span className="float-end text-brand">
-                          {match.revealed ? (
+                          {!match.hasPrediction ? (
+                            <T fa="بدون پیش‌بینی" en="No prediction" />
+                          ) : match.revealed ? (
                             match.points === null ? (
                               <T fa="در انتظار" en="Pending" />
                             ) : (
@@ -129,7 +133,9 @@ export function LeagueRoundLeaderboard({ players }: { players: Player[] }) {
                             <T fa="پیش‌بینی" en="Prediction" />
                           </small>
                           <b>
-                            {match.revealed ? (
+                            {!match.hasPrediction ? (
+                              <T fa="بدون پیش‌بینی" en="No prediction" />
+                            ) : match.revealed ? (
                               `${n(match.predictedHome ?? 0)} - ${n(match.predictedAway ?? 0)}`
                             ) : (
                               <T fa="مخفی" en="Hidden" />

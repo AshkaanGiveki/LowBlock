@@ -7,6 +7,7 @@ import { PredictionDrawer } from "@/components/PredictionCard";
 import { T, useLanguage } from "@/components/LanguageProvider";
 import { TeamCrest } from "@/components/TeamCrest";
 import { getLeague } from "@/lib/football/leagues";
+import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
 import vsIcon from "@/assets/icons/vs.png";
 
@@ -45,7 +46,7 @@ function formatKickoff(dateValue: string, language: "fa" | "en") {
 }
 
 function teamDetails(team: any, language: "fa" | "en") {
-  const name = language === "fa" ? team?.faName || team?.name : team?.name;
+  const name = teamName(language, Number(team?.id ?? 0), team?.name ?? "Team", undefined, team?.faName);
   const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
   return { name: language === "en" ? String(name ?? "Team").toUpperCase() : name ?? "Team", logo };
 }

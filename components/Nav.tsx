@@ -84,6 +84,7 @@ export function Nav() {
           <LanguageMenu language={language} setLanguage={setLanguage} fa={fa} />
           <DesktopUtilityBar
             avatar={avatar}
+            username={username}
             profileHref={profileHref}
             language={language}
             setLanguage={setLanguage}
@@ -150,12 +151,10 @@ export function Nav() {
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
               className="relative z-10 h-7 w-7 rounded-full object-cover"
             >
-              <Image
-                src={avatar}
-                alt="Profile"
-                width={28}
-                height={28}
-                className="h-full w-full rounded-full object-cover"
+              <UserAvatar
+                name={username ?? "Profile"}
+                avatarUrl={avatar}
+                className="h-7 w-7 text-[8px]"
               />
             </motion.div>
           ) : (
@@ -249,12 +248,14 @@ function LanguageMenu({
 
 function DesktopUtilityBar({
   avatar,
+  username,
   profileHref,
   language,
   setLanguage,
   fa,
 }: {
   avatar: string | null;
+  username: string | null;
   profileHref: string;
   language: "fa" | "en";
   setLanguage: (value: "fa" | "en") => void;
@@ -264,7 +265,7 @@ function DesktopUtilityBar({
     <div className="desktop-utility-only">
       <Link href={profileHref} className="desktop-user-chip">
         <UserAvatar
-          name={fa ? "پروفایل" : "Profile"}
+          name={username ?? (fa ? "پروفایل" : "Profile")}
           avatarUrl={avatar}
           className="h-8 w-8 text-[10px]"
         />

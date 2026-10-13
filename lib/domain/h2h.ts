@@ -404,15 +404,21 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
       const fixtureDetails = slate.fixtures.map((fixture) => {
         const match = matchById.get(String(fixture.matchId));
         const finished = ["FINISHED", "FT", "AET", "PEN"].includes(String(match?.status ?? "").toUpperCase()) || (match?.homeGoals != null && match?.awayGoals != null);
-        const aPrediction = predictionByKey.get(`${pairing.playerA}:${fixture.matchId}`);
-        const bPrediction = predictionByKey.get(`${pairing.playerB}:${fixture.matchId}`);
+        let aPrediction = predictionByKey.get(`${pairing.playerA}:${fixture.matchId}`);
+        let bPrediction = predictionByKey.get(`${pairing.playerB}:${fixture.matchId}`);
+        const aHasPrediction = Boolean(aPrediction);
+        const bHasPrediction = Boolean(bPrediction);
+        if (!aPrediction) aPrediction = { noPrediction: true };
+        if (!bPrediction) bPrediction = { noPrediction: true };
+        const aVisiblePrediction = finished || pairing.playerA === viewerId ? aPrediction : aHasPrediction ? null : aPrediction;
+        const bVisiblePrediction = finished || pairing.playerB === viewerId ? bPrediction : bHasPrediction ? null : bPrediction;
         const scoreFor = (prediction: any, playerId: string) => {
           if (!finished) return { points: 0, category: "NO_PREDICTION" as const };
           const score = calculatePredictionScore(prediction?.homeGoals ?? null, prediction?.awayGoals ?? null, match?.homeGoals ?? null, match?.awayGoals ?? null);
           const gold = goldByPlayerSlate.get(`${playerId}:${slate.matchday}`) === fixture.matchId;
           return { ...score, points: score.points * (gold ? 2 : 1) };
         };
-        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, predictions: { playerA: finished || pairing.playerA === viewerId ? aPrediction ?? null : null, playerB: finished || pairing.playerB === viewerId ? bPrediction ?? null : null }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
+        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, hasPrediction: { playerA: aHasPrediction, playerB: bHasPrediction }, predictions: { playerA: aVisiblePrediction, playerB: bVisiblePrediction }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
       });
       const scoreA = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerA.points, 0);
       const scoreB = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerB.points, 0);

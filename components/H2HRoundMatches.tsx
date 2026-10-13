@@ -7,8 +7,10 @@ import { T, useLanguage } from "@/components/LanguageProvider";
 import { LocalTime } from "@/components/LocalDateTime";
 import { TeamCrest } from "@/components/TeamCrest";
 import { UserAvatar } from "@/components/UserAvatar";
+import { teamName } from "@/lib/football/team-names";
 
 function predictionLabel(prediction: any) {
+  if (prediction?.noPrediction) return "No prediction";
   if (!prediction) return "—";
   return `${prediction.homeGoals ?? "-"} : ${prediction.awayGoals ?? "-"}`;
 }
@@ -22,13 +24,13 @@ function scoreCircle(points: number, highlighted: boolean, finished: boolean) {
 }
 
 function MatchTeam({ team, side, language }: { team: any; side: "home" | "away"; language: "fa" | "en" }) {
-  const name = language === "fa" ? team?.faName || team?.name : team?.name;
+  const name = teamName(language, Number(team?.id ?? 0), team?.name ?? "Team", undefined, team?.faName);
   const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
   const crest = <TeamCrest name={name ?? "Team"} logo={logo} className="h-5 w-5 rounded-lg" />;
   return <div className={`flex min-w-0 items-center gap-2 ${side === "home" ? "justify-end" : "justify-start"}`}>{side === "home" ? <><span className="truncate whitespace-nowrap text-[10px] font-bold text-white/75">{name}</span>{crest}</> : <>{crest}<span className="truncate whitespace-nowrap text-[10px] font-bold text-white/75">{name}</span></>}</div>;
 }
 
-function PlayerSide({ player, prediction, gold, align, language }: { player: any; prediction: any; gold: boolean; align: "left" | "right"; language: "fa" | "en" }) {
+function PlayerSide({ player, prediction, hasPrediction, gold, align, language }: { player: any; prediction: any; hasPrediction: boolean; gold: boolean; align: "left" | "right"; language: "fa" | "en" }) {
   const avatar = <span title={gold ? (language === "fa" ? "انتخاب طلایی" : "Gold pick") : player?.username} className={`relative inline-flex rounded-full ${gold ? "ring-2 ring-[#e8c66a]/80 ring-offset-1 ring-offset-[#101713]" : ""}`}><UserAvatar name={player?.username ?? "Player"} avatarUrl={player?.avatarUrl} className="h-6 w-6 text-[7px]" />{gold && <span className="absolute -end-1 -top-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#e8c66a] text-[#241d08]"><Sparkles size={8} /></span>}</span>;
   const predictionValue = <span className={`text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>{prediction ? predictionLabel(prediction) : <T fa="مخفی" en="Hidden" />}</span>;
   return align === "right" ? <div className="flex min-w-0 items-center justify-end gap-2">{predictionValue}{avatar}</div> : <div className="flex min-w-0 items-center justify-start gap-2">{avatar}{predictionValue}</div>;
@@ -57,13 +59,13 @@ function FixtureDetails({ fixture, match, language }: { fixture: any; match: any
 
       <div className="mt-1.5 rounded-lg border border-white/[.06] bg-black/10 px-2 py-2">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <PlayerSide player={match.playerA} prediction={fixture.predictions?.playerA} gold={Boolean(fixture.isGold?.playerA)} align="right" language={language} />
+          <PlayerSide player={match.playerA} prediction={fixture.predictions?.playerA ?? (fixture.hasPrediction?.playerA ? null : { noPrediction: true })} hasPrediction={Boolean(fixture.hasPrediction?.playerA)} gold={Boolean(fixture.isGold?.playerA)} align="right" language={language} />
           <div className="flex items-center justify-center gap-1.5">
             {scoreCircle(playerAScore, winner === "A", finished)}
             <span className="text-xs font-normal text-white/25">–</span>
             {scoreCircle(playerBScore, winner === "B", finished)}
           </div>
-          <PlayerSide player={match.playerB} prediction={fixture.predictions?.playerB} gold={Boolean(fixture.isGold?.playerB)} align="left" language={language} />
+          <PlayerSide player={match.playerB} prediction={fixture.predictions?.playerB ?? (fixture.hasPrediction?.playerB ? null : { noPrediction: true })} hasPrediction={Boolean(fixture.hasPrediction?.playerB)} gold={Boolean(fixture.isGold?.playerB)} align="left" language={language} />
         </div>
       </div>
     </div>

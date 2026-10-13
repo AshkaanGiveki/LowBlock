@@ -17,7 +17,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function LowBlockPage({
+async function LowBlockData({
   searchParams,
 }: {
   searchParams: Promise<{ scope?: string; league?: string; week?: string }>;
@@ -114,6 +114,27 @@ export default async function LowBlockPage({
         </Suspense>
       </div>
     </main>
+  );
+}
+
+function LowBlockLoading() {
+  return (
+    <main className="desktop-lowblock-page min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
+      <div className="mx-auto max-w-6xl animate-pulse space-y-5">
+        <div className="h-64 rounded-[2rem] bg-white/[.06]" />
+        <div className="h-[620px] rounded-3xl bg-white/[.06]" />
+      </div>
+    </main>
+  );
+}
+
+export default function LowBlockPage(props: {
+  searchParams: Promise<{ scope?: string; league?: string; week?: string }>;
+}) {
+  return (
+    <Suspense fallback={<LowBlockLoading />}>
+      <LowBlockData {...props} />
+    </Suspense>
   );
 }
 

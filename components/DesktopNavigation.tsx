@@ -109,7 +109,7 @@ export function DesktopNavigation() {
             <span className="desktop-rail-link-icon">
               {avatar || champion ? (
                 <UserAvatar
-                  name="Profile"
+                  name={username ?? "Profile"}
                   avatarUrl={avatar}
                   isDefendingChampion={champion}
                   className="h-7 w-7 text-[8px]"

@@ -431,12 +431,14 @@ export function PredictionCard({
             included={countsInLeaderboard}
             home={{
               id: match.homeTeam.id,
-              name: homeName,
+              name: match.homeTeam.name,
+              faName: match.homeTeam.faName,
               logo: match.homeTeam.logoUrl,
             }}
             away={{
               id: match.awayTeam.id,
-              name: awayName,
+              name: match.awayTeam.name,
+              faName: match.awayTeam.faName,
               logo: match.awayTeam.logoUrl,
             }}
             homeValue={home}
