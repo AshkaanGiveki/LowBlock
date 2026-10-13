@@ -27,8 +27,7 @@ function formatCountdown(milliseconds: number, language: "fa" | "en") {
 export default function H2HHomeMatchupCard({ match }: { match: H2HTodayMatch }) {
   const { language } = useLanguage();
   const [now, setNow] = useState(Date.now());
-  const startsAt = new Date(match.startsAt).getTime();
-  const remaining = startsAt - now;
+  const remaining = new Date(match.startsAt).getTime() - now;
   const started = remaining <= 0;
   const timer = formatCountdown(remaining, language);
 
@@ -38,24 +37,36 @@ export default function H2HHomeMatchupCard({ match }: { match: H2HTodayMatch }) 
   }, []);
 
   return (
-    <section className="relative mb-5 overflow-hidden rounded-2xl border border-brand/25 bg-[#0e1d15] shadow-[0_12px_36px_rgba(0,0,0,.16)]">
-      <div className="pointer-events-none absolute -end-12 -top-16 h-32 w-32 rounded-full bg-brand/20 blur-3xl" />
-      <Link href="/h2h" dir="ltr" className="group relative grid min-h-[68px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <UserAvatar name={match.player.username} avatarUrl={match.player.avatarUrl} className="h-9 w-9 shrink-0 border-2 border-brand/60 text-[10px] shadow-[0_0_18px_rgba(32,184,121,.2)]" />
-          <p dir="auto" title={match.player.username} className="min-w-0 truncate text-xs font-bold text-white">{match.player.username}</p>
+    <section className="relative mt-9 mb-5 overflow-visible rounded-2xl border border-brand/25 bg-[#0e1d15] shadow-[0_18px_48px_rgba(0,0,0,.2)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+        <div className="absolute -end-12 -top-16 h-40 w-40 rounded-full bg-brand/20 blur-3xl" />
+        <div className="absolute -bottom-20 start-1/3 h-32 w-32 rounded-full bg-emerald-950/80 blur-3xl" />
+      </div>
+
+      <Link href="/h2h" dir="ltr" className="group relative block">
+        <div className="absolute left-1/2 top-0 z-20 flex h-[54px] min-w-[184px] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-2 overflow-hidden rounded-2xl border border-brand/50 bg-[#091a12]/[.98] px-4 shadow-[0_10px_28px_rgba(0,0,0,.32),0_0_26px_rgba(32,184,121,.16)]">
+          <span className="pointer-events-none absolute inset-1 rounded-xl border border-brand/15" />
+          <span className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-brand/80 to-transparent" />
+          <Clock3 size={15} className={started ? "relative text-brand" : "relative text-brand/85"} />
+          <span className="relative text-base font-black tracking-[.08em] tabular-nums text-white">{started ? "LIVE" : timer}</span>
+          <span className={`relative h-1.5 w-1.5 rounded-full ${started ? "bg-brand shadow-[0_0_10px_rgba(32,184,121,.9)]" : "bg-brand/60"}`} />
         </div>
-        <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-brand/35 bg-[#092216] text-brand shadow-[0_0_18px_rgba(32,184,121,.16)]">
-          <span className="absolute inset-1 rounded-lg border border-brand/15" />
-          <Swords size={18} strokeWidth={2.1} />
-        </div>
-        <div className="flex min-w-0 items-center justify-end gap-2">
-          <p dir="auto" title={match.opponent.username} className="min-w-0 truncate text-right text-xs font-bold text-white/85">{match.opponent.username}</p>
-          <UserAvatar name={match.opponent.username} avatarUrl={match.opponent.avatarUrl} className="h-9 w-9 shrink-0 border-2 border-white/20 text-[10px]" />
-        </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/[.09] bg-black/15 px-2 py-1 text-[11px] font-bold tabular-nums text-white/75">
-          <Clock3 size={11} className={started ? "text-brand" : "text-brand/80"} />
-          <span>{started ? "LIVE" : timer}</span>
+
+        <div className="relative grid min-h-[108px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-4 pb-3 pt-10 sm:px-7">
+          <div className="flex min-w-0 items-center gap-3">
+            <UserAvatar name={match.player.username} avatarUrl={match.player.avatarUrl} className="h-11 w-11 shrink-0 border-2 border-brand/65 text-xs shadow-[0_0_22px_rgba(32,184,121,.2)]" />
+            <p dir="auto" title={match.player.username} className="min-w-0 truncate text-sm font-black text-white">{match.player.username}</p>
+          </div>
+
+          <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/40 bg-[#092216] text-brand shadow-[0_0_22px_rgba(32,184,121,.18)]">
+            <span className="absolute inset-1 rounded-xl border border-brand/15" />
+            <Swords size={22} strokeWidth={2.1} />
+          </div>
+
+          <div className="flex min-w-0 items-center justify-end gap-3">
+            <p dir="auto" title={match.opponent.username} className="min-w-0 truncate text-right text-sm font-black text-white/85">{match.opponent.username}</p>
+            <UserAvatar name={match.opponent.username} avatarUrl={match.opponent.avatarUrl} className="h-11 w-11 shrink-0 border-2 border-white/25 text-xs" />
+          </div>
         </div>
       </Link>
     </section>
