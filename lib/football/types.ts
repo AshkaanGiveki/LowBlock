@@ -162,6 +162,7 @@ export type CanonicalMatch = {
 export type SyncOptions = {
   mode?: "current" | "season";
   season?: number;
+  deferScoring?: boolean;
 };
 
 export type SyncScoreEngineResult = {
@@ -170,6 +171,7 @@ export type SyncScoreEngineResult = {
   matches?: number;
   roundWinners?: number;
   awards?: unknown;
+  deferred?: boolean;
 };
 
 export type SyncResult = {
@@ -189,6 +191,10 @@ export type SyncDateResult = {
   leaderboardEngine?: unknown;
 };
 
+export type SyncDateOptions = {
+  deferScoring?: boolean;
+};
+
 export type ProviderRealtimeStatus = {
   connected: boolean;
   activeSubscriptions: string[];
@@ -204,7 +210,8 @@ export interface FootballDataProvider {
   readonly name: ProviderName;
   getDailyMatches(dates: string[]): Promise<CanonicalMatch[]>;
   sync(options?: SyncOptions): Promise<SyncResult>;
-  syncDate(dateKey: string): Promise<SyncDateResult>;
+  syncDate(dateKey: string, options?: SyncDateOptions): Promise<SyncDateResult>;
+  syncRecentResults?(): Promise<SyncDateResult>;
   getMatchDetails?(matchId: string): Promise<CanonicalMatch | null>;
   startRealtime?(): void;
   stopRealtime?(): void;

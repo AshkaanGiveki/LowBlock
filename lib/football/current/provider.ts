@@ -4,6 +4,7 @@ import type {
   SyncOptions,
   SyncResult,
   SyncDateResult,
+  SyncDateOptions,
   ProviderName,
 } from "../types";
 import { syncFootballApi, syncFootballApiDate } from "../api-sports/sync";
@@ -20,7 +21,7 @@ export class CurrentFootballProvider implements FootballDataProvider {
 
   async sync(options?: SyncOptions): Promise<SyncResult> {
     // Call the exact legacy sync function
-    const result = await syncFootballApi();
+    const result = await syncFootballApi(options);
     return {
       total: result.total,
       listRequests: result.listRequests,
@@ -32,9 +33,12 @@ export class CurrentFootballProvider implements FootballDataProvider {
     };
   }
 
-  async syncDate(dateKey: string): Promise<SyncDateResult> {
+  async syncDate(
+    dateKey: string,
+    options?: SyncDateOptions,
+  ): Promise<SyncDateResult> {
     // Call the exact legacy sync date function
-    const result = await syncFootballApiDate(dateKey);
+    const result = await syncFootballApiDate(dateKey, options);
     return {
       total: result.total,
       listRequests: result.listRequests,
