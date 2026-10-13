@@ -43,6 +43,8 @@ export function Nav() {
     refetchOnWindowFocus: false,
   });
   const avatar = navData?.me?.user?.avatarUrl ?? null;
+  const username = navData?.me?.user?.username ?? null;
+  const profileHref = username ? `/u/${encodeURIComponent(username)}` : "/profile";
   const isDefendingChampion = Boolean(navData?.me?.user?.isDefendingChampion);
   const clubImage = navData?.club?.club?.imageUrl ?? null;
   const fa = language === "fa";
@@ -81,6 +83,8 @@ export function Nav() {
           <LanguageMenu language={language} setLanguage={setLanguage} fa={fa} />
           <DesktopUtilityBar
             avatar={avatar}
+            username={username}
+            profileHref={profileHref}
             language={language}
             setLanguage={setLanguage}
             fa={fa}
@@ -145,12 +149,10 @@ export function Nav() {
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
               className="relative z-10 h-7 w-7 rounded-full object-cover"
             >
-              <Image
-                src={avatar}
-                alt="Profile"
-                width={28}
-                height={28}
-                className="h-full w-full rounded-full object-cover"
+              <UserAvatar
+                name={username ?? "Profile"}
+                avatarUrl={avatar}
+                className="h-7 w-7 text-[8px]"
               />
             </motion.div>
           ) : (
@@ -244,20 +246,24 @@ function LanguageMenu({
 
 function DesktopUtilityBar({
   avatar,
+  username,
+  profileHref,
   language,
   setLanguage,
   fa,
 }: {
   avatar: string | null;
+  username: string | null;
+  profileHref: string;
   language: "fa" | "en";
   setLanguage: (value: "fa" | "en") => void;
   fa: boolean;
 }) {
   return (
     <div className="desktop-utility-only">
-      <Link href="/profile" className="desktop-user-chip">
+      <Link href={profileHref} className="desktop-user-chip">
         <UserAvatar
-          name={fa ? "پروفایل" : "Profile"}
+          name={username ?? (fa ? "پروفایل" : "Profile")}
           avatarUrl={avatar}
           className="h-8 w-8 text-[10px]"
         />

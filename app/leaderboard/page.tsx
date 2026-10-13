@@ -40,17 +40,31 @@ async function leaderboard(): Promise<{
   return { rows, usersCount, picksCount, roundsCount };
 }
 
-export default async function LeaderboardPage() {
-  const [data, me] = await Promise.all([leaderboard(), currentUserId()]);
+function LeaderboardLoading() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen animate-pulse p-8">
-          <div className="mx-auto h-96 max-w-6xl rounded-3xl bg-white/[.06]" />
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8">
+      <div className="mx-auto max-w-6xl animate-pulse space-y-5">
+        <div className="h-48 rounded-[2.25rem] bg-white/[.06]" />
+        <div className="h-16 rounded-2xl bg-white/[.06]" />
+        <div className="space-y-2 rounded-3xl bg-white/[.04] p-5">
+          {Array.from({ length: 10 }, (_, index) => (
+            <div key={index} className="h-14 rounded-xl bg-white/[.06]" />
+          ))}
         </div>
-      }
-    >
-      <LeaderboardView {...data} me={me} />
+      </div>
+    </main>
+  );
+}
+
+async function LeaderboardData() {
+  const [data, me] = await Promise.all([leaderboard(), currentUserId()]);
+  return <LeaderboardView {...data} me={me} />;
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={<LeaderboardLoading />}>
+      <LeaderboardData />
     </Suspense>
   );
 }

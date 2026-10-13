@@ -33,7 +33,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function RoundPage({
+async function RoundData({
   params,
   searchParams,
 }: {
@@ -104,19 +104,41 @@ export default async function RoundPage({
       actualAway: locked ? match.awayGoals : null,
       points: locked ? Number(score?.points ?? 0) : null,
       revealed: locked,
+      hasPrediction: true,
     });
     grouped.set(prediction.userId, row);
   }
-  const players = canonical.map(
-    (row) =>
-      grouped.get(row.userId) ?? {
-        userId: row.userId,
-        username: row.username,
-        avatarUrl: row.avatarUrl,
-        points: row.points,
-        predictions: [],
-      },
-  );
+  const players = canonical.map((row) => {
+    const groupedPlayer = grouped.get(row.userId);
+    const submitted = new Map<string, any>(
+      (groupedPlayer?.predictions ?? []).map((prediction: any) => [
+        prediction.matchId,
+        prediction,
+      ]),
+    );
+    return {
+      userId: row.userId,
+      username: row.username,
+      avatarUrl: row.avatarUrl,
+      points: groupedPlayer?.points ?? row.points,
+      predictionCount: submitted.size,
+      predictions: matches.map((match) =>
+        submitted.get(match.providerMatchId) ?? {
+          matchId: match.providerMatchId,
+          kickoffAt: new Date(match.kickoffAt).toISOString(),
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          predictedHome: null,
+          predictedAway: null,
+          actualHome: isPredictionLocked(match) ? match.homeGoals : null,
+          actualAway: isPredictionLocked(match) ? match.awayGoals : null,
+          points: null,
+          revealed: isPredictionLocked(match),
+          hasPrediction: false,
+        },
+      ),
+    };
+  });
   return (
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-3xl">
@@ -170,5 +192,28 @@ export default async function RoundPage({
         </Suspense>
       </div>
     </main>
+  );
+}
+
+function RoundLoading() {
+  return (
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
+      <div className="mx-auto max-w-3xl animate-pulse space-y-5">
+        <div className="h-10 w-32 rounded-xl bg-white/[.06]" />
+        <div className="h-48 rounded-3xl bg-white/[.06]" />
+        <div className="h-[620px] rounded-3xl bg-white/[.06]" />
+      </div>
+    </main>
+  );
+}
+
+export default function RoundPage(props: {
+  params: Promise<{ code: string; matchday: string }>;
+  searchParams: Promise<{ match?: string }>;
+}) {
+  return (
+    <Suspense fallback={<RoundLoading />}>
+      <RoundData {...props} />
+    </Suspense>
   );
 }

@@ -1,10 +1,26 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
 import { PredictionHistory } from "@/components/PredictionHistory";
+
 export const dynamic = "force-dynamic";
-export default async function PredictionsPage() {
+
+function PredictionsLoading() {
+  return (
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8">
+      <div className="mx-auto max-w-5xl animate-pulse space-y-4">
+        <div className="h-28 rounded-[2rem] bg-white/[.06]" />
+        {Array.from({ length: 7 }, (_, index) => (
+          <div key={index} className="h-24 rounded-2xl bg-white/[.06]" />
+        ))}
+      </div>
+    </main>
+  );
+}
+
+async function PredictionsData() {
   const userId = await currentUserId();
   if (!userId) redirect("/login");
   const db = await getDb();
@@ -60,4 +76,12 @@ export default async function PredictionsPage() {
     ];
   });
   return <PredictionHistory rows={rows} />;
+}
+
+export default function PredictionsPage() {
+  return (
+    <Suspense fallback={<PredictionsLoading />}>
+      <PredictionsData />
+    </Suspense>
+  );
 }

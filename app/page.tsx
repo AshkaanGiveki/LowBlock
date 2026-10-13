@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ObjectId } from "mongodb";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
@@ -24,7 +25,7 @@ const featuredLeagues = FEATURED_COMPETITION_CODES.map((code) =>
 ).filter(Boolean);
 const LEAGUES = featuredLeagues;
 
-export default async function Home() {
+async function HomeData() {
   const [{ matches: fetchedMatches }, userId] = await Promise.all([
     getMatchesPage(50),
     currentUserId(),
@@ -310,6 +311,31 @@ export default async function Home() {
         </section>
       </div>
     </main>
+  );
+}
+
+function HomeLoading() {
+  return (
+    <main className="min-h-screen pb-24 pt-20">
+      <div className="mx-auto max-w-7xl animate-pulse space-y-5 px-4 md:px-8">
+        <div className="h-28 rounded-2xl bg-white/[.06]" />
+        <div className="h-64 rounded-[2rem] bg-white/[.06]" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="h-24 rounded-2xl bg-white/[.06]" />
+          ))}
+        </div>
+        <div className="h-48 rounded-[2rem] bg-white/[.06]" />
+      </div>
+    </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<HomeLoading />}>
+      <HomeData />
+    </Suspense>
   );
 }
 

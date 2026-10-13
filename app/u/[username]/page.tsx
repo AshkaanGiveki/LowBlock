@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
 import {
@@ -48,7 +49,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicProfile({
+async function PublicProfileData({
   params,
 }: {
   params: Promise<{ username: string }>;
@@ -257,6 +258,28 @@ export default async function PublicProfile({
         <PublicPredictionHistory username={user.username} />
       </div>
     </main>
+  );
+}
+
+function PublicProfileLoading() {
+  return (
+    <main className="min-h-screen px-4 pb-28 pt-24 md:px-8">
+      <div className="mx-auto max-w-4xl animate-pulse space-y-5">
+        <div className="h-72 rounded-[2.25rem] bg-white/[.06]" />
+        <div className="h-32 rounded-3xl bg-white/[.06]" />
+        <div className="h-96 rounded-3xl bg-white/[.06]" />
+      </div>
+    </main>
+  );
+}
+
+export default function PublicProfile(props: {
+  params: Promise<{ username: string }>;
+}) {
+  return (
+    <Suspense fallback={<PublicProfileLoading />}>
+      <PublicProfileData {...props} />
+    </Suspense>
   );
 }
 

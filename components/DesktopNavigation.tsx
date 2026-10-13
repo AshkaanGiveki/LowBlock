@@ -49,6 +49,7 @@ export function DesktopNavigation() {
     refetchOnWindowFocus: false,
   });
   const avatar = data?.me?.user?.avatarUrl ?? null;
+  const username = data?.me?.user?.username ?? null;
   const clubImage = data?.club?.club?.imageUrl ?? null;
   const champion = Boolean(data?.me?.user?.isDefendingChampion);
   const active = (href: string) =>
@@ -105,7 +106,7 @@ export function DesktopNavigation() {
             <span className="desktop-rail-link-icon">
               {avatar || champion ? (
                 <UserAvatar
-                  name="Profile"
+                  name={username ?? "Profile"}
                   avatarUrl={avatar}
                   isDefendingChampion={champion}
                   className="h-7 w-7 text-[8px]"
