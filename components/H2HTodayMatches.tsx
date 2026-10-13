@@ -155,9 +155,10 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
             const timer = countdownParts(startsAt - now, language);
             const homeTeam = teamDetails(fixture.homeTeam, language);
             const awayTeam = teamDetails(fixture.awayTeam, language);
-            const primaryText = gold ? "text-[#211b09]" : "text-white";
-            const secondaryText = gold ? "text-[#211b09]/70" : "text-white/70";
-            const mutedText = gold ? "text-[#211b09]/60" : "text-white/50";
+            const primaryText = "text-white";
+            const secondaryText = "text-white/70";
+            const countdownPrimaryText = gold ? "text-[#211b09]" : "text-white";
+            const countdownMutedText = gold ? "text-[#211b09]/60" : "text-white/50";
 
             return (
               <article
@@ -181,12 +182,12 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
                     <div className="flex min-w-0 items-center gap-1.5">
                       {competition?.logo ? <img src={competition.logo} alt="" className="h-6 w-6 shrink-0 object-contain" /> : <span className="h-6 w-6 shrink-0 rounded-full bg-white/[.06]" />}
                     </div>
-                    {!slateStarted && <button type="button" aria-label={gold ? (language === "fa" ? "حذف انتخاب طلایی" : "Remove gold pick") : (language === "fa" ? "انتخاب به عنوان بازی طلایی" : "Choose as gold match")} aria-pressed={gold} disabled={goldBusy !== null} onClick={(event) => void chooseGold(event, fixture)} className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${gold ? "border-[#e8c66a] bg-[#e8c66a] text-[#241d08]" : "border-white/15 bg-white/[.035] text-white/35 hover:border-[#e8c66a]/70 hover:text-[#e8c66a]"}`}><Star size={14} fill={gold ? "currentColor" : "none"} /></button>}
+                    {!slateStarted && <button type="button" aria-label={gold ? (language === "fa" ? "حذف انتخاب طلایی" : "Remove gold pick") : (language === "fa" ? "انتخاب به عنوان بازی طلایی" : "Choose as gold match")} aria-pressed={gold} disabled={goldBusy !== null} onClick={(event) => void chooseGold(event, fixture)} className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${gold ? "border-[#e8c66a] bg-[#e8c66a] text-white" : "border-white/15 bg-white/[.035] text-white/35 hover:border-[#e8c66a]/70 hover:text-[#e8c66a]"}`}><Star size={14} fill={gold ? "currentColor" : "none"} /></button>}
                   </div>
 
                   <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-0">
                     <div className="flex justify-end"><TeamCrest name={homeTeam.name} logo={homeTeam.logo} className="h-11 w-11 rounded-xl" /></div>
-                    <img src={vsIcon.src} alt="" aria-hidden="true" className={`relative z-10 h-10 w-10 shrink-0 object-contain ${gold ? "" : "brightness-0 invert"}`} />
+                    <img src={vsIcon.src} alt="" aria-hidden="true" className="relative z-10 h-10 w-10 shrink-0 object-contain brightness-0 invert" />
                     <div className="flex justify-start"><TeamCrest name={awayTeam.name} logo={awayTeam.logo} className="h-11 w-11 rounded-xl" /></div>
                   </div>
 
@@ -197,21 +198,21 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
                   </div>
 
                   <div className={`mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold ${secondaryText}`}>
-                    <span className="inline-flex items-center gap-1"><CalendarDays size={12} className={gold ? "text-[#211b09]/60" : "text-white/45"} />{kickoff.date}</span>
-                    <span className={`h-1 w-1 rounded-full ${gold ? "bg-[#211b09]/25" : "bg-white/25"}`} />
-                    <span className="inline-flex items-center gap-1 tabular-nums"><Clock3 size={12} className={gold ? "text-[#211b09]/65" : "text-white/75"} />{kickoff.time}</span>
+                    <span className="inline-flex items-center gap-1"><CalendarDays size={12} className="text-white/45" />{kickoff.date}</span>
+                    <span className="h-1 w-1 rounded-full bg-white/25" />
+                    <span className="inline-flex items-center gap-1 tabular-nums"><Clock3 size={12} className="text-white/75" />{kickoff.time}</span>
                   </div>
 
                 </div>
 
                 {!started && (
                   <div className={`border-t px-3 py-3 ${gold ? "border-[#211b09]/20 bg-[#e5b90b]/70" : "border-white/[.1] bg-[#06120d]/80"}`}>
-                    <div className={ `mb-2 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-[.16em] ${mutedText}` }><Clock3 size={11} /> <T fa="زمان باقی‌مانده" en="STARTS IN" /></div>
+                    <div className={ `mb-2 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-[.16em] ${countdownMutedText}` }><Clock3 size={11} /> <T fa="زمان باقی‌مانده" en="STARTS IN" /></div>
                     <div className={`grid grid-cols-4 divide-x overflow-hidden rounded-xl border ${gold ? "divide-[#211b09]/15 border-[#211b09]/20 bg-[#211b09]/[.06]" : "divide-white/10 border-white/[.1] bg-black/10"}`}>
                       {timer.map((unit) => (
                         <div key={unit.label} className="px-1 py-2 text-center">
-                          <div className={`text-[17px] font-light leading-none tracking-[-.04em] tabular-nums ${primaryText}`}>{unit.value}</div>
-                          <div className={`mt-1.5 text-[8px] font-medium uppercase tracking-[.12em] ${mutedText}`}>{unit.label}</div>
+                          <div className={`text-[17px] font-light leading-none tracking-[-.04em] tabular-nums ${countdownPrimaryText}`}>{unit.value}</div>
+                          <div className={`mt-1.5 text-[8px] font-medium uppercase tracking-[.12em] ${countdownMutedText}`}>{unit.label}</div>
                         </div>
                       ))}
                     </div>
