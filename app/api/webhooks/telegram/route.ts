@@ -7,6 +7,8 @@ import { ObjectId } from "mongodb";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
+import { providerDateKeys } from "@/lib/football/scheduleWindow";
+import { runScoreEngine } from "@/lib/scoring/scoreEngine";
 
 export const runtime = "nodejs";
 
@@ -157,7 +159,30 @@ async function handleAdminSync(chatId: string) {
     "⏳ Sync started. I’ll refresh football results and rebuild the leaderboards when it finishes.",
   );
   try {
-    const result = await getFootballProvider().sync();
+    const provider = getFootballProvider();
+    const dateResults = [];
+    for (const dateKey of providerDateKeys().slice(0, 2)) {
+      try {
+        dateResults.push(
+          await provider.syncDate(dateKey, { deferScoring: true }),
+        );
+      } catch (error) {
+        console.error("telegram_admin_sync_date_failed", {
+          chatId,
+          dateKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // The admin command deliberately runs the unrestricted full pass. This
+    // scores every finished match in MongoDB and rebuilds every leaderboard
+    // scope, unlike the bounded scheduled recovery path.
+    const scoreEngine = await runScoreEngine({ rebuildLeaderboards: true });
+    const result = {
+      total: dateResults.reduce((sum, item) => sum + item.total, 0),
+      scoreEngine,
+    };
     const notifications = await scheduleFootballNotifications();
     await send(
       chatId,

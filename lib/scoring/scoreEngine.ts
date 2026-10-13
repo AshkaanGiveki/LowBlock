@@ -98,9 +98,12 @@ async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
  * from the canonical score rows rather than incremented.
  */
 export async function runScoreEngine(
-  options: { rebuildLeaderboards?: boolean } = {},
+  options: { rebuildLeaderboards?: boolean; matchIds?: string[] } = {},
 ) {
   const rebuildLeaderboards = options.rebuildLeaderboards ?? true;
+  const requestedMatchIds = [
+    ...new Set((options.matchIds ?? []).map(String).filter(Boolean)),
+  ];
   const db = await getDb();
   const matches = await db
     .collection<Match>("matches")
@@ -109,6 +112,9 @@ export async function runScoreEngine(
       status: "FINISHED",
       homeGoals: { $ne: null },
       awayGoals: { $ne: null },
+      ...(requestedMatchIds.length
+        ? { providerMatchId: { $in: requestedMatchIds } }
+        : {}),
     })
     .toArray();
   if (!matches.length)
@@ -116,6 +122,7 @@ export async function runScoreEngine(
       matches: 0,
       scores: 0,
       leaderboards: 0,
+      touchedUsers: [] as string[],
       awards: rebuildLeaderboards ? await grantAutomaticAwards(db) : null,
     };
   const byMatch = new Map(
@@ -241,6 +248,7 @@ export async function runScoreEngine(
             predictedAwayGoals: prediction.awayGoals,
             actualHomeGoals: match.homeGoals,
             actualAwayGoals: match.awayGoals,
+            predictionCreatedAt: prediction.createdAt ?? null,
             globalEligible,
             clubIdAtLock: snapshot?.clubIdAtLock ?? null,
             scoringVersion: SCORING_VERSION,
@@ -373,6 +381,7 @@ export async function runScoreEngine(
       matches: matches.length,
       scores: scoreOps.length,
       leaderboards: 0,
+      touchedUsers,
       awards: null,
     };
   await writeRankSnapshots(
@@ -393,11 +402,209 @@ export async function runScoreEngine(
     matches: matches.length,
     scores: scoreOps.length,
     leaderboards: aggregates.size,
+    touchedUsers,
     roundWinners,
     awards,
   };
 }
 
-export async function runLeaderboardEngine() {
-  return runScoreEngine({ rebuildLeaderboards: true });
+async function rebuildLeaderboardStatsForUsers(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userIds: string[],
+) {
+  const ids = [...new Set(userIds.map(String).filter(Boolean))];
+  if (!ids.length) return { leaderboards: 0, scoreRows: 0 };
+
+  const scoreRows = await db
+    .collection<any>("predictionScores")
+    .find({ userId: { $in: ids } })
+    .toArray();
+  const clubIds = [
+    ...new Set(
+      scoreRows
+        .map((row) => row.clubIdAtLock)
+        .filter(Boolean)
+        .map(String),
+    ),
+  ];
+  const clubs = clubIds.length
+    ? await db
+        .collection<any>("clubs")
+        .find(
+          {
+            _id: {
+              $in: clubIds
+                .filter(ObjectId.isValid)
+                .map((id) => new ObjectId(id)),
+            },
+          },
+          { projection: { leaderboardCompetitionCodes: 1 } },
+        )
+        .toArray()
+    : [];
+  const clubCompetitionCodes = new Map(
+    clubs.map((club) => [
+      String(club._id),
+      Array.isArray(club.leaderboardCompetitionCodes)
+        ? club.leaderboardCompetitionCodes
+        : DEFAULT_CLUB_LEAGUE_CODES,
+    ]),
+  );
+  const aggregates = new Map<string, any>();
+  for (const score of scoreRows) {
+    const leagueCode = String(score.leagueCode ?? "");
+    const seasonStartYear = Number(
+      score.seasonStartYear ?? score.seasonId ?? 0,
+    );
+    const scopes = [
+      `LEAGUE:${leagueCode}:${seasonStartYear}`,
+      `ROUND:${leagueCode}:${seasonStartYear}:${Number(score.matchday ?? 0)}`,
+      `SEASON:${seasonStartYear}`,
+    ];
+    if (score.globalEligible) scopes.push("GLOBAL");
+    const clubId = score.clubIdAtLock ? String(score.clubIdAtLock) : null;
+    if (
+      clubId &&
+      (
+        clubCompetitionCodes.get(clubId) ?? DEFAULT_CLUB_LEAGUE_CODES
+      ).includes(leagueCode)
+    ) {
+      scopes.push(
+        `CLUB:${clubId}:OVERALL:${seasonStartYear}`,
+        `CLUB:${clubId}:LEAGUE:${leagueCode}:${seasonStartYear}`,
+        `CLUB:${clubId}:ROUND:${leagueCode}:${seasonStartYear}:${Number(score.matchday ?? 0)}`,
+      );
+    }
+    for (const scope of scopes) {
+      const key = `${String(score.userId)}:${scope}`;
+      const row = aggregates.get(key) ?? {
+        userId: String(score.userId),
+        scope,
+        points: 0,
+        predictions: 0,
+        exact: 0,
+        correctOutcome: 0,
+        earliestPredictionAt: undefined,
+      };
+      row.points += Number(score.points ?? 0);
+      row.predictions += 1;
+      row.exact += score.exactScore ? 1 : 0;
+      row.correctOutcome += score.correctOutcome ? 1 : 0;
+      const predictionCreatedAt = score.predictionCreatedAt
+        ? new Date(score.predictionCreatedAt)
+        : null;
+      if (
+        predictionCreatedAt &&
+        !Number.isNaN(predictionCreatedAt.getTime()) &&
+        (!row.earliestPredictionAt ||
+          predictionCreatedAt < row.earliestPredictionAt)
+      )
+        row.earliestPredictionAt = predictionCreatedAt;
+      aggregates.set(key, row);
+    }
+  }
+  const globalPoints = new Map(
+    [...aggregates.values()]
+      .filter((row) => row.scope === "GLOBAL")
+      .map((row) => [row.userId, row.points]),
+  );
+  const now = new Date();
+  const statOps = [...aggregates.values()].map((row) => ({
+    updateOne: {
+      filter: { userId: row.userId, scope: row.scope },
+      update: {
+        $set: {
+          ...row,
+          globalPoints: globalPoints.get(row.userId) ?? 0,
+          totalPoints: row.points,
+          predictionCount: row.predictions,
+          exactScores: row.exact,
+          updatedAt: now,
+        },
+      },
+      upsert: true,
+    },
+  }));
+  const chunks = <T,>(items: T[], size = 100) =>
+    Array.from(
+      { length: Math.ceil(items.length / size) },
+      (_, index) => items.slice(index * size, (index + 1) * size),
+    );
+  await withMongoTransaction(async (transactionDb, session) => {
+    await transactionDb
+      .collection("leaderboardStats")
+      .deleteMany({ userId: { $in: ids } }, { session });
+    for (const chunk of chunks(statOps))
+      await transactionDb
+        .collection("leaderboardStats")
+        .bulkWrite(chunk, { ordered: false, session });
+  });
+  await writeRankSnapshots(
+    db,
+    [...aggregates.values()].map((row) => ({
+      userId: row.userId,
+      scope: row.scope,
+      points: row.points,
+      exact: row.exact,
+      correctOutcome: row.correctOutcome,
+      predictions: row.predictions,
+    })),
+    now,
+  );
+  return { leaderboards: aggregates.size, scoreRows: scoreRows.length };
+}
+
+export async function runLeaderboardEngine(
+  options: {
+    recentOnly?: boolean;
+    batchIndex?: number;
+    batchSize?: number;
+  } = {},
+) {
+  if (!options.recentOnly) return runScoreEngine({ rebuildLeaderboards: true });
+
+  const db = await getDb();
+  // Recovery is for newly finished fixtures, not every old fixture touched by
+  // the weekly discovery refresh. Limiting by kickoff date keeps the cron
+  // bounded and prevents a historical re-sync from creating dozens of jobs.
+  const since = new Date(Date.now() - 3 * 86_400_000);
+  const recentMatches = await db
+    .collection<any>("matches")
+    .find(
+      {
+        provider: { $in: ["football-api", "sportsapi"] },
+        status: "FINISHED",
+        homeGoals: { $ne: null },
+        awayGoals: { $ne: null },
+        kickoffAt: { $gte: since },
+      },
+      { projection: { providerMatchId: 1 } },
+    )
+    .limit(5000)
+    .toArray();
+  const batchSize = Math.max(1, options.batchSize ?? 5);
+  const batchIndex = Math.max(0, options.batchIndex ?? 0);
+  const batch = recentMatches.slice(
+    batchIndex * batchSize,
+    (batchIndex + 1) * batchSize,
+  );
+  const scored = await runScoreEngine({
+    rebuildLeaderboards: false,
+    matchIds: batch.map((match) => String(match.providerMatchId)),
+  });
+  const rebuilt = await rebuildLeaderboardStatsForUsers(
+    db,
+    scored.touchedUsers ?? [],
+  );
+  return {
+    ...scored,
+    leaderboards: rebuilt.leaderboards,
+    roundWinners: 0,
+    awards: null,
+    recoveryMode: "recent-three-days",
+    batchIndex,
+    batchSize,
+    totalBatches: Math.ceil(recentMatches.length / batchSize),
+    hasMore: (batchIndex + 1) * batchSize < recentMatches.length,
+  };
 }

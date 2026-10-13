@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
+import { appDateKey } from "../scheduleWindow";
 
 export type SportsApiRestResponse<T> = {
   success?: boolean;
@@ -31,9 +32,10 @@ export type SportsApiQuota = {
 };
 
 const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 mins
-const DISCOVERY_CACHE_TTL_MS = env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED
-  ? CACHE_TTL * 1000
-  : Math.max(CACHE_TTL, 86_400) * 1000;
+// A finished fixture must be allowed to replace its earlier scheduled/live
+// representation. A 24-hour cache here made yesterday's results stale until
+// the cache expired, which in turn prevented scoring and leaderboard rebuilds.
+const DISCOVERY_CACHE_TTL_MS = CACHE_TTL * 1000;
 
 async function trackRequest(
   path: string,
@@ -137,8 +139,10 @@ export async function getSportsApiDailyFixtures(
   dateString: string,
 ): Promise<SportsApiRestResponse<any>> {
   const now = Date.now();
+  const todayStr = appDateKey();
+  const isPast = dateString < todayStr;
   const cached = dailyFixturesCache.get(dateString);
-  if (cached && cached.expiresAt > now) {
+  if (!isPast && cached && cached.expiresAt > now) {
     return cached.data;
   }
 
@@ -147,7 +151,12 @@ export async function getSportsApiDailyFixtures(
   try {
     const db = await getDb();
     const persisted = await db.collection<any>("sportsApiDailyFixtures").findOne({ dateString });
-    if (persisted?.expiresAt && new Date(persisted.expiresAt).getTime() > now && persisted.data) {
+    if (
+      !isPast &&
+      persisted?.expiresAt &&
+      new Date(persisted.expiresAt).getTime() > now &&
+      persisted.data
+    ) {
       dailyFixturesCache.set(dateString, {
         data: persisted.data,
         expiresAt: new Date(persisted.expiresAt).getTime(),
@@ -159,7 +168,6 @@ export async function getSportsApiDailyFixtures(
   }
 
   const eventsMap = new Map<number | string, any>();
-  const todayStr = new Date().toISOString().slice(0, 10);
   const isToday = dateString === todayStr;
 
   // 1. If today, fetch /today first (returns full 800+ matches across all tournaments)
@@ -236,14 +244,20 @@ function eventTournamentKey(event: any) {
 /** Discovers and audits every date in a week before H2H slate generation. */
 export async function discoverSportsApiWeek(dateStrings: string[], options: { attempts?: number } = {}) {
   const attempts = Math.max(1, options.attempts ?? 3);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = appDateKey();
   const allEvents = new Map<string, any>();
   const manifests: SportsApiDiscoveryManifest[] = [];
 
   for (const dateString of [...new Set(dateStrings)]) {
     const db = await getDb();
     const persisted = await db.collection<any>("sportsApiDiscoveryManifests").findOne({ kind: "daily", dateString, status: "COMPLETE", "data.events": { $exists: true } });
-    if (persisted?.data?.events && Array.isArray(persisted.data.events)) {
+    const persistedAt = persisted?.checkedAt ? new Date(persisted.checkedAt).getTime() : 0;
+    const reusableFutureManifest =
+      dateString > todayStr &&
+      persistedAt > 0 &&
+      Date.now() - persistedAt < DISCOVERY_CACHE_TTL_MS &&
+      Array.isArray(persisted?.data?.events);
+    if (reusableFutureManifest) {
       for (const event of persisted.data.events) {
         const id = String(event?.id ?? event?.eventId ?? "");
         if (id) allEvents.set(id, event);
@@ -280,6 +294,9 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
         selectedEvents = merged;
         break;
       }
+      // Preserve whatever the provider did return. An incomplete day must not
+      // block scoring the complete days, and the next run can retry the gap.
+      if (merged.length) selectedEvents = merged;
       if (schedule.error?.code === 429 || today?.error?.code === 429) break;
       if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
     }

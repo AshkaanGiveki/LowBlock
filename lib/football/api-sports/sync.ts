@@ -10,6 +10,7 @@ import { rebuildRoundRecords } from "@/lib/football/roundLifecycle";
 import { invalidateCompetitionCaches } from "@/lib/domain/cache";
 import { syncMatchInsights } from "./matchInsights";
 import { providerDateKeys } from "../scheduleWindow";
+import type { SyncDateOptions } from "../types";
 import { ensureCentralTeam } from "../centralTeams";
 
 type Fixture = {
@@ -229,14 +230,21 @@ async function saveDailyFixtures(
   return { total, listRequests: 1 };
 }
 
-export async function syncFootballApiDate(dateKey: string) {
+export async function syncFootballApiDate(
+  dateKey: string,
+  options?: SyncDateOptions,
+) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) throw new Error("INVALID_UTC_DATE");
   const db = await getDb();
   await ensureIndexes();
   await ensurePerformanceIndexes();
   const result = await saveDailyFixtures(dateKey, db);
-  const scoreEngine = await runScoreEngine({ rebuildLeaderboards: false });
-  const leaderboardEngine = await runLeaderboardEngine();
+  const scoreEngine = options?.deferScoring
+    ? { scores: 0, leaderboards: 0, matches: 0, deferred: true }
+    : await runScoreEngine({ rebuildLeaderboards: false });
+  const leaderboardEngine = options?.deferScoring
+    ? { deferred: true }
+    : await runLeaderboardEngine();
   invalidateCompetitionCaches();
   return { ...result, scoreEngine, leaderboardEngine };
 }
@@ -258,7 +266,7 @@ async function refreshStaleFixtures(db: Awaited<ReturnType<typeof getDb>>) {
   return { requests, updated };
 }
 
-export async function syncFootballApi() {
+export async function syncFootballApi(options: { deferScoring?: boolean } = {}) {
   if (!env.MONGODB_URI) throw new Error("MONGODB_URI is required");
   const db = await getDb();
   await ensureIndexes();
@@ -377,9 +385,13 @@ export async function syncFootballApi() {
         matches: 0,
         providerErrors: [],
       };
-  const rounds = await rebuildRoundRecords(db);
-  const scoreEngine = await runScoreEngine({ rebuildLeaderboards: false });
-  const leaderboardEngine = await runLeaderboardEngine();
+  const rounds = options.deferScoring ? 0 : await rebuildRoundRecords(db);
+  const scoreEngine = options.deferScoring
+    ? { scores: 0, leaderboards: 0, matches: 0, deferred: true }
+    : await runScoreEngine({ rebuildLeaderboards: false });
+  const leaderboardEngine = options.deferScoring
+    ? { deferred: true }
+    : await runLeaderboardEngine();
   invalidateCompetitionCaches();
   await db.collection("syncRuns").insertOne({
     provider: "football-api",

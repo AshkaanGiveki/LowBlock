@@ -5,6 +5,7 @@ import type {
   SyncOptions,
   SyncResult,
   SyncDateResult,
+  SyncDateOptions,
   ProviderName,
   ProviderRealtimeStatus,
 } from "../types";
@@ -20,7 +21,7 @@ import { env } from "@/lib/env";
 import { COMPETITION_MAPPINGS } from "../competitionMapping";
 import { LEAGUES } from "../leagues";
 import { rebuildRoundRecords } from "../roundLifecycle";
-import { runScoreEngine, runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
+import { runScoreEngine } from "@/lib/scoring/scoreEngine";
 import { invalidateCompetitionCaches } from "@/lib/domain/cache";
 import {
   startSportsApiBackgroundService,
@@ -351,7 +352,10 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     return { total, requests };
   }
 
-  async syncDate(dateKey: string): Promise<SyncDateResult> {
+  async syncDate(
+    dateKey: string,
+    options?: SyncDateOptions,
+  ): Promise<SyncDateResult> {
     const db = await getDb();
     const matches = await this.getDailyMatches([dateKey]);
     const dailyTotal = await this.saveMatches(db, matches);
@@ -359,8 +363,16 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     const total = dailyTotal + fallback.total;
 
     await rebuildRoundRecords(db);
-    const scoreEngine = await runScoreEngine();
-    await runLeaderboardEngine();
+    const scoreEngine = options?.deferScoring
+      ? {
+          scores: 0,
+          leaderboards: 0,
+          matches: 0,
+          roundWinners: 0,
+          awards: null,
+          deferred: true,
+        }
+      : { ...(await runScoreEngine()), deferred: false };
     invalidateCompetitionCaches();
 
     return {
@@ -372,55 +384,118 @@ export class SportsApiFootballProvider implements FootballDataProvider {
         matches: scoreEngine.matches,
         roundWinners: scoreEngine.roundWinners,
         awards: scoreEngine.awards,
+        deferred: scoreEngine.deferred,
+      },
+    };
+  }
+
+  /**
+   * Small second pass used after the main nightly sync. It refreshes only
+   * yesterday, so final scores get another provider read without repeating
+   * weekly discovery or spending another large quota batch.
+   */
+  async syncRecentResults(): Promise<SyncDateResult> {
+    const db = await getDb();
+    const dateKey = providerDateKeys()[0];
+    const matches = await this.getDailyMatches([dateKey]);
+    const total = await this.saveMatches(db, matches);
+    invalidateCompetitionCaches();
+
+    try {
+      await db.collection("syncRuns").insertOne({
+        provider: this.name,
+        mode: "recent-results-recovery",
+        startedAt: new Date(),
+        finishedAt: new Date(),
+        status: "OK",
+        listRequests: 1,
+        detailRequests: 0,
+        fixturesUpdated: total,
+        scoring: "DEFERRED_TO_LEADERBOARD_CRON",
+      });
+    } catch (recordingError) {
+      console.error("[SportsAPI] Failed to record recovery run:", recordingError);
+    }
+
+    return {
+      total,
+      listRequests: 1,
+      scoreEngine: {
+        scores: 0,
+        leaderboards: 0,
+        matches: 0,
+        deferred: true,
       },
     };
   }
 
   async sync(options?: SyncOptions): Promise<SyncResult> {
     const db = await getDb();
+    const startedAt = new Date();
     let total = 0;
     let listRequests = 0;
 
-    // 1. Sync daily window (yesterday, today, tomorrow) for live and real-time updates
-    const dateKeys = providerDateKeys();
+    // 1. Refresh the full app week. One pass is deliberate: the Hobby plan
+    // and the provider quota do not tolerate three retries across seven days.
     const weekKeys = providerWeekDateKeys();
-    const discovery = await discoverSportsApiWeek(weekKeys, { attempts: 3 });
+    const discovery = await discoverSportsApiWeek(weekKeys, { attempts: 1 });
+    const incompleteDates = discovery.manifests
+      .filter((item) => item.status !== "COMPLETE")
+      .map((item) => item.dateString);
     if (!discovery.complete) {
-      throw new Error(`SportsAPI weekly discovery incomplete: ${discovery.manifests.filter((item) => item.status !== "COMPLETE").map((item) => item.dateString).join(", ")}`);
+      // Partial provider availability must not suppress scoring for fixtures
+      // already stored in MongoDB. The next scheduled run retries the gaps.
+      console.warn("[SportsAPI] Weekly discovery incomplete; continuing with available fixtures", {
+        dates: incompleteDates,
+      });
     }
 
     const dailyMatches = discovery.events
       .map((event) => normalizeSportsApiMatch(event))
       .filter((match): match is CanonicalMatch => Boolean(match));
     if (dailyMatches.length > 0) total += await this.saveMatches(db, dailyMatches);
-    listRequests += weekKeys.length;
+    // Each date costs one /schedule request; today's date also costs one
+    // /today request. This keeps the scheduled sync at eight provider calls
+    // maximum and prevents the previous 24-call retry fan-out.
+    listRequests += weekKeys.length + (weekKeys.includes(appDateKey()) ? 1 : 0);
 
-    // Some provider-wide daily schedules omit entire competitions. Recover
-    // only explicitly configured competitions without enabling the expensive
-    // all-tournament discovery mode.
-    const targetedFallback = await this.syncTargetedTournamentFallback(
-      dateKeys,
-      dailyMatches,
-      db,
-    );
-    total += targetedFallback.total;
-    listRequests += targetedFallback.requests;
-
-    // 2. Optional tournament discovery. Disabled by default because it can
-    // consume dozens of REST calls and is not safe on the Free plan.
-    const tournamentSync = env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED
-      ? await this.syncAllTournaments()
-      : { total: 0, requests: 0 };
-    total += tournamentSync.total;
-    listRequests += tournamentSync.requests;
-
-    // 3. Rebuild round lifecycle and recalculate scoring & leaderboards
-    const rounds = await rebuildRoundRecords(db);
-    const scoreEngine = await runScoreEngine();
-    await runLeaderboardEngine();
+    // 2. Rebuild round lifecycle and recalculate scoring & leaderboards. The
+    // score engine already materializes leaderboards, so do not run it twice.
+    const rounds = options?.deferScoring ? 0 : await rebuildRoundRecords(db);
+    const scoreEngine = options?.deferScoring
+      ? {
+          scores: 0,
+          leaderboards: 0,
+          matches: 0,
+          roundWinners: 0,
+          awards: null,
+          deferred: true,
+        }
+      : await runScoreEngine();
     invalidateCompetitionCaches();
 
-    // 4. Ensure automated real-time background WebSocket service is active
+    try {
+      await db.collection("syncRuns").insertOne({
+        provider: this.name,
+        mode: "weekly-discovery",
+        startedAt,
+        finishedAt: new Date(),
+        status: discovery.complete ? "OK" : "PARTIAL",
+        listRequests,
+        detailRequests: 0,
+        fixturesUpdated: total,
+        roundsUpdated: rounds,
+        incompleteDates,
+        scoreEngine,
+        scoring: options?.deferScoring
+          ? "DEFERRED_TO_LEADERBOARD_CRON"
+          : "COMPLETED",
+      });
+    } catch (recordingError) {
+      console.error("[SportsAPI] Failed to record sync run:", recordingError);
+    }
+
+    // 3. Ensure automated real-time background WebSocket service is active
     ensureSportsApiBackgroundService();
 
     return {
