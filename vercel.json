@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/sync-football", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/refresh-results", "schedule": "0 2 * * *" }
+    { "path": "/api/cron/sync-football", "schedule": "0 0 * * *" }
   ]
 }

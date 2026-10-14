@@ -179,6 +179,7 @@ export type SyncResult = {
   listRequests: number;
   detailRequests: number;
   rounds: number;
+  failedDates?: string[];
   insights?: unknown;
   scoreEngine: SyncScoreEngineResult;
   leaderboardEngine?: unknown;
