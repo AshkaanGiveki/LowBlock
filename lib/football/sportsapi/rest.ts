@@ -32,9 +32,10 @@ export type SportsApiQuota = {
 };
 
 const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 mins
-// A finished fixture must be allowed to replace its earlier scheduled/live
-// representation. A 24-hour cache here made yesterday's results stale until
-// the cache expired, which in turn prevented scoring and leaderboard rebuilds.
+// The daily sync intentionally reads each of yesterday, today, and tomorrow
+// once per short cache window. This prevents the page, cron, and Telegram
+// paths from multiplying the same REST request while still allowing a manual
+// retry shortly after a provider outage.
 const DISCOVERY_CACHE_TTL_MS = CACHE_TTL * 1000;
 
 async function trackRequest(
@@ -132,27 +133,29 @@ const dailyFixturesCache = new Map<
 >();
 
 /**
- * Fetches daily fixtures. Cached in-memory to prevent quota consumption.
- * Merges /today with /schedule to guarantee all 800+ matches across all tournaments are captured.
+ * Fetches one calendar day's fixtures through the provider REST API.
+ *
+ * The scheduled sync deliberately uses one `/schedule/{date}` request per
+ * date. The WebSocket remains responsible for realtime deltas; REST is the
+ * authoritative daily snapshot/discovery path. Keeping this function to one
+ * request per date makes the normal yesterday/today/tomorrow sync three
+ * provider calls at most.
  */
 export async function getSportsApiDailyFixtures(
   dateString: string,
 ): Promise<SportsApiRestResponse<any>> {
   const now = Date.now();
-  const todayStr = appDateKey();
-  const isPast = dateString < todayStr;
   const cached = dailyFixturesCache.get(dateString);
-  if (!isPast && cached && cached.expiresAt > now) {
+  if (cached && cached.expiresAt > now) {
     return cached.data;
   }
 
   // Persist the discovery cache so a restart or a second app instance does
-  // not spend another four REST calls against the Free-plan quota.
+  // not spend another request for the same date within the cache window.
   try {
     const db = await getDb();
     const persisted = await db.collection<any>("sportsApiDailyFixtures").findOne({ dateString });
     if (
-      !isPast &&
       persisted?.expiresAt &&
       new Date(persisted.expiresAt).getTime() > now &&
       persisted.data
@@ -168,25 +171,9 @@ export async function getSportsApiDailyFixtures(
   }
 
   const eventsMap = new Map<number | string, any>();
-  const isToday = dateString === todayStr;
 
-  // 1. If today, fetch /today first (returns full 800+ matches across all tournaments)
-  if (isToday) {
-    try {
-      const res = await fetchSportsApi<any>("/today");
-      const events = res.events || res.data || (Array.isArray(res) ? res : null);
-      if (Array.isArray(events)) {
-        for (const ev of events) {
-          const id = ev.id || ev.eventId;
-          if (id) eventsMap.set(id, ev);
-        }
-      }
-    } catch (err) {
-      console.warn("[SportsAPI] /today query failed:", err);
-    }
-  }
-
-  // 2. Fetch /schedule/{dateString}
+  // One request per requested date. Do not add a second /today request here:
+  // the daily window is deliberately capped at three REST calls.
   try {
     const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
     const events = res.events || res.data || (Array.isArray(res) ? res : null);
@@ -202,34 +189,29 @@ export async function getSportsApiDailyFixtures(
     console.warn(`[SportsAPI] /schedule/${dateString} failed:`, err);
   }
 
-  const allEvents = Array.from(eventsMap.values());
-  if (allEvents.length > 0) {
-    const result = { success: true, events: allEvents };
-    dailyFixturesCache.set(dateString, {
-      data: result,
-      expiresAt: now + DISCOVERY_CACHE_TTL_MS,
-    });
-    try {
-      const db = await getDb();
-      await db.collection("sportsApiDailyFixtures").updateOne(
-        { dateString },
-        {
-          $set: {
-            dateString,
-            data: result,
-            expiresAt: new Date(now + DISCOVERY_CACHE_TTL_MS),
-            updatedAt: new Date(),
-          },
+  const result = { success: true, events: Array.from(eventsMap.values()) };
+  dailyFixturesCache.set(dateString, {
+    data: result,
+    expiresAt: now + DISCOVERY_CACHE_TTL_MS,
+  });
+  try {
+    const db = await getDb();
+    await db.collection("sportsApiDailyFixtures").updateOne(
+      { dateString },
+      {
+        $set: {
+          dateString,
+          data: result,
+          expiresAt: new Date(now + DISCOVERY_CACHE_TTL_MS),
+          updatedAt: new Date(),
         },
-        { upsert: true },
-      );
-    } catch (err) {
-      console.warn("[SportsAPI] Failed to persist discovery cache:", err);
-    }
-    return result;
+      },
+      { upsert: true },
+    );
+  } catch (err) {
+    console.warn("[SportsAPI] Failed to persist discovery cache:", err);
   }
-
-  return { success: false, events: [] };
+  return result;
 }
 
 function eventList(response: SportsApiRestResponse<any>) {

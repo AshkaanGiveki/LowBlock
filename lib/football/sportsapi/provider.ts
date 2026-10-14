@@ -27,7 +27,7 @@ import {
   startSportsApiBackgroundService,
   ensureSportsApiBackgroundService,
 } from "./backgroundService";
-import { appDateKey, providerDateKeys, providerWeekDateKeys } from "../scheduleWindow";
+import { appDateKey, providerDateKeys } from "../scheduleWindow";
 import { ensureCentralTeam } from "../centralTeams";
 
 // In-memory season cache to avoid redundant season requests
@@ -187,11 +187,24 @@ export class SportsApiFootballProvider implements FootballDataProvider {
   }
 
   async getDailyMatches(dates: string[]): Promise<CanonicalMatch[]> {
+    const result = await this.collectDailyMatches(dates);
+    return result.matches;
+  }
+
+  private async collectDailyMatches(dates: string[]): Promise<{
+    matches: CanonicalMatch[];
+    failedDates: string[];
+  }> {
     const matchesMap = new Map<string, CanonicalMatch>();
+    const failedDates: string[] = [];
 
     for (const date of dates) {
       try {
         const response = await getSportsApiDailyFixtures(date);
+        if (response.success === false || response.error) {
+          failedDates.push(date);
+          continue;
+        }
         const resAny = response as any;
         const rawList =
           resAny.events ||
@@ -208,11 +221,12 @@ export class SportsApiFootballProvider implements FootballDataProvider {
           }
         }
       } catch (err) {
+        failedDates.push(date);
         console.error(`[SportsAPI] Failed to fetch fixtures for ${date}:`, err);
       }
     }
 
-    return Array.from(matchesMap.values());
+    return { matches: Array.from(matchesMap.values()), failedDates };
   }
 
   async syncWeekDates(dateKeys: string[]) {
@@ -435,29 +449,15 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     let total = 0;
     let listRequests = 0;
 
-    // 1. Refresh the full app week. One pass is deliberate: the Hobby plan
-    // and the provider quota do not tolerate three retries across seven days.
-    const weekKeys = providerWeekDateKeys();
-    const discovery = await discoverSportsApiWeek(weekKeys, { attempts: 1 });
-    const incompleteDates = discovery.manifests
-      .filter((item) => item.status !== "COMPLETE")
-      .map((item) => item.dateString);
-    if (!discovery.complete) {
-      // Partial provider availability must not suppress scoring for fixtures
-      // already stored in MongoDB. The next scheduled run retries the gaps.
-      console.warn("[SportsAPI] Weekly discovery incomplete; continuing with available fixtures", {
-        dates: incompleteDates,
-      });
-    }
-
-    const dailyMatches = discovery.events
-      .map((event) => normalizeSportsApiMatch(event))
-      .filter((match): match is CanonicalMatch => Boolean(match));
+    // Refresh exactly yesterday, today, and tomorrow through REST. The daily
+    // fixture helper caches each date, so cron and Telegram sync_now share the
+    // same bounded request path instead of multiplying quota usage.
+    const dateKeys = providerDateKeys();
+    const dailyResult = await this.collectDailyMatches(dateKeys);
+    const dailyMatches = dailyResult.matches;
     if (dailyMatches.length > 0) total += await this.saveMatches(db, dailyMatches);
-    // Each date costs one /schedule request; today's date also costs one
-    // /today request. This keeps the scheduled sync at eight provider calls
-    // maximum and prevents the previous 24-call retry fan-out.
-    listRequests += weekKeys.length + (weekKeys.includes(appDateKey()) ? 1 : 0);
+    // One /schedule request per date, at most three provider calls per run.
+    listRequests += dateKeys.length;
 
     // 2. Rebuild round lifecycle and recalculate scoring & leaderboards. The
     // score engine already materializes leaderboards, so do not run it twice.
@@ -477,15 +477,20 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     try {
       await db.collection("syncRuns").insertOne({
         provider: this.name,
-        mode: "weekly-discovery",
+        mode: "daily-window-rest",
         startedAt,
         finishedAt: new Date(),
-        status: discovery.complete ? "OK" : "PARTIAL",
+        status:
+          dailyResult.failedDates.length === 0
+            ? "OK"
+            : dailyResult.failedDates.length === dateKeys.length
+              ? "FAILED"
+              : "PARTIAL",
         listRequests,
         detailRequests: 0,
         fixturesUpdated: total,
         roundsUpdated: rounds,
-        incompleteDates,
+        failedDates: dailyResult.failedDates,
         scoreEngine,
         scoring: options?.deferScoring
           ? "DEFERRED_TO_LEADERBOARD_CRON"
@@ -503,6 +508,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
       listRequests,
       detailRequests: 0,
       rounds,
+      failedDates: dailyResult.failedDates,
       scoreEngine: {
         scores: scoreEngine.scores,
         leaderboards: scoreEngine.leaderboards,

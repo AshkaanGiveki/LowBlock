@@ -7,7 +7,6 @@ import { ObjectId } from "mongodb";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
-import { providerDateKeys } from "@/lib/football/scheduleWindow";
 import { runScoreEngine } from "@/lib/scoring/scoreEngine";
 
 export const runtime = "nodejs";
@@ -154,46 +153,53 @@ function isCommand(text: string, command: string) {
 }
 
 async function handleAdminSync(chatId: string) {
-  await send(
+  const progressMessageId = await send(
     chatId,
-    "⏳ Sync started. I’ll refresh football results and rebuild the leaderboards when it finishes.",
+    "Sync started. I will refresh football results and rebuild the leaderboards when it finishes.",
   );
+  const updateProgress = async (text: string) => {
+    if (progressMessageId == null) return;
+    await editMessage(chatId, progressMessageId, text);
+  };
   try {
     const provider = getFootballProvider();
-    const dateResults = [];
-    for (const dateKey of providerDateKeys().slice(0, 2)) {
-      try {
-        dateResults.push(
-          await provider.syncDate(dateKey, { deferScoring: true }),
-        );
-      } catch (error) {
-        console.error("telegram_admin_sync_date_failed", {
-          chatId,
-          dateKey,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+    // Use the same bounded daily REST window as the scheduled sync:
+    // yesterday, today, and tomorrow. The provider-level cache prevents this
+    // command from repeating requests already made by the cron path.
+    await updateProgress(
+      "<b>Sync in progress</b>\n\nFetching yesterday, today, and tomorrow through SportsAPI REST...\nSaving fixtures and official statuses to MongoDB...",
+    );
+    const syncResult = await provider.sync({ deferScoring: true });
+    await updateProgress(
+      `<b>REST sync complete</b>\n\nFixtures updated: <b>${syncResult.total}</b>\nREST requests attempted: <b>${syncResult.listRequests}</b>\n\nRecalculating player prediction scores...`,
+    );
 
     // The admin command deliberately runs the unrestricted full pass. This
     // scores every finished match in MongoDB and rebuilds every leaderboard
     // scope, unlike the bounded scheduled recovery path.
     const scoreEngine = await runScoreEngine({ rebuildLeaderboards: true });
     const result = {
-      total: dateResults.reduce((sum, item) => sum + item.total, 0),
+      total: syncResult.total,
       scoreEngine,
     };
+    await updateProgress(
+      `<b>Scores and leaderboards complete</b>\n\nPrediction scores recalculated: <b>${result.scoreEngine.scores}</b>\nLeaderboard records rebuilt: <b>${result.scoreEngine.leaderboards}</b>\nRound winners processed: <b>${result.scoreEngine.roundWinners}</b>\n\nScheduling notifications...`,
+    );
     const notifications = await scheduleFootballNotifications();
-    await send(
-      chatId,
-      `✅ Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
+    await updateProgress(
+      (syncResult.failedDates?.length ?? 0) > 0
+        ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${result.total}. Failed dates: ${syncResult.failedDates?.join(", ")}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`
+        : `Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
     );
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateProgress(
+      `<b>Sync failed</b>\n\nThe process stopped before all phases completed.\n\n<code>${escapeHtml(message).slice(0, 3500)}</code>\n\nPlease retry /sync_now when the database/provider is available.`,
+    );
     console.error("telegram_admin_sync_failed", {
       chatId,
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
     });
-    await send(chatId, "❌ Sync failed. Check the server logs for details.");
   }
 }
 
@@ -649,8 +655,8 @@ async function send(
   chatId: string,
   text: string,
   keyboard: boolean | InlineKeyboard = false,
-) {
-  if (!env.TELEGRAM_BOT_TOKEN) return;
+): Promise<number | null> {
+  if (!env.TELEGRAM_BOT_TOKEN) return null;
 
   const response = await fetch(
     `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -685,11 +691,47 @@ async function send(
   const result = (await response.json().catch(() => null)) as {
     ok?: boolean;
     description?: string;
+    result?: { message_id?: number };
   } | null;
   if (!response.ok || !result?.ok) {
     console.error("Telegram sendMessage failed", {
       status: response.status,
       description: result?.description,
+    });
+    return null;
+  }
+  return result?.result?.message_id ?? null;
+}
+
+async function editMessage(chatId: string, messageId: number, text: string) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text,
+          parse_mode: "HTML",
+        }),
+      },
+    );
+    const result = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      description?: string;
+    } | null;
+    if (!response.ok || !result?.ok) {
+      console.error("Telegram editMessageText failed", {
+        status: response.status,
+        description: result?.description,
+      });
+    }
+  } catch (error) {
+    console.error("Telegram editMessageText request failed", {
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }
