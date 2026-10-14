@@ -171,11 +171,22 @@ export async function getSportsApiDailyFixtures(
   }
 
   const eventsMap = new Map<number | string, any>();
+  let result: SportsApiRestResponse<any> = {
+    success: true,
+    events: [],
+  };
 
   // One request per requested date. Do not add a second /today request here:
   // the daily window is deliberately capped at three REST calls.
   try {
     const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
+    if (res.success === false || res.error) {
+      return {
+        success: false,
+        events: [],
+        error: res.error ?? { code: 502, message: "SportsAPI returned an unsuccessful response" },
+      };
+    }
     const events = res.events || res.data || (Array.isArray(res) ? res : null);
     if (Array.isArray(events)) {
       for (const ev of events) {
@@ -186,10 +197,13 @@ export async function getSportsApiDailyFixtures(
       }
     }
   } catch (err) {
-    console.warn(`[SportsAPI] /schedule/${dateString} failed:`, err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[SportsAPI] /schedule/${dateString} failed:`, message);
+    result = { success: false, events: [], error: { code: 500, message } };
   }
 
-  const result = { success: true, events: Array.from(eventsMap.values()) };
+  result = { success: true, events: Array.from(eventsMap.values()) };
+  if (result.success === false) return result;
   dailyFixturesCache.set(dateString, {
     data: result,
     expiresAt: now + DISCOVERY_CACHE_TTL_MS,

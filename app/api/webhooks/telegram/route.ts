@@ -194,11 +194,31 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
     await updateProgress(
       `<b>Scores and leaderboards complete</b>\n\nPrediction scores recalculated: <b>${result.scoreEngine.scores}</b>\nLeaderboard records rebuilt: <b>${result.scoreEngine.leaderboards}</b>\nRound winners processed: <b>${result.scoreEngine.roundWinners}</b>\n\nScheduling notifications...`,
     );
-    const notifications = await scheduleFootballNotifications();
+    let notifications = {
+      remindersScheduled: 0,
+      channelReminderScheduled: 0,
+      channelDailyPostsScheduled: 0,
+    };
+    let notificationWarning = "";
+    try {
+      notifications = await scheduleFootballNotifications();
+    } catch (error) {
+      notificationWarning =
+        error instanceof Error ? error.message : String(error);
+      console.error("telegram_admin_sync_notifications_failed", {
+        chatId,
+        error: notificationWarning,
+      });
+    }
     await updateProgress(
-      (syncResult.failedDates?.length ?? 0) > 0
-        ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${result.total}. Failed dates: ${syncResult.failedDates?.join(", ")}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`
-        : `Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
+      [
+        (syncResult.failedDates?.length ?? 0) > 0
+          ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${result.total}. Failed dates: ${syncResult.failedDates?.join(", ")}.`
+          : `<b>Sync complete</b>\n\nFixtures updated: ${result.total}.`,
+        `Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}.`,
+        `Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
+        notificationWarning ? `\nNotification warning: <code>${escapeHtml(notificationWarning)}</code>` : "",
+      ].filter(Boolean).join("\n"),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
