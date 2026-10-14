@@ -10,6 +10,7 @@ import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
 import { runScoreEngine } from "@/lib/scoring/scoreEngine";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type TelegramMessage = {
   text?: string;
@@ -54,7 +55,19 @@ export async function POST(req: Request) {
       !(await claimTelegramUpdate(update.update_id))
     )
       return NextResponse.json({ ok: true });
-    after(() => handleAdminSync(String(chatId)));
+    let progressMessageId: number | null = null;
+    try {
+      progressMessageId = await send(
+        String(chatId),
+        "Sync accepted. I will refresh football results and rebuild the leaderboards when it finishes.",
+      );
+    } catch (error) {
+      console.error("telegram_sync_ack_failed", {
+        chatId: String(chatId),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    after(() => handleAdminSync(String(chatId), progressMessageId));
     return NextResponse.json({ ok: true });
   }
 
@@ -152,11 +165,7 @@ function isCommand(text: string, command: string) {
   return commandName(text) === command;
 }
 
-async function handleAdminSync(chatId: string) {
-  const progressMessageId = await send(
-    chatId,
-    "Sync started. I will refresh football results and rebuild the leaderboards when it finishes.",
-  );
+async function handleAdminSync(chatId: string, progressMessageId: number | null) {
   const updateProgress = async (text: string) => {
     if (progressMessageId == null) return;
     await editMessage(chatId, progressMessageId, text);
