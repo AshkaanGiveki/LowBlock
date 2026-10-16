@@ -32,7 +32,6 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { username } = await params;
   const db = await getDb();
-  const viewerId = await currentUserId();
   const user = await db
     .collection<any>("users")
     .findOne(
@@ -60,6 +59,7 @@ async function PublicProfileData({
 }) {
   const { username } = await params;
   const db = await getDb();
+  const viewerId = await currentUserId();
   const [user, championId] = await Promise.all([
     db
       .collection<any>("users")
