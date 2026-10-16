@@ -69,13 +69,16 @@ export async function GET(request: Request) {
   const dateString = dates[batchIndex];
   try {
     const result = await new SportsApiFootballProvider().syncWeekDates([dateString]);
+    // Publish this day's slate immediately. Future dates may not exist in the
+    // provider yet, so weekly completeness must not block today's H2H round.
+    const dailyH2H = await ensureCurrentH2HLeagues(await getDb(), { sourceDate: dateString, batchIndex: 0, batchSize: CLUB_BATCH_SIZE });
     const nextBatch = batchIndex + 1;
     const queuedNextBatch = await enqueue(
       `/api/cron/h2h?batch=${nextBatch}`,
       { reason: "h2h-discovery-next", weekKey: week.key, dateString, batch: nextBatch },
       `${baseId}-discovery-${nextBatch}`,
     );
-    return NextResponse.json({ ok: true, phase, batchIndex, dateString, complete: result.discovery.complete, queuedNextBatch });
+    return NextResponse.json({ ok: true, phase, batchIndex, dateString, complete: result.discovery.complete, dailyH2H, queuedNextBatch });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (retry < DISCOVERY_ATTEMPTS - 1) {

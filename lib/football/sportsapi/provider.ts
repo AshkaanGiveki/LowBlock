@@ -38,6 +38,14 @@ const seasonIdCache = new Map<number, { tournamentId?: number; id: number; name:
 export class SportsApiFootballProvider implements FootballDataProvider {
   readonly name: ProviderName = "sportsapi";
 
+  private async refreshDailyH2H(db: any, dateKeys: string[]) {
+    if (!env.H2H_ENABLED) return;
+    const { ensureCurrentH2HLeagues } = await import("@/lib/domain/h2h");
+    for (const sourceDate of dateKeys) {
+      await ensureCurrentH2HLeagues(db, { sourceDate, batchIndex: 0, batchSize: 1000 });
+    }
+  }
+
   private async syncTargetedTournamentFallback(
     dateKeys: string[],
     dailyMatches: CanonicalMatch[],
@@ -252,6 +260,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
       .map((event: any) => normalizeSportsApiMatch(event))
       .filter((match): match is CanonicalMatch => Boolean(match));
     const total = await this.saveMatches(db, matches);
+    await this.refreshDailyH2H(db, dateKeys);
     return { total, matches, discovery };
   }
 
@@ -388,6 +397,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     const dailyTotal = await this.saveMatches(db, matches);
     const fallback = await this.syncTargetedTournamentFallback([dateKey], matches, db);
     const total = dailyTotal + fallback.total;
+    await this.refreshDailyH2H(db, [dateKey]);
 
     await rebuildRoundRecords(db);
     const scoreEngine = options?.deferScoring
@@ -469,6 +479,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     const dailyResult = await this.collectDailyMatches(dateKeys);
     const dailyMatches = dailyResult.matches;
     if (dailyMatches.length > 0) total += await this.saveMatches(db, dailyMatches);
+    await this.refreshDailyH2H(db, dateKeys);
     // One /schedule request per date, at most three provider calls per run.
     listRequests += dateKeys.length;
 

@@ -4,7 +4,7 @@ import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { currentUserId } from "@/lib/auth/session";
 import { env } from "@/lib/env";
-import { providerWeekDateKeys } from "@/lib/football/scheduleWindow";
+import { appDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import ratingsData from "@/data/h2h-team-ratings-review.json";
 
@@ -207,18 +207,13 @@ export async function createH2HLeague(db: Db, clubId: string, week: H2HWeek) {
   if (!isH2HEnabled()) return null;
   const existing = await db.collection<any>("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber: 1 });
   if (existing) return null;
-  if (!(await hasCompleteWeeklyDiscovery(db, week))) return null;
+  // A league can be created before future provider dates are published.
   const players = await selectH2HPlayers(db, clubId, week);
   if (players.length < 8) return null;
-  const matches = await db.collection<any>("matches").find({
-    kickoffAt: { $gte: week.start, $lt: week.end },
-  }).toArray();
-  const slates = buildH2HSlates(matches, week, await loadCentralH2HRatings(db));
-  if (!slates.length) return null;
   const now = new Date();
   const doc = {
     clubId, weekKey: week.key, startsAt: week.start, endsAt: week.end, groupNumber: 1,
-    players, slates, status: "ACTIVE", winnerUserId: null, cancelledReason: null,
+    players, slates: [], status: "ACTIVE", winnerUserId: null, cancelledReason: null,
     createdAt: now, updatedAt: now,
   };
   await db.collection("h2hLeagues").insertOne(doc);
@@ -246,13 +241,22 @@ export async function materializeH2HLeague(db: Db, league: any) {
   for (const userId of league.players.map(String)) await db.collection("notificationDeliveries").updateOne({ userId, matchId: `H2H:${league._id}`, channel: "IN_APP", type: "H2H_ROSTER_PUBLISHED" }, { $setOnInsert: { userId, matchId: `H2H:${league._id}`, type: "H2H_ROSTER_PUBLISHED", leagueId: league._id, channel: "IN_APP", status: "PENDING", createdAt: now } }, { upsert: true });
 }
 
-export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: number; batchSize?: number } = {}) {
+export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: number; batchSize?: number; sourceDate?: string } = {}) {
   if (!isH2HEnabled()) return { enabled: false, created: 0 };
   await ensureH2HIndexes();
   const week = getH2HWeek();
   await settleH2HLeagues(db, getH2HWeek(new Date(), 1).key);
   const batchIndex = Math.max(0, options.batchIndex ?? 0);
   const batchSize = Math.max(1, options.batchSize ?? 5);
+  const sourceDate = options.sourceDate;
+  const dailySlate = sourceDate
+    ? buildH2HDailySlate(
+        await db.collection<any>("matches").find({ kickoffAt: { $gte: week.start, $lt: week.end } }).toArray(),
+        week,
+        sourceDate,
+        await loadCentralH2HRatings(db),
+      )
+    : null;
   const totalClubs = await db.collection<any>("clubs").countDocuments({ state: "ACTIVE" });
   const clubs = await db.collection<any>("clubs").find({ state: "ACTIVE" }, { projection: { _id: 1 } }).sort({ _id: 1 }).skip(batchIndex * batchSize).limit(batchSize).toArray();
   let created = 0;
@@ -260,6 +264,12 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
     const clubId = String(club._id);
     const existingPrimary = await db.collection<any>("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber: 1 });
     const primary = existingPrimary ?? await createH2HLeague(db, clubId, week);
+    if (primary && dailySlate) {
+      const slates = [...(primary.slates ?? []).filter((slate: H2HSlate) => slate.sourceDate !== sourceDate), dailySlate]
+        .sort((a, b) => a.matchday - b.matchday);
+      await db.collection("h2hLeagues").updateOne({ _id: primary._id }, { $set: { slates, updatedAt: new Date() } });
+      primary.slates = slates;
+    }
     if (primary) await materializeH2HLeague(db, primary);
     if (primary) created++;
     // Larger Clubs get additional independent eight-player groups. The primary
@@ -271,11 +281,8 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
     const ordered = [...rows.map((row) => row.userId), ...allIds].filter((id, index, list) => allIds.includes(id) && !primaryIds.has(id) && list.indexOf(id) === index);
     for (let offset = 0, groupNumber = 2; offset + 8 <= ordered.length; offset += 8, groupNumber++) {
       if (await db.collection("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber })) continue;
-      if (!(await hasCompleteWeeklyDiscovery(db, week))) break;
       const players = ordered.slice(offset, offset + 8);
-      const matches = await db.collection<any>("matches").find({ kickoffAt: { $gte: week.start, $lt: week.end } }).toArray();
-      const slates = buildH2HSlates(matches, week, await loadCentralH2HRatings(db));
-      if (!slates.length) break;
+      const slates = dailySlate ? [dailySlate] : [];
       const result = await db.collection("h2hLeagues").insertOne({ clubId, weekKey: week.key, startsAt: week.start, endsAt: week.end, groupNumber, players, slates, status: "ACTIVE", winnerUserId: null, cancelledReason: null, createdAt: new Date(), updatedAt: new Date() });
       await materializeH2HLeague(db, { _id: result.insertedId, clubId, weekKey: week.key, startsAt: week.start, endsAt: week.end, groupNumber, players, slates });
       created++;
@@ -287,6 +294,33 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
     if (!weekLeagues) await db.collection("h2hWeeks").updateOne({ weekKey: week.key }, { $set: { weekKey: week.key, startsAt: week.start, endsAt: week.end, status: "CANCELLED", cancelledReason: "NO_VALID_EIGHT_PLAYER_LEAGUE_OR_SCHEDULE", updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
   }
   return { enabled: true, created, weekKey: week.key, batchIndex, batchSize, processedClubs: clubs.length, totalClubs, hasMore };
+}
+
+/** Select the daily H2H slate as soon as that provider date is available. */
+export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: string, ratingMap: Map<string, number> = ratings): H2HSlate | null {
+  const matchday = providerWeekDateKeys(week.start).indexOf(sourceDate) + 1;
+  if (matchday < 1) return null;
+  const candidates = matches
+    .filter((match) => selectable(match, week, ratingMap))
+    .filter((match) => appDateKey(kickoff(match.kickoffAt)!) === sourceDate)
+    .map((match) => ({ match, date: kickoff(match.kickoffAt)!, score: scoreH2HFixture(match, ratingMap)!, id: String(match.providerMatchId) }))
+    .filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index)
+    .sort((a, b) => b.score - a.score || a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
+  if (!candidates.length) return null;
+  const chosen = candidates.slice(0, 5).sort((a, b) => a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
+  const firstKickoffAt = chosen[0].date;
+  return {
+    matchday, sourceDate, fixtureIds: chosen.map((row) => row.id),
+    fixtures: chosen.map((row) => ({
+      matchId: row.id, kickoffAt: row.date, score: row.score, leagueCode: String(row.match.leagueCode),
+      homeTeam: row.match.homeTeam, awayTeam: row.match.awayTeam,
+      homeRating: ratingMap.get(String(row.match.homeTeam?.centralTeamId ?? row.match.homeTeam?.teamId)) ?? 0,
+      awayRating: ratingMap.get(String(row.match.awayTeam?.centralTeamId ?? row.match.awayTeam?.teamId)) ?? 0,
+      tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(row.match.leagueCode)] ?? 1,
+      ratingVersion: "h2h-team-ratings-review", selectionReason: "top-five-rated-matches-for-fetched-date",
+    })),
+    firstKickoffAt, goldDeadline: firstKickoffAt,
+  };
 }
 
 export async function settleH2HLeagues(db: Db, weekKey = getH2HWeek().key) {
