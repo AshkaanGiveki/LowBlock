@@ -284,7 +284,11 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
     // subsequent groups use the next eligible Club members.
     const allIds = await eligibleUsers(db, await memberIds(db, clubId), week.key);
     const primaryIds = new Set<string>(primary?.players?.map(String) ?? []);
-    const rows = await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, Math.max(100, allIds.length));
+    let rows = await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, Math.max(100, allIds.length));
+    if (!rows.length) {
+      const globalRows = await getCanonicalLeaderboard(db, { weekly: true, weeklyOffset: 1 }, 100);
+      rows = globalRows.filter((row) => allIds.includes(row.userId));
+    }
     const ordered = [...rows.map((row) => row.userId), ...allIds].filter((id, index, list) => allIds.includes(id) && !primaryIds.has(id) && list.indexOf(id) === index);
     for (let offset = 0, groupNumber = 2; offset + 8 <= ordered.length; offset += 8, groupNumber++) {
       if (await db.collection("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber })) continue;
@@ -373,8 +377,9 @@ export async function calculateH2HStandings(db: Db, league: any) {
   const totals = new Map<string, Standing & { slateScores: Record<string, number> }>(ids.map((id: string) => [id, { userId: id, h2hPoints: 0, wins: 0, draws: 0, losses: 0, predictionPoints: 0, slateScores: {} }]));
   for (const slate of league.slates as H2HSlate[]) {
     const slateMatches = slate.fixtureIds.map((matchId) => byMatch.get(matchId)).filter(Boolean);
-    const slateComplete = slateMatches.length === slate.fixtureIds.length && slateMatches.every((match: any) => match.homeGoals != null && match.awayGoals != null);
-    if (!slateComplete) continue;
+    const completedMatches = slateMatches.filter((match: any) => match.homeGoals != null && match.awayGoals != null);
+    if (!completedMatches.length) continue;
+    const slateComplete = completedMatches.length === slate.fixtureIds.length;
     const slateScores = new Map<string, number>();
     for (const id of ids) {
       let score = 0;
@@ -389,6 +394,9 @@ export async function calculateH2HStandings(db: Db, league: any) {
       totals.get(id)!.slateScores[String(slate.matchday)] = score;
       totals.get(id)!.predictionPoints += score;
     }
+    // Do not award the slate-level H2H result until every fixture in that
+    // slate is final; prediction points still accumulate match by match.
+    if (!slateComplete) continue;
     for (const pairing of buildH2HPairings(ids, slate.matchday - 1)) {
       const a = totals.get(pairing.playerA)!, b = totals.get(pairing.playerB)!;
       const as = slateScores.get(a.userId)!, bs = slateScores.get(b.userId)!;
