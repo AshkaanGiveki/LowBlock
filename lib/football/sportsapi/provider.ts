@@ -41,7 +41,8 @@ export class SportsApiFootballProvider implements FootballDataProvider {
   private async refreshDailyH2H(db: any, dateKeys: string[]) {
     if (!env.H2H_ENABLED) return;
     const { ensureCurrentH2HLeagues } = await import("@/lib/domain/h2h");
-    for (const sourceDate of dateKeys) {
+    const today = appDateKey();
+    for (const sourceDate of dateKeys.filter((dateKey) => dateKey >= today)) {
       await ensureCurrentH2HLeagues(db, { sourceDate, batchIndex: 0, batchSize: 1000 });
     }
   }

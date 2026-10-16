@@ -3,7 +3,7 @@ import { Client } from "@upstash/qstash";
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
 import { ensureCurrentH2HLeagues, getH2HWeek } from "@/lib/domain/h2h";
-import { providerWeekDateKeys } from "@/lib/football/scheduleWindow";
+import { appDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { SportsApiFootballProvider } from "@/lib/football/sportsapi/provider";
 
 export const maxDuration = 60;
@@ -71,7 +71,9 @@ export async function GET(request: Request) {
     const result = await new SportsApiFootballProvider().syncWeekDates([dateString]);
     // Publish this day's slate immediately. Future dates may not exist in the
     // provider yet, so weekly completeness must not block today's H2H round.
-    const dailyH2H = await ensureCurrentH2HLeagues(await getDb(), { sourceDate: dateString, batchIndex: 0, batchSize: CLUB_BATCH_SIZE });
+    const dailyH2H = dateString >= appDateKey()
+      ? await ensureCurrentH2HLeagues(await getDb(), { sourceDate: dateString, batchIndex: 0, batchSize: CLUB_BATCH_SIZE })
+      : { enabled: true, skipped: "historical-date" };
     const nextBatch = batchIndex + 1;
     const queuedNextBatch = await enqueue(
       `/api/cron/h2h?batch=${nextBatch}`,
