@@ -12,6 +12,7 @@ import {
   Home,
   Target,
   Trophy,
+  Swords,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -19,9 +20,8 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 
 const routes = [
-  { href: "/", icon: Home, label: "Home" },
-  { href: "/matches", icon: Target, label: "Predict" },
   { href: "/club", icon: UsersRound, label: "Club" },
+  { href: "/matches", icon: Target, label: "Predict" },
   { href: "/lowblock", icon: Trophy, label: "Leaderboard" },
 ];
 
@@ -42,6 +42,7 @@ export function Nav() {
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const { data: h2hConfig } = useQuery({ queryKey: ["h2h-config"], queryFn: () => fetch("/api/h2h/config").then((response) => response.json()), staleTime: 60_000 });
   const avatar = navData?.me?.user?.avatarUrl ?? null;
   const username = navData?.me?.user?.username ?? null;
   const profileHref = username ? `/u/${encodeURIComponent(username)}` : "/profile";
@@ -100,7 +101,7 @@ export function Nav() {
         )}
       </header>
       <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around xl:hidden">
-        {routes.map(({ href, icon: Component, label }) => (
+        {[routes[0], routes[1], ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Swords, label: "H2H" }] : []), routes[2]].map(({ href, icon: Component, label }) => (
           <Link
             key={href}
             href={href}
@@ -113,6 +114,7 @@ export function Nav() {
                       Predict: "پیش‌بینی",
                       Club: "باشگاه",
                       Leaderboard: "جدول امتیازات",
+                      H2H: "رو در رو",
                     } as Record<string, string>
                   )[label]
                 : label
@@ -131,12 +133,12 @@ export function Nav() {
           </Link>
         ))}
         <Link
-          href="/profile"
+          href={profileHref}
           aria-label={fa ? "پروفایل" : "Profile"}
-          onClick={() => pathname !== "/profile" && setLoading(true)}
-          className={`relative grid h-11 w-12 place-items-center rounded-lg ${active("/profile") ? "text-brand" : "text-[var(--muted)]"}`}
+          onClick={() => pathname !== profileHref && setLoading(true)}
+          className={`relative grid h-11 w-12 place-items-center rounded-lg ${active(profileHref) ? "text-brand" : "text-[var(--muted)]"}`}
         >
-          {active("/profile") && (
+          {active(profileHref) && (
             <motion.span
               layoutId="mobile-nav-active"
               className="bottom-nav-active-indicator absolute inset-1 rounded-[1.1rem] bg-brand/15"
@@ -145,7 +147,7 @@ export function Nav() {
           )}{" "}
           {avatar ? (
             <motion.div
-              animate={{ y: active("/profile") ? 2 : 0 }}
+              animate={{ y: active(profileHref) ? 2 : 0 }}
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
               className="relative z-10 h-7 w-7 rounded-full object-cover"
             >
@@ -156,7 +158,7 @@ export function Nav() {
               />
             </motion.div>
           ) : (
-            navIcon(UserRound, active("/profile"))
+            navIcon(UserRound, active(profileHref))
           )}
         </Link>
       </nav>

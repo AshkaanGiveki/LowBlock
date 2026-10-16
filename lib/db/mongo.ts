@@ -168,6 +168,7 @@ export async function ensureIndexes() {
     db.collection("centralTeams").createIndex({ centralTeamId: 1 }, { unique: true }),
     db.collection("centralTeams").createIndex({ "providerIds.football-api": 1 }, { sparse: true, unique: true }),
     db.collection("centralTeams").createIndex({ "providerIds.sportsapi": 1 }, { sparse: true, unique: true }),
+    db.collection("centralTeams").createIndex({ numericTeamId: 1 }, { sparse: true, unique: true, name: "central_team_numeric_id" }),
     db.collection("centralTeams").createIndex({ aliases: 1 }),
     db
       .collection("matches")
@@ -286,6 +287,23 @@ export async function ensureIndexes() {
     db
       .collection("channelPublications")
       .createIndex({ dateKey: 1, type: 1 }, { unique: true }),
+  ]);
+}
+export async function ensureH2HIndexes() {
+  const db = await getDb();
+  await Promise.all([
+    db.collection("h2hLeagues").createIndex({ clubId: 1, weekKey: 1, groupNumber: 1 }, { unique: true }),
+    db.collection("h2hLeagues").createIndex({ players: 1, weekKey: 1 }),
+    db.collection("h2hGoldPicks").createIndex({ leagueId: 1, userId: 1, matchday: 1 }, { unique: true }),
+    db.collection("h2hGoldPicks").createIndex({ leagueId: 1, matchId: 1 }),
+    db.collection("h2hWeeks").createIndex({ weekKey: 1 }, { unique: true }),
+    db.collection("h2hLeagueMembers").createIndex({ leagueId: 1, userId: 1 }, { unique: true }),
+    db.collection("h2hSlateFixtures").createIndex({ weekId: 1, matchId: 1 }, { unique: true }),
+    db.collection("h2hMatchResults").createIndex({ leagueId: 1, matchday: 1, playerPair: 1 }, { unique: true }),
+    db.collection("h2hStandings").createIndex({ leagueId: 1, userId: 1 }, { unique: true }),
+    db.collection("h2hRewards").createIndex({ leagueId: 1, userId: 1, rewardType: 1 }, { unique: true }),
+    db.collection("h2hAuditEvents").createIndex({ leagueId: 1, createdAt: -1 }),
+    db.collection("h2hAuditEvents").createIndex({ eventKey: 1 }, { unique: true }),
   ]);
 }
 export async function ensurePerformanceIndexes() {

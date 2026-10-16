@@ -7,6 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { ConnectedAccounts } from "@/components/ConnectedAccounts";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PlatformNotificationToggle } from "@/components/PlatformNotificationToggle";
+import { H2HPreference } from "@/components/H2HPreference";
 type User = {
   username: string;
   avatarUrl: string | null;
@@ -141,6 +142,7 @@ export default function ProfilePage() {
             username={platformUsername}
           />
         )}
+        <H2HPreference />
         <form
           onSubmit={save}
           className="mt-4 rounded-2xl border border-white/[.08] bg-[#101512] p-5 md:p-7"

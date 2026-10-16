@@ -10,6 +10,7 @@ import {
   Home,
   Languages,
   Settings2,
+  Swords,
   Target,
   Trophy,
   UsersRound,
@@ -48,8 +49,14 @@ export function DesktopNavigation() {
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const { data: h2hConfig } = useQuery({
+    queryKey: ["h2h-config"],
+    queryFn: () => fetch("/api/h2h/config").then((response) => response.json()),
+    staleTime: 60_000,
+  });
   const avatar = data?.me?.user?.avatarUrl ?? null;
   const username = data?.me?.user?.username ?? null;
+  const profileHref = username ? `/u/${encodeURIComponent(username)}` : "/profile";
   const clubImage = data?.club?.club?.imageUrl ?? null;
   const champion = Boolean(data?.me?.user?.isDefendingChampion);
   const active = (href: string) =>
@@ -72,7 +79,7 @@ export function DesktopNavigation() {
           {t("فضای رقابت", "COMPETE")}
         </div>
         <nav className="desktop-rail-nav">
-          {items.map(({ href, icon: Icon, fa, en }) => (
+          {[...items, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Swords, fa: "رو در رو", en: "Head to Head" }] : [])].map(({ href, icon: Icon, fa, en }) => (
             <Link
               href={href}
               key={href}
@@ -100,8 +107,8 @@ export function DesktopNavigation() {
         </div>
         <nav className="desktop-rail-nav">
           <Link
-            href="/profile"
-            className={`desktop-rail-link ${active("/profile") ? "is-active" : ""}`}
+            href={profileHref}
+            className={`desktop-rail-link ${active(profileHref) ? "is-active" : ""}`}
           >
             <span className="desktop-rail-link-icon">
               {avatar || champion ? (
@@ -116,7 +123,7 @@ export function DesktopNavigation() {
               )}
             </span>
             <span>{t("پروفایل", "Profile")}</span>
-            {active("/profile") && (
+            {active(profileHref) && (
               <motion.span
                 layoutId="desktop-rail-active"
                 className="desktop-rail-active"

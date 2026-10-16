@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
 import { Client } from "@upstash/qstash";
+import { getH2HWeek } from "@/lib/domain/h2h";
+import { appDateKey } from "@/lib/football/scheduleWindow";
 
 export const maxDuration = 60;
 
@@ -38,7 +40,28 @@ export async function GET(request: Request) {
       });
       queuedNextBatch = true;
     }
-    return NextResponse.json({ ok: true, queuedNextBatch, ...result });
+    let queuedH2H = false;
+    const week = getH2HWeek();
+    const isFinalBatch = !("hasMore" in result) || !result.hasMore;
+    const isH2HWeekStart = appDateKey() === appDateKey(week.start);
+    if (
+      isFinalBatch &&
+      isH2HWeekStart &&
+      env.H2H_ENABLED &&
+      env.QSTASH_TOKEN &&
+      env.NEXT_PUBLIC_APP_URL &&
+      env.CRON_SECRET
+    ) {
+      await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
+        url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/h2h`,
+        body: { reason: "weekly-h2h-after-leaderboards", weekKey: week.key },
+        headers: { authorization: `Bearer ${env.CRON_SECRET}` },
+        notBefore: Math.floor((Date.now() + 60_000) / 1000),
+        deduplicationId: `lowblock-h2h-discovery-${week.key}`,
+      });
+      queuedH2H = true;
+    }
+    return NextResponse.json({ ok: true, queuedNextBatch, queuedH2H, ...result });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "leaderboard rebuild failed";

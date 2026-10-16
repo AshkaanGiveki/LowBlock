@@ -26,9 +26,7 @@ export function providerWeekDateKeys(value = new Date()): string[] {
   const local = new Date(`${today}T00:00:00.000Z`);
   const daysSinceFriday = (local.getUTCDay() + 2) % 7;
   local.setUTCDate(local.getUTCDate() - daysSinceFriday);
-  return Array.from({ length: 7 }, (_, index) =>
-    addDays(local.toISOString().slice(0, 10), index),
-  );
+  return Array.from({ length: 7 }, (_, index) => addDays(local.toISOString().slice(0, 10), index));
 }
 
 export function appDayBounds(value = new Date()) {

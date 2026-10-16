@@ -202,8 +202,8 @@ export async function getSportsApiDailyFixtures(
     result = { success: false, events: [], error: { code: 500, message } };
   }
 
-  result = { success: true, events: Array.from(eventsMap.values()) };
-  if (result.success === false) return result;
+  if (result.success !== false)
+    result = { success: true, events: Array.from(eventsMap.values()) };
   dailyFixturesCache.set(dateString, {
     data: result,
     expiresAt: now + DISCOVERY_CACHE_TTL_MS,

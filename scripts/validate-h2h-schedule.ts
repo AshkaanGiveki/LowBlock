@@ -1,0 +1,2 @@
+import { getDb, closeMongo } from "../lib/db/mongo";
+const db = await getDb(); const leagues = await db.collection<any>("h2hLeagues").find({}).toArray(); const invalid = leagues.filter((l) => l.slates?.length !== 7 || new Set(l.slates.flatMap((s: any) => s.fixtureIds)).size !== l.slates.flatMap((s: any) => s.fixtureIds).length || l.slates.some((s: any) => s.fixtures.length < 4 || s.fixtures.length > 5)); console.log(JSON.stringify({ leagues: leagues.length, invalid: invalid.length })); if (invalid.length) process.exitCode = 1; await closeMongo();

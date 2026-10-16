@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
 import {
@@ -7,11 +8,13 @@ import {
   Crown,
   Medal,
   Sparkles,
+  Settings2,
   Trophy,
   Users,
   Zap,
 } from "lucide-react";
 import { getDb } from "@/lib/db/mongo";
+import { currentUserId } from "@/lib/auth/session";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
 import { UserAvatar } from "@/components/UserAvatar";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
@@ -29,6 +32,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { username } = await params;
   const db = await getDb();
+  const viewerId = await currentUserId();
   const user = await db
     .collection<any>("users")
     .findOne(
@@ -67,6 +71,7 @@ async function PublicProfileData({
   ]);
   if (!user) notFound();
   const userId = String(user._id);
+  const isSelf = viewerId === userId;
   const year = Number(
     (
       await db
@@ -137,6 +142,7 @@ async function PublicProfileData({
     <main className="min-h-screen px-5 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-4xl">
         <section className="relative isolate overflow-hidden rounded-[2.25rem] border border-brand/25 bg-[radial-gradient(circle_at_50%_-15%,rgba(32,184,121,.34),transparent_42%),linear-gradient(150deg,#142b20,#080e0a)] p-6 shadow-[0_28px_100px_rgba(0,0,0,.3)] sm:p-10">
+          {isSelf && <Link href="/profile" aria-label="Account settings" className="absolute end-5 top-5 z-20 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-white/65 backdrop-blur transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand"><Settings2 size={16} /><span className="hidden text-[10px] font-black sm:inline"><T fa="تنظیمات" en="Settings" /></span></Link>}
           <div className="pointer-events-none absolute -right-20 -top-20 -z-10 h-64 w-64 rounded-full bg-brand/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-14 -z-10 h-60 w-60 rounded-full bg-[#e8c66a]/10 blur-3xl" />
           <div className="relative mx-auto grid w-fit place-items-center">

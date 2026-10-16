@@ -87,7 +87,7 @@ flowchart LR
   H --> J[Match analytics]
 ```
 
-The scheduled sync fetches match lists and results first. Only after a successful fetch does the score engine recalculate affected rounds, leagues, seasons, and global totals. This keeps leaderboards reproducible and makes a retry safe.
+The scheduled sync fetches match lists and results at 00:00 UTC (03:30 Asia/Tehran). A separate batched leaderboard job runs at 00:10 UTC (03:40 Asia/Tehran), after the data sync, recalculates prediction scores for recently finished matches, and rebuilds the affected leaderboard scopes. The leaderboard job uses QStash to continue through additional batches when more than five recent matches need processing. When H2H is enabled, the Friday sync also queues the full Friday–Thursday H2H discovery and league-materialization job through QStash, so only the two daily Vercel cron entries are required.
 
 ## Scoring model
 

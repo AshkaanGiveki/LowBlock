@@ -18,6 +18,8 @@ import {
 import { T } from "@/components/LanguageProvider";
 import { DesktopHomeDashboard } from "@/components/DesktopHomeDashboard";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getViewerH2HTodayMatch } from "@/lib/domain/h2h";
+import H2HHomeMatchupCard from "@/components/H2HHomeMatchupCard";
 
 export const dynamic = "force-dynamic";
 const featuredLeagues = FEATURED_COMPETITION_CODES.map((code) =>
@@ -54,9 +56,10 @@ async function HomeData() {
   let points = 0;
   let exact = 0;
   let club: any = null;
+  let h2hTodayMatch: any = null;
   if (userId) {
     const db = await getDb();
-    const [user, year, membership] = await Promise.all([
+    const [user, year, membership, todayMatch] = await Promise.all([
       db
         .collection<any>("users")
         .findOne(
@@ -67,8 +70,10 @@ async function HomeData() {
       db
         .collection<any>("clubMemberships")
         .findOne({ userId, leftAt: null }, { projection: { clubId: 1 } }),
+      getViewerH2HTodayMatch(db, userId),
     ]);
     username = user?.username ?? "";
+    h2hTodayMatch = todayMatch;
     const mine = await getLeaderboardSummary(db, userId, {
       seasonStartYear: year,
     });
@@ -98,6 +103,7 @@ async function HomeData() {
   return (
     <main className="min-h-screen pb-24 pt-20">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
+        {h2hTodayMatch && <H2HHomeMatchupCard match={h2hTodayMatch} />}
         <DesktopHomeDashboard
           matches={matches}
           predictions={Object.fromEntries(predictions)}

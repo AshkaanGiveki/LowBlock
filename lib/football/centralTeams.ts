@@ -6,6 +6,7 @@ import type { ProviderName } from "./types";
 
 export type CentralTeamRecord = {
   centralTeamId: string;
+  numericTeamId?: number;
   names: { en: string; fa: string };
   providerIds: Partial<Record<ProviderName | "transfermarkt", string>>;
   providerNames: Partial<Record<ProviderName | "transfermarkt", string>>;
@@ -75,6 +76,12 @@ export async function ensureCentralTeam(input: {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+  const counter = await db.collection<{ _id: string; nextValue: number }>("centralTeamCounters").findOneAndUpdate(
+    { _id: "numericTeamId" },
+    { $inc: { nextValue: 1 } },
+    { upsert: true, returnDocument: "after" },
+  );
+  record.numericTeamId = Number(counter?.nextValue ?? 1);
   await db.collection("centralTeams").insertOne(record as any);
   return record.centralTeamId;
 }
@@ -86,5 +93,6 @@ export async function ensureCentralTeamIndexes() {
     db.collection("centralTeams").createIndex({ "providerIds.football-api": 1 }, { sparse: true, unique: true }),
     db.collection("centralTeams").createIndex({ "providerIds.sportsapi": 1 }, { sparse: true, unique: true }),
     db.collection("centralTeams").createIndex({ aliases: 1 }),
+    db.collection("centralTeams").createIndex({ numericTeamId: 1 }, { unique: true, sparse: true }),
   ]);
 }
