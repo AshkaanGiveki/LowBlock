@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     }
     let queuedH2H = false;
     const week = getH2HWeek();
-    const isFinalBatch = !result.hasMore;
+    const isFinalBatch = !("hasMore" in result) || !result.hasMore;
     const isH2HWeekStart = appDateKey() === appDateKey(week.start);
     if (
       isFinalBatch &&
