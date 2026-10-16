@@ -26,10 +26,10 @@ function countdownParts(milliseconds: number, language: "fa" | "en") {
   const remainder = seconds % 60;
 
   return [
-    [days, language === "fa" ? "روز" : "D"],
-    [hours, language === "fa" ? "ساعت" : "H"],
-    [minutes, language === "fa" ? "دقیقه" : "M"],
-    [remainder, language === "fa" ? "ثانیه" : "S"],
+    [days, "D"],
+    [hours, "H"],
+    [minutes, "M"],
+    [remainder, "S"],
   ].map(([value, label]) => ({
     value: formatNumber(value as number, language, { minimumIntegerDigits: 2, useGrouping: false }),
     label,
@@ -209,7 +209,7 @@ export default function H2HTodayMatches({ slates, leagueId }: { slates: any[]; l
                 {!started && (
                   <div className={`border-t px-3 py-3 ${gold ? "border-[#211b09]/20 bg-[#e5b90b]/70" : "border-white/[.1] bg-[#06120d]/80"}`}>
                     <div className={ `mb-2 flex items-center justify-center gap-1.5 text-[8px] font-black uppercase tracking-[.16em] ${countdownMutedText}` }><Clock3 size={11} /> <T fa="زمان باقی‌مانده" en="STARTS IN" /></div>
-                    <div className={`grid grid-cols-4 divide-x overflow-hidden rounded-xl border ${gold ? "divide-[#211b09]/15 border-[#211b09]/20 bg-[#211b09]/[.06]" : "divide-white/10 border-white/[.1] bg-black/10"}`}>
+                    <div dir="ltr" className={`grid grid-cols-4 divide-x overflow-hidden rounded-xl border ${gold ? "divide-[#211b09]/15 border-[#211b09]/20 bg-[#211b09]/[.06]" : "divide-white/10 border-white/[.1] bg-black/10"}`}>
                       {timer.map((unit) => (
                         <div key={unit.label} className="px-1 py-2 text-center">
                           <div className={`text-[17px] font-light leading-none tracking-[-.04em] tabular-nums ${countdownPrimaryText}`}>{unit.value}</div>

@@ -1,6 +1,7 @@
 import { closeMongo, getDb } from "../lib/db/mongo";
 import { reviewedPersianTeamName } from "../lib/football/persian-team-names";
 import { repairPersianText, teamName } from "../lib/football/team-names";
+import { SPORTSAPI_PERSIAN_TEAM_NAMES } from "../lib/football/persian-team-names-sportsapi";
 
 function isEnglishFallback(en: string, fa: string | undefined) {
   return !fa || fa.trim() === en.trim();
@@ -15,7 +16,7 @@ async function main() {
   for (const row of central) {
     const en = String(row.names?.en || row.providerNames?.sportsapi || row.providerNames?.["football-api"] || "").trim();
     if (!en) continue;
-    let fa = reviewedPersianTeamName(en);
+    let fa = repairPersianText(SPORTSAPI_PERSIAN_TEAM_NAMES[en] || reviewedPersianTeamName(en) || "");
     if (!fa) {
       for (const provider of ["sportsapi", "football-api"] as const) {
         const id = row.providerIds?.[provider];
