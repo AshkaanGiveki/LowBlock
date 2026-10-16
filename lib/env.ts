@@ -42,7 +42,7 @@ const schema = z.object({
   APP_TIMEZONE: z.string().default("UTC"),
   H2H_ENABLED: z
     .preprocess((value) => value === "true" || value === true, z.boolean())
-    .default(false),
+    .default(true),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     // `current` and `football-api` are retained as backwards-compatible
     // aliases for the API-Football provider. `sportsapi` is the default.
