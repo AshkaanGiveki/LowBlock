@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
-import { runScoreEngine } from "@/lib/scoring/scoreEngine";
+import { Client } from "@upstash/qstash";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -179,26 +179,31 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
       "<b>Sync in progress</b>\n\nFetching yesterday, today, and tomorrow through SportsAPI REST...\nSaving fixtures and official statuses to MongoDB...",
     );
     const syncResult = await provider.sync({ deferScoring: true });
-    await updateProgress(
-      `<b>REST sync complete</b>\n\nFixtures updated: <b>${syncResult.total}</b>\nREST requests attempted: <b>${syncResult.listRequests}</b>\n\nRecalculating player prediction scores...`,
-    );
+    if (!env.QSTASH_TOKEN || !env.NEXT_PUBLIC_APP_URL || !env.CRON_SECRET) {
+      throw new Error(
+        "QSTASH_NOT_CONFIGURED:QSTASH_TOKEN,NEXT_PUBLIC_APP_URL,CRON_SECRET",
+      );
+    }
 
-    // The admin command deliberately runs the unrestricted full pass. This
-    // scores every finished match in MongoDB and rebuilds every leaderboard
-    // scope, unlike the bounded scheduled recovery path.
-    const scoreEngine = await runScoreEngine({ rebuildLeaderboards: true });
-    const result = {
-      total: syncResult.total,
-      scoreEngine,
-    };
+    // Do not run the unrestricted full-season score pass inside the Telegram
+    // webhook. It can exceed the function lifetime after the REST sync has
+    // completed. Queue the same bounded, chained rebuild used by the daily
+    // cron instead; it performs no additional SportsAPI requests.
+    await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
+      url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/rebuild-leaderboards`,
+      body: { reason: "telegram-sync-now", requestedAt: new Date().toISOString() },
+      headers: { authorization: `Bearer ${env.CRON_SECRET}` },
+      deduplicationId: `lowblock-telegram-rebuild-${String(chatId)}-${Date.now()}`,
+    });
+
     await updateProgress(
-      `<b>Scores and leaderboards complete</b>\n\nPrediction scores recalculated: <b>${result.scoreEngine.scores}</b>\nLeaderboard records rebuilt: <b>${result.scoreEngine.leaderboards}</b>\nRound winners processed: <b>${result.scoreEngine.roundWinners}</b>\n\nScheduling notifications...`,
+      `<b>REST sync complete</b>\n\nFixtures updated: <b>${syncResult.total}</b>\nREST requests attempted: <b>${syncResult.listRequests}</b>\n\nScore calculation and leaderboard rebuild queued in background...`,
     );
     const notifications = await scheduleFootballNotifications();
     await updateProgress(
       (syncResult.failedDates?.length ?? 0) > 0
-        ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${result.total}. Failed dates: ${syncResult.failedDates?.join(", ")}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`
-        : `Sync complete. Fixtures updated: ${result.total}. Scores recalculated: ${result.scoreEngine.scores}. Leaderboard scopes rebuilt: ${result.scoreEngine.leaderboards}. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
+        ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${syncResult.total}. Failed dates: ${syncResult.failedDates?.join(", ")}. Score calculation and leaderboard rebuild are queued. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`
+        : `Sync complete. Fixtures updated: ${syncResult.total}. Score calculation and leaderboard rebuild are queued. Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
