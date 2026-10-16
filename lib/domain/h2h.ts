@@ -246,12 +246,15 @@ export async function materializeH2HLeague(db: Db, league: any) {
   for (const userId of league.players.map(String)) await db.collection("notificationDeliveries").updateOne({ userId, matchId: `H2H:${league._id}`, channel: "IN_APP", type: "H2H_ROSTER_PUBLISHED" }, { $setOnInsert: { userId, matchId: `H2H:${league._id}`, type: "H2H_ROSTER_PUBLISHED", leagueId: league._id, channel: "IN_APP", status: "PENDING", createdAt: now } }, { upsert: true });
 }
 
-export async function ensureCurrentH2HLeagues(db: Db) {
+export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: number; batchSize?: number } = {}) {
   if (!isH2HEnabled()) return { enabled: false, created: 0 };
   await ensureH2HIndexes();
   const week = getH2HWeek();
   await settleH2HLeagues(db, getH2HWeek(new Date(), 1).key);
-  const clubs = await db.collection<any>("clubs").find({ state: "ACTIVE" }, { projection: { _id: 1 } }).toArray();
+  const batchIndex = Math.max(0, options.batchIndex ?? 0);
+  const batchSize = Math.max(1, options.batchSize ?? 5);
+  const totalClubs = await db.collection<any>("clubs").countDocuments({ state: "ACTIVE" });
+  const clubs = await db.collection<any>("clubs").find({ state: "ACTIVE" }, { projection: { _id: 1 } }).sort({ _id: 1 }).skip(batchIndex * batchSize).limit(batchSize).toArray();
   let created = 0;
   for (const club of clubs) {
     const clubId = String(club._id);
@@ -278,9 +281,12 @@ export async function ensureCurrentH2HLeagues(db: Db) {
       created++;
     }
   }
-  const weekLeagues = await db.collection<any>("h2hLeagues").countDocuments({ weekKey: week.key });
-  if (!weekLeagues) await db.collection("h2hWeeks").updateOne({ weekKey: week.key }, { $set: { weekKey: week.key, startsAt: week.start, endsAt: week.end, status: "CANCELLED", cancelledReason: "NO_VALID_EIGHT_PLAYER_LEAGUE_OR_SCHEDULE", updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
-  return { enabled: true, created, weekKey: week.key };
+  const hasMore = (batchIndex + 1) * batchSize < totalClubs;
+  if (!hasMore) {
+    const weekLeagues = await db.collection<any>("h2hLeagues").countDocuments({ weekKey: week.key });
+    if (!weekLeagues) await db.collection("h2hWeeks").updateOne({ weekKey: week.key }, { $set: { weekKey: week.key, startsAt: week.start, endsAt: week.end, status: "CANCELLED", cancelledReason: "NO_VALID_EIGHT_PLAYER_LEAGUE_OR_SCHEDULE", updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
+  }
+  return { enabled: true, created, weekKey: week.key, batchIndex, batchSize, processedClubs: clubs.length, totalClubs, hasMore };
 }
 
 export async function settleH2HLeagues(db: Db, weekKey = getH2HWeek().key) {

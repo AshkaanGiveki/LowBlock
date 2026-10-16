@@ -238,7 +238,7 @@ function eventTournamentKey(event: any) {
 }
 
 /** Discovers and audits every date in a week before H2H slate generation. */
-export async function discoverSportsApiWeek(dateStrings: string[], options: { attempts?: number } = {}) {
+export async function discoverSportsApiWeek(dateStrings: string[], options: { attempts?: number; reuseComplete?: boolean } = {}) {
   const attempts = Math.max(1, options.attempts ?? 3);
   const todayStr = appDateKey();
   const allEvents = new Map<string, any>();
@@ -248,12 +248,12 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
     const db = await getDb();
     const persisted = await db.collection<any>("sportsApiDiscoveryManifests").findOne({ kind: "daily", dateString, status: "COMPLETE", "data.events": { $exists: true } });
     const persistedAt = persisted?.checkedAt ? new Date(persisted.checkedAt).getTime() : 0;
-    const reusableFutureManifest =
-      dateString > todayStr &&
+    const reusableManifest =
+      (options.reuseComplete || dateString > todayStr) &&
       persistedAt > 0 &&
       Date.now() - persistedAt < DISCOVERY_CACHE_TTL_MS &&
       Array.isArray(persisted?.data?.events);
-    if (reusableFutureManifest) {
+    if (reusableManifest) {
       for (const event of persisted.data.events) {
         const id = String(event?.id ?? event?.eventId ?? "");
         if (id) allEvents.set(id, event);
@@ -309,6 +309,25 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
   const db = await getDb();
   await db.collection("sportsApiDiscoveryManifests").updateOne({ kind: "weekly", dates }, { $set: { kind: "weekly", dates, status: complete ? "COMPLETE" : "INCOMPLETE", manifests, checkedAt: new Date() } }, { upsert: true });
   return { complete, events: Array.from(allEvents.values()), manifests };
+}
+
+/** Rebuilds the weekly manifest from persisted daily manifests without API calls. */
+export async function finalizeSportsApiWeek(dateStrings: string[]) {
+  const dates = [...new Set(dateStrings)];
+  const db = await getDb();
+  const manifests = await db.collection<any>("sportsApiDiscoveryManifests").find({
+    kind: "daily",
+    dateString: { $in: dates },
+  }).toArray();
+  const byDate = new Map(manifests.map((manifest) => [String(manifest.dateString), manifest]));
+  const ordered = dates.map((dateString) => byDate.get(dateString)).filter(Boolean) as SportsApiDiscoveryManifest[];
+  const complete = ordered.length === dates.length && ordered.every((manifest) => manifest.status === "COMPLETE");
+  await db.collection("sportsApiDiscoveryManifests").updateOne(
+    { kind: "weekly", dates },
+    { $set: { kind: "weekly", dates, status: complete ? "COMPLETE" : "INCOMPLETE", manifests: ordered, checkedAt: new Date() } },
+    { upsert: true },
+  );
+  return { complete, manifests: ordered };
 }
 
 /**

@@ -12,9 +12,11 @@ import type {
 import {
   getSportsApiDailyFixtures,
   discoverSportsApiWeek,
+  finalizeSportsApiWeek,
   getSportsApiTournamentSeasons,
   getSportsApiTournamentEvents,
 } from "./rest";
+import type { SportsApiDiscoveryManifest } from "./rest";
 import { normalizeSportsApiMatch } from "./normalizer";
 import { getSportsApiWsManager } from "./ws";
 import { env } from "@/lib/env";
@@ -231,12 +233,23 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
   async syncWeekDates(dateKeys: string[]) {
     const db = await getDb();
-    const discovery = await discoverSportsApiWeek(dateKeys, { attempts: 3 });
+    const discovery = await discoverSportsApiWeek(dateKeys, { attempts: 1, reuseComplete: true });
     if (!discovery.complete) {
       throw new Error(`SportsAPI weekly discovery incomplete: ${discovery.manifests.filter((item) => item.status !== "COMPLETE").map((item) => item.dateString).join(", ")}`);
     }
     const matches = discovery.events
       .map((event) => normalizeSportsApiMatch(event))
+      .filter((match): match is CanonicalMatch => Boolean(match));
+    const total = await this.saveMatches(db, matches);
+    return { total, matches, discovery };
+  }
+
+  async finalizeWeekDates(dateKeys: string[]) {
+    const db = await getDb();
+    const discovery = await finalizeSportsApiWeek(dateKeys);
+    const events = discovery.manifests.flatMap((manifest) => (manifest as SportsApiDiscoveryManifest & { data?: { events?: any[] } }).data?.events ?? []);
+    const matches = events
+      .map((event: any) => normalizeSportsApiMatch(event))
       .filter((match): match is CanonicalMatch => Boolean(match));
     const total = await this.saveMatches(db, matches);
     return { total, matches, discovery };
