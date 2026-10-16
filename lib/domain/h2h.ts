@@ -189,13 +189,20 @@ async function eligibleUsers(db: Db, ids: string[], weekKey: string) {
 
 export async function selectH2HPlayers(db: Db, clubId: string, week: H2HWeek) {
   const ids = await eligibleUsers(db, await memberIds(db, clubId), week.key);
-  const previous = getH2HWeek(week.start, 1);
+  const previous = getH2HWeek(week.start, -1);
   const previousLeague = await db.collection<any>("h2hLeagues").findOne(
     { clubId, weekKey: previous.key, groupNumber: 1, status: "COMPLETED" },
     { projection: { winnerUserId: 1 } },
   );
-  const rows = await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, Math.max(100, ids.length));
   const idSet = new Set(ids);
+  let rows = await getCanonicalLeaderboard(db, { clubId, weekly: true, weeklyOffset: 1 }, Math.max(100, ids.length));
+  // Older score rows may not contain clubIdAtLock. In that case the club
+  // scoped query is empty even though the same members are present globally.
+  // Filter the canonical global weekly leaderboard by current eligibility.
+  if (!rows.length) {
+    const globalRows = await getCanonicalLeaderboard(db, { weekly: true, weeklyOffset: 1 }, 100);
+    rows = globalRows.filter((row) => idSet.has(row.userId));
+  }
   const picked: string[] = [];
   if (previousLeague?.winnerUserId && idSet.has(String(previousLeague.winnerUserId))) picked.push(String(previousLeague.winnerUserId));
   for (const row of rows) if (idSet.has(row.userId) && !picked.includes(row.userId)) picked.push(row.userId);
