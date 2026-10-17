@@ -62,6 +62,21 @@ export function buildH2HPairings(playerIds: string[], roundIndex: number): H2HPa
 
 export function isH2HEnabled() { return env.H2H_ENABLED; }
 
+const H2H_VOID_STATUSES = new Set([
+  "VOID",
+  "CANCELLED",
+  "CANCELED",
+  "POSTPONED",
+  "ABANDONED",
+]);
+
+/** A fixture is resolved for H2H when it has a score or is terminal without one. */
+export function isH2HFixtureResolved(match: any): boolean {
+  if (!match) return false;
+  if (match.homeGoals != null && match.awayGoals != null) return true;
+  return H2H_VOID_STATUSES.has(String(match.status ?? "").toUpperCase());
+}
+
 export function getH2HWeek(now = new Date(), offset = 0): H2HWeek {
   const zone = (() => { try { new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE }).format(now); return env.APP_TIMEZONE; } catch { return "UTC"; } })();
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
@@ -379,7 +394,7 @@ export async function calculateH2HStandings(db: Db, league: any) {
     const slateMatches = slate.fixtureIds.map((matchId) => byMatch.get(matchId)).filter(Boolean);
     const completedMatches = slateMatches.filter((match: any) => match.homeGoals != null && match.awayGoals != null);
     if (!completedMatches.length) continue;
-    const slateComplete = completedMatches.length === slate.fixtureIds.length;
+    const slateComplete = slate.fixtureIds.every((matchId) => isH2HFixtureResolved(byMatch.get(matchId)));
     const slateScores = new Map<string, number>();
     for (const id of ids) {
       let score = 0;
