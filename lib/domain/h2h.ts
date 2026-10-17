@@ -267,7 +267,8 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
   if (!isH2HEnabled()) return { enabled: false, created: 0 };
   await ensureH2HIndexes();
   const week = getH2HWeek();
-  await settleH2HLeagues(db, getH2HWeek(new Date(), 1).key);
+  // At the beginning of a new H2H week, finish the previous week's leagues.
+  await settleH2HLeagues(db, getH2HWeek(new Date(), -1).key);
   const batchIndex = Math.max(0, options.batchIndex ?? 0);
   const batchSize = Math.max(1, options.batchSize ?? 5);
   const sourceDate = options.sourceDate;
@@ -315,11 +316,13 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
     }
   }
   const hasMore = (batchIndex + 1) * batchSize < totalClubs;
+  let refreshed: { updated: number } | null = null;
+  if (!hasMore) refreshed = await refreshActiveH2HResults(db, week.key);
   if (!hasMore) {
     const weekLeagues = await db.collection<any>("h2hLeagues").countDocuments({ weekKey: week.key });
     if (!weekLeagues) await db.collection("h2hWeeks").updateOne({ weekKey: week.key }, { $set: { weekKey: week.key, startsAt: week.start, endsAt: week.end, status: "CANCELLED", cancelledReason: "NO_VALID_EIGHT_PLAYER_LEAGUE_OR_SCHEDULE", updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
   }
-  return { enabled: true, created, weekKey: week.key, batchIndex, batchSize, processedClubs: clubs.length, totalClubs, hasMore };
+  return { enabled: true, created, weekKey: week.key, batchIndex, batchSize, processedClubs: clubs.length, totalClubs, hasMore, refreshed };
 }
 
 /** Select the daily H2H slate as soon as that provider date is available. */
@@ -353,28 +356,48 @@ export async function settleH2HLeagues(db: Db, weekKey = getH2HWeek().key) {
   const leagues = await db.collection<any>("h2hLeagues").find({ weekKey, status: "ACTIVE" }).toArray();
   let completed = 0;
   for (const league of leagues) {
-    const standings = await calculateH2HStandings(db, league);
+    const refreshed = await refreshH2HLeagueResults(db, league);
+    const standings = refreshed.standings;
     if (new Date() < new Date(league.endsAt)) continue;
     const winner = standings[0];
-    await db.collection("h2hStandings").deleteMany({ leagueId: league._id });
-    if (standings.length) {
-      const played = league.slates.length;
-      await db.collection("h2hStandings").insertMany(standings.map((row: any) => ({ ...row, leagueId: league._id, played, totalSlatePoints: row.predictionPoints, normalizedAveragePoints: played ? row.predictionPoints / played : 0, scoreDifference: row.wins - row.losses, exactPredictions: 0, goldSelections: 0, goldWins: 0, qualificationStatus: row.rank <= 7 ? "QUALIFIED" : "NOT_QUALIFIED", createdAt: new Date(), updatedAt: new Date() })));
-      const operations = [] as any[];
-      for (const slate of league.slates as H2HSlate[]) for (const pairing of buildH2HPairings(league.players.map(String), slate.matchday - 1)) {
-        const a = standings.find((row: any) => row.userId === pairing.playerA);
-        const b = standings.find((row: any) => row.userId === pairing.playerB);
-        const as = a?.slateScores?.[String(slate.matchday)] ?? 0; const bs = b?.slateScores?.[String(slate.matchday)] ?? 0;
-        operations.push({ updateOne: { filter: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}` }, update: { $set: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}`, playerA: a?.userId, playerB: b?.userId, scoreA: as, scoreB: bs, winnerUserId: as === bs ? null : as > bs ? a?.userId : b?.userId, status: "FINAL", updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } }, upsert: true } });
-      }
-      if (operations.length) await db.collection("h2hMatchResults").bulkWrite(operations);
-    }
     if (winner) await db.collection("h2hRewards").updateOne({ leagueId: league._id, userId: winner.userId, rewardType: "PREVIOUS_H2H_WINNER" }, { $set: { leagueId: league._id, userId: winner.userId, rewardType: "PREVIOUS_H2H_WINNER", rank: 1, createdAt: new Date() }, $setOnInsert: { ticketId: new ObjectId().toHexString() } }, { upsert: true });
     await db.collection("h2hLeagues").updateOne({ _id: league._id, status: "ACTIVE" }, { $set: { status: "COMPLETED", winnerUserId: winner?.userId ?? null, completedAt: new Date(), updatedAt: new Date() } });
     await db.collection("h2hAuditEvents").updateOne({ eventKey: `SETTLED:${league._id}` }, { $setOnInsert: { eventKey: `SETTLED:${league._id}`, leagueId: league._id, type: "LEAGUE_COMPLETED", createdAt: new Date(), winnerUserId: winner?.userId ?? null } }, { upsert: true });
     completed++;
   }
   return { weekKey, completed };
+}
+
+/** Rebuild the persisted H2H rows for one active league after new results arrive. */
+export async function refreshH2HLeagueResults(db: Db, league: any) {
+  const standings = await calculateH2HStandings(db, league);
+  const fixtureIds = league.slates.flatMap((slate: H2HSlate) => slate.fixtureIds);
+  const matches = await db.collection<any>("matches").find({ providerMatchId: { $in: fixtureIds } }, { projection: { providerMatchId: 1, status: 1, homeGoals: 1, awayGoals: 1 } }).toArray();
+  const byMatch = new Map(matches.map((match) => [String(match.providerMatchId), match]));
+  const completedSlates = (league.slates as H2HSlate[]).filter((slate) => slate.fixtureIds.every((matchId) => isH2HFixtureResolved(byMatch.get(matchId))));
+  const now = new Date();
+  await db.collection("h2hStandings").deleteMany({ leagueId: league._id });
+  if (standings.length) {
+    const played = completedSlates.length;
+    await db.collection("h2hStandings").insertMany(standings.map((row: any) => ({ ...row, leagueId: league._id, played, totalSlatePoints: row.predictionPoints, normalizedAveragePoints: played ? row.predictionPoints / played : 0, scoreDifference: row.wins - row.losses, exactPredictions: 0, goldSelections: 0, goldWins: 0, qualificationStatus: row.rank <= 7 ? "QUALIFIED" : "NOT_QUALIFIED", createdAt: now, updatedAt: now })));
+    const operations = [] as any[];
+    for (const slate of completedSlates) for (const pairing of buildH2HPairings(league.players.map(String), slate.matchday - 1)) {
+      const a = standings.find((row: any) => row.userId === pairing.playerA);
+      const b = standings.find((row: any) => row.userId === pairing.playerB);
+      const as = a?.slateScores?.[String(slate.matchday)] ?? 0;
+      const bs = b?.slateScores?.[String(slate.matchday)] ?? 0;
+      operations.push({ updateOne: { filter: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}` }, update: { $set: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}`, playerA: a?.userId, playerB: b?.userId, scoreA: as, scoreB: bs, winnerUserId: as === bs ? null : as > bs ? a?.userId : b?.userId, status: "FINAL", updatedAt: now }, $setOnInsert: { createdAt: now } }, upsert: true } });
+    }
+    if (operations.length) await db.collection("h2hMatchResults").bulkWrite(operations);
+  }
+  return { standings, played: completedSlates.length };
+}
+
+/** Persist current standings/results for every active league after nightly sync. */
+export async function refreshActiveH2HResults(db: Db, weekKey = getH2HWeek().key) {
+  const leagues = await db.collection<any>("h2hLeagues").find({ weekKey, status: "ACTIVE" }).toArray();
+  for (const league of leagues) await refreshH2HLeagueResults(db, league);
+  return { updated: leagues.length };
 }
 
 export async function calculateH2HStandings(db: Db, league: any) {
@@ -488,7 +511,7 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
           const gold = goldByPlayerSlate.get(`${playerId}:${slate.matchday}`) === fixture.matchId;
           return { ...score, points: score.points * (gold ? 2 : 1) };
         };
-        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, hasPrediction: { playerA: aHasPrediction, playerB: bHasPrediction }, predictions: { playerA: aVisiblePrediction, playerB: bVisiblePrediction }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
+        return { ...fixture, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isResolved: isH2HFixtureResolved(match), isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, hasPrediction: { playerA: aHasPrediction, playerB: bHasPrediction }, predictions: { playerA: aVisiblePrediction, playerB: bVisiblePrediction }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
       });
       const scoreA = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerA.points, 0);
       const scoreB = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerB.points, 0);
