@@ -83,7 +83,7 @@ export default function H2HBoard() {
   const [now, setNow] = useState(Date.now());
   const initialized = useRef(false);
 
-  const load = () => fetch("/api/h2h/current").then((response) => response.json()).then((next) => {
+  const load = () => fetch("/api/h2h/current", { cache: "no-store" }).then((response) => response.json()).then((next) => {
     setData(next);
     if (!initialized.current && next.league?.slates?.length) {
       const upcoming = next.league.slates.find((slate: any) => new Date(slate.firstKickoffAt) > new Date());
@@ -91,7 +91,11 @@ export default function H2HBoard() {
       initialized.current = true;
     }
   }).catch(() => setError("Could not load H2H"));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
 
   if (!data) return <main className="min-h-screen bg-[#080b0a]" />;
@@ -99,7 +103,9 @@ export default function H2HBoard() {
   const league = data.league;
   if (!league) return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><H2HAccessCard reason={data.reason} clubMemberCount={data.clubMemberCount} /></div></main>;
 
-  const availableMatchdays = league.slates.map((item: any) => Number(item.matchday)).sort((a: number, b: number) => a - b);
+  // The weekly H2H track is always seven rounds, even while future dates are
+  // still being discovered and their slates have not been materialized yet.
+  const availableMatchdays = Array.from({ length: 7 }, (_, index) => index + 1);
   const selectedIndex = Math.max(0, availableMatchdays.indexOf(day));
   const activeMatchday = availableMatchdays[selectedIndex] ?? 1;
   const round = league.h2hMatches?.find((item: any) => item.matchday === activeMatchday);
@@ -111,7 +117,7 @@ export default function H2HBoard() {
   const go = (direction: number) => setDay(availableMatchdays[Math.min(availableMatchdays.length - 1, Math.max(0, selectedIndex + direction))] ?? 1);
 
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl">
-    <H2HHero slateCount={league.slates.length} activeSlate={selectedIndex + 1} progressSlate={progressSlate} />
+    <H2HHero slateCount={7} activeSlate={selectedIndex + 1} progressSlate={progressSlate} />
     {data.viewerIncluded ? <H2HTodayMatches slates={league.slates} leagueId={league.id} /> : <H2HAccessCard observer />}
     <section dir="ltr" className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-4 py-3.5 md:px-5"><button type="button" onClick={() => go(-1)} disabled={selectedIndex <= 0} aria-label="Previous round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div dir="auto" className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="راند هفتگی" en="WEEKLY ROUND" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="راند" en="Round" /> {activeMatchday}</h2><p className="mt-0.5 text-[10px] text-white/35">{slate?.sourceDate ?? league.weekKey}</p></div><button type="button" onClick={() => go(1)} disabled={selectedIndex >= availableMatchdays.length - 1} aria-label="Next round" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
     <H2HRoundMatches round={round} />

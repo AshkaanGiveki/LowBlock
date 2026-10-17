@@ -37,7 +37,7 @@ function PlayerSide({ player, prediction, hasPrediction, gold, align, language }
 }
 
 function FixtureDetails({ fixture, match, language }: { fixture: any; match: any; language: "fa" | "en" }) {
-  const finished = fixture.homeGoals !== null && fixture.awayGoals !== null;
+  const finished = fixture.isResolved ?? (fixture.homeGoals !== null && fixture.awayGoals !== null);
   const playerAScore = fixture.scores?.playerA?.points ?? 0;
   const playerBScore = fixture.scores?.playerB?.points ?? 0;
   const winner = finished && playerAScore !== playerBScore ? (playerAScore > playerBScore ? "A" : "B") : null;
@@ -88,7 +88,7 @@ export default function H2HRoundMatches({ round }: { round: any }) {
       <div className="grid gap-3 lg:grid-cols-2">
         {round.pairings.map((match: any, index: number) => {
           const isExpanded = expanded === index;
-          const isFinished = match.fixtures.every((fixture: any) => fixture.homeGoals !== null && fixture.awayGoals !== null);
+          const isFinished = match.fixtures.every((fixture: any) => fixture.isResolved ?? (fixture.homeGoals !== null && fixture.awayGoals !== null));
           const winner = match.winner;
           return (
             <motion.div layout key={`${match.playerA?.userId}-${match.playerB?.userId}`} role="button" tabIndex={0} aria-expanded={isExpanded} onClick={() => setExpanded(isExpanded ? null : index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setExpanded(isExpanded ? null : index); } }} className={`cursor-pointer overflow-hidden rounded-[1.15rem] border bg-[#101713] transition ${isExpanded ? "border-brand/45 shadow-[0_18px_46px_rgba(0,0,0,.2)]" : "border-white/[.08] hover:border-white/20"}`}>
