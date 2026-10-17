@@ -580,6 +580,7 @@ export async function runLeaderboardEngine(
       },
       { projection: { providerMatchId: 1 } },
     )
+    .sort({ kickoffAt: 1, providerMatchId: 1 })
     .limit(5000)
     .toArray();
   const batchSize = Math.max(1, options.batchSize ?? 5);

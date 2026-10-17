@@ -19,26 +19,44 @@ export async function GET(request: Request) {
       0,
       Number(url.searchParams.get("batch") ?? "0") || 0,
     );
-    const result = await runLeaderboardEngine({
+    const canQueueContinuation = Boolean(
+      env.QSTASH_TOKEN && env.NEXT_PUBLIC_APP_URL && env.CRON_SECRET,
+    );
+    // QStash keeps the Vercel invocation bounded when there are many recent
+    // fixtures. If it is not configured, process the complete recent window
+    // in this invocation instead of silently scoring only the first five.
+    let result = await runLeaderboardEngine({
       recentOnly: true,
       batchIndex,
-      batchSize: 5,
+      batchSize: canQueueContinuation ? 5 : 5000,
     });
     let queuedNextBatch = false;
     if (
       "hasMore" in result &&
       result.hasMore &&
-      env.QSTASH_TOKEN &&
-      env.NEXT_PUBLIC_APP_URL &&
-      env.CRON_SECRET
+      canQueueContinuation
     ) {
-      await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
-        url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/rebuild-leaderboards?batch=${batchIndex + 1}`,
-        body: { reason: "incremental-leaderboard-rebuild", batch: batchIndex + 1 },
-        headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-        deduplicationId: `lowblock-leaderboard-rebuild-${new Date().toISOString().slice(0, 10)}-${batchIndex + 1}`,
-      });
-      queuedNextBatch = true;
+      try {
+        await new Client({ token: env.QSTASH_TOKEN! }).publishJSON({
+          url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/rebuild-leaderboards?batch=${batchIndex + 1}`,
+          body: { reason: "incremental-leaderboard-rebuild", batch: batchIndex + 1 },
+          headers: { authorization: `Bearer ${env.CRON_SECRET!}` },
+          deduplicationId: `lowblock-leaderboard-rebuild-${new Date().toISOString().slice(0, 10)}-${batchIndex + 1}`,
+        });
+        queuedNextBatch = true;
+      } catch (queueError) {
+        // A queue outage must not leave the remaining matches unscored. The
+        // score engine is idempotent, so replaying the first batch and
+        // processing the whole window is safe.
+        console.error("leaderboard_continuation_queue_failed", {
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        });
+        result = await runLeaderboardEngine({
+          recentOnly: true,
+          batchIndex: 0,
+          batchSize: 5000,
+        });
+      }
     }
     let queuedH2H = false;
     const week = getH2HWeek();
