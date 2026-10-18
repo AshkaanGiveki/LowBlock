@@ -4,6 +4,8 @@ import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
 import { Client } from "@upstash/qstash";
 import { getH2HWeek } from "@/lib/domain/h2h";
 import { appDateKey } from "@/lib/football/scheduleWindow";
+import { ensureCurrentH2HLeagues } from "@/lib/domain/h2h";
+import { getDb } from "@/lib/db/mongo";
 
 export const maxDuration = 60;
 
@@ -59,8 +61,17 @@ export async function GET(request: Request) {
       }
     }
     let queuedH2H = false;
+    let dailyH2H: unknown = null;
     const week = getH2HWeek();
     const isFinalBatch = !("hasMore" in result) || !result.hasMore;
+    if (isFinalBatch && env.H2H_ENABLED) {
+      const tomorrow = appDateKey(new Date(Date.now() + 86_400_000));
+      dailyH2H = await ensureCurrentH2HLeagues(await getDb(), {
+        sourceDate: tomorrow,
+        batchIndex: 0,
+        batchSize: 1000,
+      });
+    }
     const isH2HWeekStart = appDateKey() === appDateKey(week.start);
     if (
       isFinalBatch &&
@@ -79,7 +90,7 @@ export async function GET(request: Request) {
       });
       queuedH2H = true;
     }
-    return NextResponse.json({ ok: true, queuedNextBatch, queuedH2H, ...result });
+    return NextResponse.json({ ok: true, queuedNextBatch, queuedH2H, dailyH2H, ...result });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "leaderboard rebuild failed";
