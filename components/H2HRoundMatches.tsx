@@ -9,8 +9,8 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { UserAvatar } from "@/components/UserAvatar";
 import { teamName } from "@/lib/football/team-names";
 
-function predictionLabel(prediction: any) {
-  if (prediction?.noPrediction) return "No prediction";
+function predictionLabel(prediction: any, language: "fa" | "en") {
+  if (prediction?.noPrediction) return language === "fa" ? "پیش بینی نشده" : "No prediction";
   if (!prediction) return "—";
   return `${prediction.homeGoals ?? "-"} : ${prediction.awayGoals ?? "-"}`;
 }
@@ -32,7 +32,7 @@ function MatchTeam({ team, side, language }: { team: any; side: "home" | "away";
 
 function PlayerSide({ player, prediction, hasPrediction, gold, align, language }: { player: any; prediction: any; hasPrediction: boolean; gold: boolean; align: "left" | "right"; language: "fa" | "en" }) {
   const avatar = <span title={gold ? (language === "fa" ? "انتخاب طلایی" : "Gold pick") : player?.username} className={`relative inline-flex rounded-full ${gold ? "ring-2 ring-[#e8c66a]/80 ring-offset-1 ring-offset-[#101713]" : ""}`}><UserAvatar name={player?.username ?? "Player"} avatarUrl={player?.avatarUrl} className="h-6 w-6 text-[7px]" />{gold && <span className="absolute -end-1 -top-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#e8c66a] text-[#241d08]"><Sparkles size={8} /></span>}</span>;
-  const predictionValue = <span className={`text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>{prediction ? predictionLabel(prediction) : <T fa="مخفی" en="Hidden" />}</span>;
+  const predictionValue = <span className={`text-[10px] font-black ${prediction ? "text-brand" : "text-white/25"}`}>{prediction ? predictionLabel(prediction, language) : <T fa="مخفی" en="Hidden" />}</span>;
   return align === "right" ? <div className="flex min-w-0 items-center justify-end gap-2">{predictionValue}{avatar}</div> : <div className="flex min-w-0 items-center justify-start gap-2">{avatar}{predictionValue}</div>;
 }
 

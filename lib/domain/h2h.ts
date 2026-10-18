@@ -503,8 +503,11 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
         const bHasPrediction = Boolean(bPrediction);
         if (!aPrediction) aPrediction = { noPrediction: true };
         if (!bPrediction) bPrediction = { noPrediction: true };
-        const aVisiblePrediction = finished || pairing.playerA === viewerId ? aPrediction : aHasPrediction ? null : aPrediction;
-        const bVisiblePrediction = finished || pairing.playerB === viewerId ? bPrediction : bHasPrediction ? null : bPrediction;
+        // Reveal submitted picks when the fixture starts, not only after it is
+        // completed. A player's own pick remains visible before kickoff.
+        const started = new Date() >= new Date(fixture.kickoffAt);
+        const aVisiblePrediction = started || pairing.playerA === viewerId ? aPrediction : aHasPrediction ? null : aPrediction;
+        const bVisiblePrediction = started || pairing.playerB === viewerId ? bPrediction : bHasPrediction ? null : bPrediction;
         const scoreFor = (prediction: any, playerId: string) => {
           if (!finished) return { points: 0, category: "NO_PREDICTION" as const };
           const score = calculatePredictionScore(prediction?.homeGoals ?? null, prediction?.awayGoals ?? null, match?.homeGoals ?? null, match?.awayGoals ?? null);
