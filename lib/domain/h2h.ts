@@ -292,6 +292,9 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
   for (const club of clubs) {
     const clubId = String(club._id);
     const existingPrimary = await db.collection<any>("h2hLeagues").findOne({ clubId, weekKey: week.key, groupNumber: 1 });
+    // An explicitly suspended round must remain suspended for the rest of the week.
+    // Do not add slates, materialize fixtures, or create additional groups for it.
+    if (existingPrimary?.status === "INACTIVE") continue;
     const primary = existingPrimary ?? await createH2HLeague(db, clubId, week);
     if (primary && dailySlate) {
       const slates = [...(primary.slates ?? []).filter((slate: H2HSlate) => slate.sourceDate !== sourceDate), dailySlate]

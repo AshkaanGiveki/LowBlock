@@ -76,6 +76,22 @@ function H2HAccessCard({ reason, clubMemberCount, observer = false }: { reason?:
   );
 }
 
+function H2HInactiveCard() {
+  return (
+    <section dir="rtl" className="relative mt-6 max-w-2xl overflow-hidden rounded-[1.5rem] border border-brand/20 bg-[linear-gradient(135deg,rgba(32,184,121,.12),rgba(16,23,19,.96)_60%)] px-5 py-6 text-right">
+      <div className="pointer-events-none absolute -end-10 -top-16 h-36 w-36 rounded-full bg-brand/10 blur-3xl" />
+      <div className="relative flex items-start gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/25 bg-brand/10 text-brand"><Swords size={20} /></span>
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[.18em] text-brand">H2H</p>
+          <h2 className="mt-1 text-xl font-black text-white">در انتظار شروع راند بعدی</h2>
+          <p className="mt-2 text-xs leading-6 text-white/55">راند این هفته به پایان رسیده است. رقابت H2H از هفته‌ی آینده با نفرات برتر هفته‌ی قبل آغاز می‌شود.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function H2HBoard() {
   const [data, setData] = useState<any>();
   const [day, setDay] = useState(1);
@@ -100,6 +116,7 @@ export default function H2HBoard() {
 
   if (!data) return <main className="min-h-screen bg-[#080b0a]" />;
   if (!data.enabled) return null;
+  if (data.reason === "NEXT_WEEK") return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><H2HInactiveCard /></div></main>;
   const league = data.league;
   if (!league) return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><H2HAccessCard reason={data.reason} clubMemberCount={data.clubMemberCount} /></div></main>;
 

@@ -18,5 +18,8 @@ export async function GET() {
   const clubMemberCount = await db.collection<any>("clubMemberships").countDocuments({ clubId: membership.clubId, leftAt: null });
   const league = await db.collection<any>("h2hLeagues").findOne({ clubId: membership.clubId, weekKey: week.key, groupNumber: 1 });
   if (!league) return NextResponse.json({ enabled: true, league: null, weekKey: week.key, reason: clubMemberCount < 8 ? "CLUB_TOO_SMALL" : "NOT_CREATED", clubMemberCount });
+  if (league.status !== "ACTIVE") {
+    return NextResponse.json({ enabled: true, league: null, weekKey: week.key, reason: "NEXT_WEEK", clubMemberCount });
+  }
   return NextResponse.json({ enabled: true, league: await publicH2HLeague(db, league, userId), viewerIncluded: league.players.map(String).includes(String(userId)), clubMemberCount });
 }
