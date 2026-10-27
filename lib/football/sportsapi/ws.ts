@@ -169,6 +169,8 @@ export class SportsApiWebSocketManager {
  * instances and can exhaust the MongoDB connection/pool budget.
  */
 export function isSportsApiRealtimeEnabled(): boolean {
+  if (env.SPORTSAPI_WS_ENABLED === false) return false;
+  if (process.env.NODE_ENV === "test") return true;
   return process.env.VERCEL !== "1" || process.env.SPORTSAPI_REALTIME_ENABLED === "true";
 }
 

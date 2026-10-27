@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
-import { Client } from "@upstash/qstash";
-import { getH2HWeek } from "@/lib/domain/h2h";
-import { appDateKey } from "@/lib/football/scheduleWindow";
 
 export const maxDuration = 60;
 
@@ -19,67 +16,14 @@ export async function GET(request: Request) {
       0,
       Number(url.searchParams.get("batch") ?? "0") || 0,
     );
-    const canQueueContinuation = Boolean(
-      env.QSTASH_TOKEN && env.NEXT_PUBLIC_APP_URL && env.CRON_SECRET,
-    );
-    // QStash keeps the Vercel invocation bounded when there are many recent
-    // fixtures. If it is not configured, process the complete recent window
-    // in this invocation instead of silently scoring only the first five.
+    // Local server workers process the complete recent window in one bounded
+    // pass; no external queue is required.
     let result = await runLeaderboardEngine({
       recentOnly: true,
       batchIndex,
-      batchSize: canQueueContinuation ? 5 : 5000,
+      batchSize: 5000,
     });
-    let queuedNextBatch = false;
-    if (
-      "hasMore" in result &&
-      result.hasMore &&
-      canQueueContinuation
-    ) {
-      try {
-        await new Client({ token: env.QSTASH_TOKEN! }).publishJSON({
-          url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/rebuild-leaderboards?batch=${batchIndex + 1}`,
-          body: { reason: "incremental-leaderboard-rebuild", batch: batchIndex + 1 },
-          headers: { authorization: `Bearer ${env.CRON_SECRET!}` },
-          deduplicationId: `lowblock-leaderboard-rebuild-${new Date().toISOString().slice(0, 10)}-${batchIndex + 1}`,
-        });
-        queuedNextBatch = true;
-      } catch (queueError) {
-        // A queue outage must not leave the remaining matches unscored. The
-        // score engine is idempotent, so replaying the first batch and
-        // processing the whole window is safe.
-        console.error("leaderboard_continuation_queue_failed", {
-          error: queueError instanceof Error ? queueError.message : String(queueError),
-        });
-        result = await runLeaderboardEngine({
-          recentOnly: true,
-          batchIndex: 0,
-          batchSize: 5000,
-        });
-      }
-    }
-    let queuedH2H = false;
-    const week = getH2HWeek();
-    const isFinalBatch = !("hasMore" in result) || !result.hasMore;
-    const isH2HWeekStart = appDateKey() === appDateKey(week.start);
-    if (
-      isFinalBatch &&
-      isH2HWeekStart &&
-      env.H2H_ENABLED &&
-      env.QSTASH_TOKEN &&
-      env.NEXT_PUBLIC_APP_URL &&
-      env.CRON_SECRET
-    ) {
-      await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
-        url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/h2h`,
-        body: { reason: "weekly-h2h-after-leaderboards", weekKey: week.key },
-        headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-        notBefore: Math.floor((Date.now() + 60_000) / 1000),
-        deduplicationId: `lowblock-h2h-discovery-${week.key}`,
-      });
-      queuedH2H = true;
-    }
-    return NextResponse.json({ ok: true, queuedNextBatch, queuedH2H, ...result });
+    return NextResponse.json({ ok: true, dispatcher: "local-worker", ...result });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "leaderboard rebuild failed";

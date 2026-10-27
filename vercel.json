@@ -1,8 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    { "path": "/api/cron/sync-football", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/rebuild-leaderboards", "schedule": "10 0 * * *" },
-    { "path": "/api/cron/h2h-daily", "schedule": "20 0 * * *" }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }

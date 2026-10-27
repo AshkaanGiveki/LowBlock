@@ -6,8 +6,8 @@ import { consumeLinkToken } from "@/lib/platform/identity";
 import { ObjectId } from "mongodb";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
+import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
 import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
-import { Client } from "@upstash/qstash";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -179,22 +179,13 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
       "<b>Sync in progress</b>\n\nFetching yesterday, today, and tomorrow through SportsAPI REST...\nSaving fixtures and official statuses to MongoDB...",
     );
     const syncResult = await provider.sync({ deferScoring: true });
-    if (!env.QSTASH_TOKEN || !env.NEXT_PUBLIC_APP_URL || !env.CRON_SECRET) {
-      throw new Error(
-        "QSTASH_NOT_CONFIGURED:QSTASH_TOKEN,NEXT_PUBLIC_APP_URL,CRON_SECRET",
-      );
-    }
-
-    // Keep the webhook bounded. The full score pass can exceed the function
-    // lifetime, so enqueue the existing recent-match batches instead.
-    await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
-      url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/rebuild-leaderboards`,
-      body: { reason: "telegram-sync-now", requestedAt: new Date().toISOString() },
-      headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-      deduplicationId: `lowblock-telegram-rebuild-${String(chatId)}-${Date.now()}`,
+    const scoring = await runLeaderboardEngine({
+      recentOnly: true,
+      batchIndex: 0,
+      batchSize: 5000,
     });
     await updateProgress(
-      `<b>REST sync complete</b>\n\nFixtures updated: <b>${syncResult.total}</b>\nREST requests attempted: <b>${syncResult.listRequests}</b>\n\nScore calculation and leaderboard rebuild queued in background...`,
+      `<b>REST sync complete</b>\n\nFixtures updated: <b>${syncResult.total}</b>\nREST requests attempted: <b>${syncResult.listRequests}</b>\n\nScore calculation and leaderboard rebuild completed: ${scoring.matches} matches, ${scoring.scores} scores.`,
     );
     let notifications = {
       remindersScheduled: 0,
@@ -217,7 +208,7 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
         (syncResult.failedDates?.length ?? 0) > 0
           ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${syncResult.total}. Failed dates: ${syncResult.failedDates?.join(", ")}.`
           : `<b>Sync complete</b>\n\nFixtures updated: ${syncResult.total}.`,
-        `Score calculation and leaderboard rebuild queued in background.`,
+        `Score calculation and leaderboard rebuild completed: ${scoring.matches} matches, ${scoring.scores} scores.`,
         `Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
         notificationWarning ? `\nNotification warning: <code>${escapeHtml(notificationWarning)}</code>` : "",
       ].filter(Boolean).join("\n"),

@@ -87,7 +87,7 @@ flowchart LR
   H --> J[Match analytics]
 ```
 
-The scheduled sync fetches match lists and results at 00:00 UTC (03:30 Asia/Tehran). A separate batched leaderboard job runs at 00:10 UTC (03:40 Asia/Tehran), after the data sync, recalculates prediction scores for recently finished matches, and rebuilds the affected leaderboard scopes. The leaderboard job uses QStash to continue through additional batches when more than five recent matches need processing. When H2H is enabled, the Friday sync also queues the full Friday–Thursday H2H discovery and league-materialization job through QStash, so only the two daily Vercel cron entries are required.
+The server-owned nightly job `npm run sync:daily` fetches match lists and results for yesterday, today, and tomorrow through the bounded SportsAPI REST schedule window, then runs one recent-results scoring and leaderboard pass. Run it from the server scheduler at the desired local night-time (for example, `30 3 * * *` for 03:30 Asia/Tehran). Vercel Cron is intentionally not used. The normal daily path does not perform tournament-season discovery or SportsAPI image requests.
 
 ## Scoring model
 
@@ -108,8 +108,8 @@ The scoring implementation is the authority; this table is a quick explanation f
 - **App:** Next.js App Router, React 19, TypeScript
 - **UI:** Tailwind CSS, Motion, Lucide icons, Highcharts
 - **Data:** MongoDB driver with indexed match, prediction, user, and leaderboard collections
-- **Football data:** API-Football for fixtures/results, with respectful public-data handling for supplementary metadata
-- **Operations:** Vercel-compatible build, cron-triggered synchronization, environment-based secrets
+- **Football data:** SportsAPI Pro Football V2 for bounded fixture/result discovery, with optional WebSocket realtime updates
+- **Operations:** Docker-compatible web app plus a server-owned local worker; no Vercel Cron or QStash dependency for scheduled work
 
 ## Local development
 
@@ -156,9 +156,6 @@ Never commit `.env.local`, API tokens, MongoDB credentials, or session secrets.
 | `TELEGRAM_WEBHOOK_SECRET`        | Secret token configured with Telegram’s webhook and required for the private admin command |
 | `BALE_BOT_TOKEN`                 | Server-only Bale bot token used for Mini App verification                                  |
 | `BALE_BOT_USERNAME`              | Bale bot username used for account-link deep links                                         |
-| `QSTASH_TOKEN`                   | Server-only Upstash QStash publishing token                                                |
-| `QSTASH_CURRENT_SIGNING_KEY`     | QStash callback verification key                                                           |
-| `QSTASH_NEXT_SIGNING_KEY`        | QStash callback key during key rotation                                                    |
 | `NEXT_PUBLIC_APP_URL`            | Canonical public URL used by links and metadata                                            |
 | `APP_TIMEZONE`                   | Scheduling/display timezone; defaults to `Asia/Tehran`                                     |
 | `FOOTBALL_API_KEY`               | API-Football key                                                                           |
@@ -166,6 +163,21 @@ Never commit `.env.local`, API tokens, MongoDB credentials, or session secrets.
 | `FOOTBALL_API_SEASON`            | Optional explicit season override                                                          |
 | `FOOTBALL_API_DAILY_LIMIT`       | Provider request budget                                                                    |
 | `FOOTBALL_API_DETAIL_BATCH_SIZE` | Detail-fetch batch size                                                                    |
+| `FOOTBALL_DATA_PROVIDER`         | Active provider; set to `sportsapi`                                                        |
+| `SPORTSAPI_API_KEY`               | SportsAPI Pro server-only API key                                                          |
+| `SPORTSAPI_BASE_URL`              | Defaults to SportsAPI Pro Football V2 REST                                                |
+| `SPORTSAPI_WS_ENABLED`            | Enables the WebSocket manager outside serverless realtime safety gates                     |
+| `WORKER_INTERVAL_MS`              | Local worker loop interval; defaults to 60 seconds                                         |
+
+### Server-owned worker
+
+Build the production image with the repository’s worker command and run it as a separate container:
+
+```bash
+npm run worker
+```
+
+The worker wakes every minute, enqueues due reminders/channel posts into MongoDB, processes due jobs with leases and retries, runs the daily SportsAPI sync at 03:30 Asia/Tehran, then performs H2H materialization from already-fetched matches. Use `npm run worker:once` for a one-cycle smoke test and `npm run worker:status` for operational status. The compose template is `docker-compose.worker.yml`.
 
 ## Repository map
 
