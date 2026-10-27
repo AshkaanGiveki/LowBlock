@@ -21,6 +21,8 @@ export type CentralTeamRecord = {
 export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds"> | null | undefined) {
   const footballApiId = row?.providerIds?.["football-api"];
   if (footballApiId) return `https://media.api-sports.io/football/teams/${encodeURIComponent(footballApiId)}.png`;
+  const sportsApiId = row?.providerIds?.sportsapi;
+  if (sportsApiId) return `https://img.sofascore.com/api/v1/team/${encodeURIComponent(sportsApiId)}/image`;
   return row?.logoUrl && /^https?:\/\//i.test(row.logoUrl) ? row.logoUrl : null;
 }
 
