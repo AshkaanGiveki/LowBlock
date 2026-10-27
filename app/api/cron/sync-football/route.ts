@@ -3,8 +3,6 @@ import { env } from "@/lib/env";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
-import { Client } from "@upstash/qstash";
-import { qstashConfigStatus } from "@/lib/notifications/qstash";
 import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
 
 export const maxDuration = 60;
@@ -65,7 +63,7 @@ async function run(request: Request) {
       channelDailyPostsScheduled,
       notifications: {
         ok: !notificationError,
-        ...qstashConfigStatus(),
+        dispatcher: "local-mongodb-queue",
         error: notificationError,
       },
     });
@@ -90,27 +88,7 @@ async function run(request: Request) {
       !/suspended|account|401|403|DAILY_LIMIT|API_KEY|configured/i.test(
         message,
       );
-    let retryAt: string | null = null;
-    if (retryable && env.QSTASH_TOKEN && env.NEXT_PUBLIC_APP_URL) {
-      const delay = [5, 15, 30][attempt] * 60_000;
-      retryAt = new Date(Date.now() + delay).toISOString();
-      try {
-        await new Client({ token: env.QSTASH_TOKEN }).publishJSON({
-          url: `${env.NEXT_PUBLIC_APP_URL}/api/cron/sync-football?retry=${attempt + 1}`,
-          body: { reason: "transient-sync-failure", attempt: attempt + 1 },
-          headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-          notBefore: Math.floor(new Date(retryAt).getTime() / 1000),
-          deduplicationId: `lowblock-football-sync-retry-${startedAt.getTime()}-${attempt + 1}`,
-        });
-      } catch (retryError) {
-        console.error("football_sync_retry_schedule_failed", {
-          error:
-            retryError instanceof Error
-              ? retryError.message
-              : String(retryError),
-        });
-      }
-    }
+    const retryAt: string | null = null;
     try {
       await (
         await getDb()

@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/mongo";
-import { getQstashClient, scheduleMatchReminder } from "./qstash";
+import { enqueueLocalNotificationJob } from "./localQueue";
 import { env } from "@/lib/env";
 import { teamName } from "@/lib/football/team-names";
 import { readableFa } from "@/lib/text";
@@ -12,7 +12,6 @@ const preferenceField = (provider: Provider) =>
     : "balePredictionRemindersEnabled";
 
 export async function scheduleUpcomingReminders() {
-  getQstashClient();
   const db = await getDb();
   const now = Date.now();
   const matches = await db
@@ -32,7 +31,12 @@ export async function scheduleUpcomingReminders() {
     const runAt = new Date(kickoff.getTime() - 30 * 60 * 1000);
     if (runAt.getTime() <= now + 60 * 1000) continue;
     try {
-      if (await scheduleMatchReminder(match.providerMatchId, runAt))
+      if (await enqueueLocalNotificationJob(db, {
+        jobKey: `match-reminder:${match.providerMatchId}`,
+        type: "MATCH_REMINDER",
+        runAt,
+        payload: { matchId: String(match.providerMatchId) },
+      }))
         scheduled++;
     } catch (error) {
       console.error("match_reminder_scheduling_failed", {
@@ -62,8 +66,8 @@ export async function processMatchReminder(matchId: string) {
     awayTeam: { ...match.awayTeam, faName: centralFa.get(match.awayTeam?.centralTeamId) || match.awayTeam?.faName },
   };
   const delta = new Date(match.kickoffAt).getTime() - Date.now();
-  // QStash may deliver a little early or retry after a transient delay. Only
-  // reject jobs that are already past kickoff or clearly scheduled too early.
+  // The local worker may claim a little early or retry after a transient delay.
+  // Only reject jobs that are already past kickoff or clearly scheduled too early.
   if (delta <= 0 || delta > 2700000) return { sent: 0, skipped: "stale" };
   const identities = await db
     .collection<any>("externalIdentities")
@@ -102,6 +106,8 @@ export async function processMatchReminder(matchId: string) {
   let sent = 0;
   for (const identity of identities) {
     const provider = String(identity.provider) as Provider;
+    if (provider === "TELEGRAM" ? !env.TELEGRAM_BOT_TOKEN : !env.BALE_BOT_TOKEN)
+      continue;
     const preferences = identity.preferences?.[0];
     if (preferences?.[preferenceField(provider)] === false) continue;
     if (
@@ -117,21 +123,29 @@ export async function processMatchReminder(matchId: string) {
       channel,
       type: "MISSING_PREDICTION_30_MIN",
     };
-    const reservation = await db
-      .collection("notificationDeliveries")
-      .updateOne(
-        deliveryFilter,
+    const now = new Date();
+    let reservation;
+    try {
+      reservation = await db.collection("notificationDeliveries").updateOne(
         {
-          $setOnInsert: {
-            ...deliveryFilter,
-            status: "PROCESSING",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
+          ...deliveryFilter,
+          $or: [
+            { status: { $exists: false } },
+            { status: "FAILED" },
+            { status: "PROCESSING", leaseUntil: { $lte: now } },
+          ],
+        },
+        {
+          $set: { status: "PROCESSING", updatedAt: now, leaseUntil: new Date(now.getTime() + 5 * 60_000) },
+          $setOnInsert: { ...deliveryFilter, createdAt: now },
         },
         { upsert: true },
       );
-    if (!reservation.upsertedCount) continue;
+    } catch (error: any) {
+      if (error?.code === 11000) continue;
+      throw error;
+    }
+    if (!reservation.upsertedCount && !reservation.modifiedCount) continue;
     try {
       const language = preferences?.language === "en" ? "en" : "fa";
       const result = await sendPlatform(
@@ -150,6 +164,7 @@ export async function processMatchReminder(matchId: string) {
               result?.message_id ?? result?.id ?? "sent",
             ),
             updatedAt: new Date(),
+            leaseUntil: null,
           },
         });
       sent++;
@@ -162,6 +177,7 @@ export async function processMatchReminder(matchId: string) {
             errorCode:
               error instanceof Error ? error.message : `${provider}_ERROR`,
             updatedAt: new Date(),
+            leaseUntil: null,
           },
         });
     }

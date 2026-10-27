@@ -36,10 +36,7 @@ const schema = z.object({
   BALE_API_BASE_URL: z.string().url().default("https://tapi.bale.ai/bot"),
   BALE_BOT_TOKEN: z.string().optional(),
   BALE_BOT_USERNAME: z.string().optional(),
-  QSTASH_TOKEN: z.string().optional(),
-  QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
-  QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
-  APP_TIMEZONE: z.string().default("UTC"),
+  APP_TIMEZONE: z.string().default("Asia/Tehran"),
   H2H_ENABLED: z
     .preprocess((value) => value === "true" || value === true, z.boolean())
     .default(true),
@@ -78,6 +75,7 @@ const schema = z.object({
     .default("https://www.transfermarkt.com"),
   SPORTSAPI_API_KEY: z.string().optional(),
   SPORTSAPI_DAILY_LIMIT: z.coerce.number().int().positive().optional(),
+  SPORTSAPI_DAILY_REQUEST_BUDGET: z.coerce.number().int().positive().max(100).default(10),
   SPORTSAPI_BASE_URL: z
     .string()
     .url()
@@ -111,7 +109,6 @@ const schema = z.object({
   SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED: z
     .preprocess((value) => value === "true" || value === true, z.boolean())
     .default(false),
-  SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES: z.string().default("SA1"),
 });
 export const env = schema.parse({
   MONGODB_URI: process.env.MONGODB_URI,
@@ -133,9 +130,6 @@ export const env = schema.parse({
   BALE_API_BASE_URL: process.env.BALE_API_BASE_URL,
   BALE_BOT_TOKEN: process.env.BALE_BOT_TOKEN,
   BALE_BOT_USERNAME: process.env.BALE_BOT_USERNAME,
-  QSTASH_TOKEN: process.env.QSTASH_TOKEN,
-  QSTASH_CURRENT_SIGNING_KEY: process.env.QSTASH_CURRENT_SIGNING_KEY,
-  QSTASH_NEXT_SIGNING_KEY: process.env.QSTASH_NEXT_SIGNING_KEY,
   APP_TIMEZONE: process.env.APP_TIMEZONE,
   H2H_ENABLED: process.env.H2H_ENABLED,
   NEXT_PUBLIC_APP_URL: safeUrl(process.env.NEXT_PUBLIC_APP_URL),
@@ -150,6 +144,7 @@ export const env = schema.parse({
   TRANSFERMARKT_BASE_URL: process.env.TRANSFERMARKT_BASE_URL,
   SPORTSAPI_API_KEY: process.env.SPORTSAPI_API_KEY,
   SPORTSAPI_DAILY_LIMIT: process.env.SPORTSAPI_DAILY_LIMIT,
+  SPORTSAPI_DAILY_REQUEST_BUDGET: process.env.SPORTSAPI_DAILY_REQUEST_BUDGET,
   SPORTSAPI_BASE_URL: process.env.SPORTSAPI_BASE_URL,
   SPORTSAPI_WS_URL: process.env.SPORTSAPI_WS_URL,
   SPORTSAPI_WS_ENABLED: process.env.SPORTSAPI_WS_ENABLED,
@@ -163,8 +158,6 @@ export const env = schema.parse({
     process.env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL,
   SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED:
     process.env.SPORTSAPI_TOURNAMENT_DISCOVERY_ENABLED,
-  SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES:
-    process.env.SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES,
 });
 export function validateProductionEnv() {
   if (process.env.NODE_ENV !== "production") return;
@@ -183,13 +176,4 @@ export function validateProductionEnv() {
     /localhost|127\.0\.0\.1/.test(env.NEXT_PUBLIC_APP_URL)
   )
     throw new Error("NEXT_PUBLIC_APP_URL must be an absolute http(s) URL");
-  const notificationMissing = [
-    "QSTASH_TOKEN",
-    "QSTASH_CURRENT_SIGNING_KEY",
-    "TELEGRAM_BOT_TOKEN",
-  ].filter((key) => !process.env[key]);
-  if (notificationMissing.length)
-    throw new Error(
-      `Missing required production notification variables: ${notificationMissing.join(", ")}`,
-    );
 }

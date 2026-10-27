@@ -47,84 +47,6 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     }
   }
 
-  private async syncTargetedTournamentFallback(
-    dateKeys: string[],
-    dailyMatches: CanonicalMatch[],
-    db: any,
-  ): Promise<{ total: number; requests: number; codes: string[] }> {
-    const configuredCodes = env.SPORTSAPI_TARGETED_TOURNAMENT_FALLBACK_CODES
-      .split(",")
-      .map((code) => code.trim().toUpperCase())
-      .filter(Boolean);
-    if (!configuredCodes.length) return { total: 0, requests: 0, codes: [] };
-
-    let total = 0;
-    let requests = 0;
-    const recoveredCodes: string[] = [];
-
-    for (const code of configuredCodes) {
-      const entry = COMPETITION_MAPPINGS.find((item) => item.code === code);
-      if (!entry) {
-        console.warn(`[SportsAPI] Ignoring unknown targeted fallback code: ${code}`);
-        continue;
-      }
-
-      const missingDates = dateKeys.filter((dateKey) =>
-        !dailyMatches.some(
-          (match) => match.leagueCode === code && appDateKey(new Date(match.kickoffAt)) === dateKey,
-        ),
-      );
-      if (!missingDates.length) continue;
-
-      try {
-        const seasonsRes: any = await getSportsApiTournamentSeasons(
-          entry.sportsApiUniqueTournamentId,
-        );
-        requests++;
-        const seasons = seasonsRes.seasons || seasonsRes.data || [];
-        const season = Array.isArray(seasons) ? seasons[0] : null;
-        if (!season?.id) {
-          console.warn(`[SportsAPI] No active season for targeted fallback ${code}`);
-          continue;
-        }
-
-        const [nextRes, lastRes] = await Promise.all([
-          getSportsApiTournamentEvents(
-            entry.sportsApiUniqueTournamentId,
-            season.id,
-            "next",
-            0,
-          ),
-          getSportsApiTournamentEvents(
-            entry.sportsApiUniqueTournamentId,
-            season.id,
-            "last",
-            0,
-          ),
-        ]);
-        requests += 2;
-
-        const nextEvents = (nextRes as any).events || (nextRes as any).data?.events || (nextRes as any).data || [];
-        const lastEvents = (lastRes as any).events || (lastRes as any).data?.events || (lastRes as any).data || [];
-        const recovered = [...nextEvents, ...lastEvents]
-          .map((event) => normalizeSportsApiMatch(event))
-          .filter((match): match is CanonicalMatch => {
-            if (!match || match.leagueCode !== code) return false;
-            return missingDates.includes(appDateKey(new Date(match.kickoffAt)));
-          });
-
-        if (recovered.length) {
-          total += await this.saveMatches(db, recovered);
-          recoveredCodes.push(code);
-        }
-      } catch (error) {
-        console.error(`[SportsAPI] Targeted tournament fallback failed for ${code}:`, error);
-      }
-    }
-
-    return { total, requests, codes: recoveredCodes };
-  }
-
   private async saveMatches(db: any, matches: CanonicalMatch[]): Promise<number> {
     if (!matches.length) return 0;
 
@@ -396,8 +318,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     const db = await getDb();
     const matches = await this.getDailyMatches([dateKey]);
     const dailyTotal = await this.saveMatches(db, matches);
-    const fallback = await this.syncTargetedTournamentFallback([dateKey], matches, db);
-    const total = dailyTotal + fallback.total;
+    const total = dailyTotal;
     await this.refreshDailyH2H(db, [dateKey]);
 
     await rebuildRoundRecords(db);
@@ -415,7 +336,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
     return {
       total,
-      listRequests: 1 + fallback.requests,
+      listRequests: 1,
       scoreEngine: {
         scores: scoreEngine.scores,
         leaderboards: scoreEngine.leaderboards,

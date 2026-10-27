@@ -287,6 +287,24 @@ export async function ensureIndexes() {
     db
       .collection("channelPublications")
       .createIndex({ dateKey: 1, type: 1 }, { unique: true }),
+    db
+      .collection("notificationJobs")
+      .createIndex({ jobKey: 1 }, { unique: true }),
+    db
+      .collection("notificationJobs")
+      .createIndex({ status: 1, runAt: 1, createdAt: 1 }),
+    db
+      .collection("notificationJobs")
+      .createIndex({ status: 1, leaseUntil: 1 }),
+    db
+      .collection("notificationDeliveries")
+      .createIndex({ status: 1, leaseUntil: 1 }),
+    db
+      .collection("workerRuns")
+      .createIndex({ runKey: 1 }, { unique: true }),
+    db
+      .collection("workerRuns")
+      .createIndex({ updatedAt: -1 }),
   ]);
 }
 export async function ensureH2HIndexes() {

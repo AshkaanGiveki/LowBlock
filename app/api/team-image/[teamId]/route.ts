@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { env } from "@/lib/env";
+import { getDb } from "@/lib/db/mongo";
+import { centralTeamLogo } from "@/lib/football/centralTeams";
 
 export const dynamic = "force-dynamic";
 
@@ -14,37 +15,37 @@ export async function GET(
     return new NextResponse(null, { status: 404 });
   }
 
-  const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
-
-  // 1. Try SportsAPI if API key is provided
-  if (apiKey) {
-    try {
-      const imageUrl = `https://v2.football.sportsapipro.com/images/teams/${cleanTeamId}`;
-      const response = await fetch(imageUrl, {
-        headers: { "x-api-key": apiKey },
-        signal: AbortSignal.timeout(4000),
+  // SportsAPI match IDs are not SofaScore IDs. Resolve the SportsAPI ID
+  // through the central-team bridge and use the already-linked API-Football
+  // crest whenever possible; this keeps image loading outside SportsAPI quota.
+  try {
+    const db = await getDb();
+    const central = await db.collection<any>("centralTeams").findOne(
+      { "providerIds.sportsapi": cleanTeamId },
+      { projection: { logoUrl: 1, providerIds: 1 } },
+    );
+    const logoUrl = centralTeamLogo(central);
+    if (logoUrl) {
+      const response = await fetch(logoUrl, {
+        signal: AbortSignal.timeout(6000),
         next: { revalidate: 2592000 },
       });
-
       if (response.ok) {
-        const contentType = response.headers.get("content-type") || "image/png";
-        const buffer = await response.arrayBuffer();
-
-        return new NextResponse(buffer, {
+        return new NextResponse(await response.arrayBuffer(), {
           status: 200,
           headers: {
-            "Content-Type": contentType,
-            "Cache-Control":
-              "public, max-age=2592000, stale-while-revalidate=86400, immutable",
+            "Content-Type": response.headers.get("content-type") || "image/png",
+            "Cache-Control": "public, max-age=2592000, stale-while-revalidate=86400, immutable",
           },
         });
       }
-    } catch {
-      // Continue to Sofascore fallback
     }
+  } catch {
+    // Continue to the public fallback below.
   }
 
-  // 2. Direct fallback to Sofascore team image CDN (bypassing hotlink protection and client ISP filtering)
+  // Team images must never consume SportsAPI quota. Use the public image CDN
+  // directly; match discovery and scores are the only SportsAPI data path.
   try {
     const sofascoreUrl = `https://img.sofascore.com/api/v1/team/${cleanTeamId}/image`;
     const response = await fetch(sofascoreUrl, {

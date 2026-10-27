@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -14,37 +13,8 @@ export async function GET(
     return new NextResponse(null, { status: 404 });
   }
 
-  const apiKey = env.SPORTSAPI_API_KEY || process.env.SPORTSAPI_API_KEY;
-
-  // 1. Try SportsAPI if API key is provided
-  if (apiKey) {
-    try {
-      const sportsApiUrl = `https://v2.football.sportsapipro.com/images/players/${cleanId}`;
-      const response = await fetch(sportsApiUrl, {
-        headers: { "x-api-key": apiKey },
-        signal: AbortSignal.timeout(4000),
-        next: { revalidate: 2592000 },
-      });
-
-      if (response.ok) {
-        const contentType = response.headers.get("content-type") || "image/png";
-        const buffer = await response.arrayBuffer();
-
-        return new NextResponse(buffer, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType,
-            "Cache-Control":
-              "public, max-age=2592000, stale-while-revalidate=86400, immutable",
-          },
-        });
-      }
-    } catch {
-      // Continue to Sofascore fallback
-    }
-  }
-
-  // 2. Direct fallback to Sofascore player image CDN (bypassing hotlink protection and client ISP filtering)
+  // Player images must never consume SportsAPI quota. Use the public image CDN
+  // directly; SportsAPI is reserved for football data discovery and scores.
   try {
     const sofascoreUrl = `https://img.sofascore.com/api/v1/player/${cleanId}/image`;
     const response = await fetch(sofascoreUrl, {

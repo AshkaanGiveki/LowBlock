@@ -1,5 +1,6 @@
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
+import { centralTeamLogo } from "./centralTeams";
 import { unstable_cache } from "next/cache";
 import type { ProviderName } from "./types";
 import {
@@ -261,12 +262,13 @@ export async function getMatchesPage(
   const page = hasMore ? matches.slice(0, -1) : matches;
   const centralIds = [...new Set(page.flatMap((match) => [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId]).filter(Boolean))];
   const centralRows = centralIds.length
-    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.fa": 1 } }).toArray()
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } }).toArray()
     : [];
   const centralFa = new Map(centralRows.map((row) => [row.centralTeamId, row.names?.fa]));
+  const centralLogos = new Map(centralRows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
   const publicPage = page.map((match) => {
-    const homeLogo = match.homeTeam.logoUrl || (match.homeTeam as any).logo || (match.homeTeam.id ? `/api/team-image/${match.homeTeam.id}` : null);
-    const awayLogo = match.awayTeam.logoUrl || (match.awayTeam as any).logo || (match.awayTeam.id ? `/api/team-image/${match.awayTeam.id}` : null);
+    const homeLogo = centralLogos.get(match.homeTeam.centralTeamId) || match.homeTeam.logoUrl || (match.homeTeam as any).logo || null;
+    const awayLogo = centralLogos.get(match.awayTeam.centralTeamId) || match.awayTeam.logoUrl || (match.awayTeam as any).logo || null;
 
     return {
       provider: match.provider,
@@ -325,13 +327,14 @@ export async function getMatch(providerMatchId: string) {
   if (!match) return null;
   const ids = [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId].filter(Boolean);
   const rows = ids.length
-    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1 } }).toArray()
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } }).toArray()
     : [];
   const fa = new Map(rows.map((row) => [row.centralTeamId, row.names?.fa]));
+  const logos = new Map(rows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
   return {
     ...match,
-    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName },
-    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName },
+    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName, logo: logos.get(match.homeTeam.centralTeamId) || match.homeTeam.logoUrl || null, logoUrl: logos.get(match.homeTeam.centralTeamId) || match.homeTeam.logoUrl || null },
+    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName, logo: logos.get(match.awayTeam.centralTeamId) || match.awayTeam.logoUrl || null, logoUrl: logos.get(match.awayTeam.centralTeamId) || match.awayTeam.logoUrl || null },
   };
 }
 

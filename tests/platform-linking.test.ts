@@ -4,7 +4,6 @@ import {
   makePendingPlatformCookie,
   readPending,
 } from "@/lib/platform/identity";
-import { verifyQstashSignature } from "@/lib/notifications/qstash";
 describe("platform linking security", () => {
   it("round trips a signed pending identity", () => {
     const raw = makePendingPlatformCookie(
@@ -27,10 +26,5 @@ describe("platform linking security", () => {
     expect(
       identitySlotConflict("user-a", "user-a", "telegram-1", "telegram-1"),
     ).toBe(false);
-  });
-  it("rejects an invalid QStash signature", async () => {
-    expect(await verifyQstashSignature('{"matchId":"m"}', "not-a-jwt")).toBe(
-      false,
-    );
   });
 });

@@ -13,8 +13,8 @@ export async function GET(request: Request) {
 
   const tomorrow = appDateKey(new Date(Date.now() + 86_400_000));
   const db = await getDb();
-  // The nightly football sync already fetched tomorrow and the leaderboard
-  // rebuild materializes the slate. This endpoint is a safe DB-only retry.
+  // The daily football worker already fetched tomorrow's fixtures. Reuse the
+  // persisted match set instead of spending another provider request here.
   const schedule = await ensureCurrentH2HLeagues(db, { sourceDate: tomorrow, batchIndex: 0, batchSize: 1000 });
   const results = await refreshActiveH2HResults(db, getH2HWeek().key);
   return NextResponse.json({ ok: true, tomorrow, schedule, results });

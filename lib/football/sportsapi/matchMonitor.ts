@@ -658,6 +658,8 @@ class MatchMonitorService {
             (Date.now() / 1000 - providerPeriodStart(ev)!) / 60,
           );
           snap.score.elapsed = Math.min(130, Math.max(1, calc));
+          } else if (snap.score.elapsed === null) {
+            snap.score.elapsed = 1;
         }
 
         this.broadcast(matchId, snap);

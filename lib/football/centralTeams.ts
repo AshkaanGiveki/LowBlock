@@ -17,6 +17,13 @@ export type CentralTeamRecord = {
   updatedAt: Date;
 };
 
+/** Prefer the already-linked API-Football crest for SportsAPI matches. */
+export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds"> | null | undefined) {
+  const footballApiId = row?.providerIds?.["football-api"];
+  if (footballApiId) return `https://media.api-sports.io/football/teams/${encodeURIComponent(footballApiId)}.png`;
+  return row?.logoUrl && /^https?:\/\//i.test(row.logoUrl) ? row.logoUrl : null;
+}
+
 const normalize = (value: string) => value.toLowerCase().trim().replace(/\b(fc|afc|cf|sc|club)\b/g, "").replace(/[^a-z0-9]/g, "");
 
 export function centralTeamId(team: { centralTeamId?: string; provider: ProviderName; providerTeamId: string | number }) {

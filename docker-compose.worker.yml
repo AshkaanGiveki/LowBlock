@@ -1,0 +1,10 @@
+services:
+  lowblock-worker:
+    image: lowblock:latest
+    container_name: lowblock-worker
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    command: ["npm", "run", "worker"]
+    stop_grace_period: 30s

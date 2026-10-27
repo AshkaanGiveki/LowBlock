@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { verifyQstashSignature } from "@/lib/notifications/qstash";
+import { env } from "@/lib/env";
 import { processMatchReminder } from "@/lib/notifications/reminders";
 export async function POST(req: Request) {
   const body = await req.text();
-  if (
-    !(await verifyQstashSignature(
-      body,
-      req.headers.get("Upstash-Signature"),
-      req.url,
-    ))
-  )
+  if (!env.CRON_SECRET || req.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   let json: unknown;
   try {

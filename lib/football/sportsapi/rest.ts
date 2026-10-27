@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { appDayBounds } from "../scheduleWindow";
 import { getDb } from "@/lib/db/mongo";
 import { appDateKey } from "../scheduleWindow";
 
@@ -75,6 +76,34 @@ export async function fetchSportsApi<T>(
   const startedAt = performance.now();
   const url = new URL(`${env.SPORTSAPI_BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+
+  // Fail closed before making a provider request once the configured daily
+  // budget is exhausted. This counts all attempted REST calls, including
+  // failed calls, and prevents optional paths from consuming the free quota.
+  try {
+    const db = await getDb();
+    const { start } = appDayBounds();
+    const used = await db.collection("sportsApiRequests").countDocuments({
+      timestamp: { $gte: start },
+    });
+    if (used >= env.SPORTSAPI_DAILY_REQUEST_BUDGET) {
+      return {
+        success: false,
+        events: [],
+        error: {
+          code: 429,
+          message: `SportsAPI local daily request budget exhausted (${used}/${env.SPORTSAPI_DAILY_REQUEST_BUDGET})`,
+        },
+      };
+    }
+  } catch (error) {
+    console.error("[SportsAPI] Could not verify local request budget:", error);
+    return {
+      success: false,
+      events: [],
+      error: { code: 503, message: "SportsAPI local request budget unavailable" },
+    };
+  }
 
   try {
     const response = await fetch(url, {

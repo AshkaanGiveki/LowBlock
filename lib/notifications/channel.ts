@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
+import { getDb } from "@/lib/db/mongo";
 import { env } from "@/lib/env";
-import { getQstashClient } from "./qstash";
+import { enqueueLocalNotificationJob } from "./localQueue";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { scheduleMatchdayPolling } from "@/lib/notifications/matchday";
 
@@ -276,7 +277,6 @@ export async function scheduleFirstMatchChannelReminder(
   db: Db,
   date = new Date(),
 ) {
-  const qstash = getQstashClient();
   const dateKey = utcDateKey(date);
   const bounds = utcDayBounds(dateKey);
   const match = await db
@@ -297,16 +297,16 @@ export async function scheduleFirstMatchChannelReminder(
   if (!match) return false;
   const runAt = new Date(new Date(match.kickoffAt).getTime() - 1800000);
   if (runAt <= new Date()) return false;
-  await qstash.publishJSON({
-    url: `${env.NEXT_PUBLIC_APP_URL}/api/notifications/channel-first-match`,
-    body: { dateKey, matchId: match.providerMatchId },
-    notBefore: Math.floor(runAt.getTime() / 1000),
-    deduplicationId: `lowblock-channel-first-match-${dateKey}`,
+  await enqueueLocalNotificationJob(db, {
+    jobKey: `channel-first-match:${dateKey}`,
+    type: "CHANNEL_FIRST_MATCH",
+    runAt,
+    payload: { dateKey, matchId: String(match.providerMatchId) },
   });
   return true;
 }
 export async function scheduleChannelDailyPosts(date = new Date()) {
-  const qstash = getQstashClient();
+  const db = await getDb();
   const dateKey = utcDateKey(date);
   const bounds = utcDayBounds(dateKey);
   const jobs = [
@@ -324,11 +324,11 @@ export async function scheduleChannelDailyPosts(date = new Date()) {
   let scheduled = 0;
   for (const job of jobs) {
     if (job.runAt <= new Date()) continue;
-    await qstash.publishJSON({
-      url: `${env.NEXT_PUBLIC_APP_URL}${job.path}`,
-      body: { dateKey },
-      notBefore: Math.floor(job.runAt.getTime() / 1000),
-      deduplicationId: `lowblock-channel-${job.type}-${dateKey}`,
+    await enqueueLocalNotificationJob(db, {
+      jobKey: `channel:${job.type}:${dateKey}`,
+      type: job.type === "leaderboard" ? "CHANNEL_LEADERBOARD" : "CHANNEL_MATCHES",
+      runAt: job.runAt,
+      payload: { dateKey },
     });
     scheduled++;
   }
