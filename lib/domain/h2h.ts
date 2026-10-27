@@ -15,6 +15,10 @@ export const H2H_TOURNAMENT_WEIGHTS: Record<string, number> = {
   GB2: 1.05, IR1: 1.04, FRIENDLY: 1.00,
 };
 
+// Saudi Pro League fixtures are currently suspended and must not enter any
+// new H2H slate, even when they are present in the provider feed.
+export const H2H_EXCLUDED_LEAGUE_CODES = new Set(["SA1"]);
+
 type RatingRow = { teamId?: string; centralTeamId?: string; rating: number };
 const ratings = new Map<string, number>(
   (ratingsData.teams as RatingRow[]).flatMap((row) => {
@@ -122,6 +126,7 @@ function selectable(match: any, week: H2HWeek, ratingMap: Map<string, number>) {
   const date = kickoff(match.kickoffAt);
   const status = String(match.status ?? "").toUpperCase();
   return Boolean(
+    !H2H_EXCLUDED_LEAGUE_CODES.has(String(match.leagueCode ?? "").toUpperCase()) &&
     date && date >= week.start && date < week.end &&
       !["FINISHED", "CANCELLED", "POSTPONED", "ABANDONED"].includes(status) &&
       scoreH2HFixture(match, ratingMap) !== null,
@@ -509,8 +514,11 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
         const bHasPrediction = Boolean(bPrediction);
         if (!aPrediction) aPrediction = { noPrediction: true };
         if (!bPrediction) bPrediction = { noPrediction: true };
-        const aVisiblePrediction = finished || pairing.playerA === viewerId ? aPrediction : aHasPrediction ? null : aPrediction;
-        const bVisiblePrediction = finished || pairing.playerB === viewerId ? bPrediction : bHasPrediction ? null : bPrediction;
+        // Reveal submitted picks when the fixture starts, not only after it is
+        // completed. A player's own pick remains visible before kickoff.
+        const started = new Date() >= new Date(fixture.kickoffAt);
+        const aVisiblePrediction = started || pairing.playerA === viewerId ? aPrediction : aHasPrediction ? null : aPrediction;
+        const bVisiblePrediction = started || pairing.playerB === viewerId ? bPrediction : bHasPrediction ? null : bPrediction;
         const scoreFor = (prediction: any, playerId: string) => {
           if (!finished) return { points: 0, category: "NO_PREDICTION" as const };
           const score = calculatePredictionScore(prediction?.homeGoals ?? null, prediction?.awayGoals ?? null, match?.homeGoals ?? null, match?.awayGoals ?? null);

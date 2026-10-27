@@ -85,6 +85,16 @@ describe("H2H schedule rules", () => {
     })).toBeNull();
   });
 
+  it("excludes Saudi Pro League fixtures from H2H slates", () => {
+    const week = getH2HWeek(new Date(Date.UTC(2026, 9, 10)));
+    const fixtures = [
+      ...Array.from({ length: 5 }, (_, index) => fixture(index, 0)),
+      { ...fixture(99, 0), providerMatchId: "saudi-fixture", leagueCode: "SA1" },
+    ];
+    const slates = buildH2HSlates(fixtures, week);
+    expect(slates.flatMap((slate) => slate.fixtures).some((item) => item.leagueCode === "SA1")).toBe(false);
+  });
+
   it("creates seven slates with no duplicate fixture and four-or-five target", () => {
     const week = getH2HWeek(new Date(Date.UTC(2026, 9, 10)));
     const fixtures = Array.from({ length: 35 }, (_, index) => fixture(index, Math.floor(index / 5)));
