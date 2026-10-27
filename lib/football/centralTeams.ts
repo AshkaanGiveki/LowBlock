@@ -17,12 +17,12 @@ export type CentralTeamRecord = {
   updatedAt: Date;
 };
 
-/** Prefer the already-linked API-Football crest for SportsAPI matches. */
+/** Resolve SportsAPI team logos through the free SofaScore image CDN. */
 export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds"> | null | undefined) {
-  const footballApiId = row?.providerIds?.["football-api"];
-  if (footballApiId) return `https://media.api-sports.io/football/teams/${encodeURIComponent(footballApiId)}.png`;
   const sportsApiId = row?.providerIds?.sportsapi;
   if (sportsApiId) return `https://img.sofascore.com/api/v1/team/${encodeURIComponent(sportsApiId)}/image`;
+  const footballApiId = row?.providerIds?.["football-api"];
+  if (footballApiId) return `https://media.api-sports.io/football/teams/${encodeURIComponent(footballApiId)}.png`;
   return row?.logoUrl && /^https?:\/\//i.test(row.logoUrl) ? row.logoUrl : null;
 }
 
