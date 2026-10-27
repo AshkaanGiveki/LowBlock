@@ -15,9 +15,8 @@ export async function GET(
     return new NextResponse(null, { status: 404 });
   }
 
-  // SportsAPI match IDs are not SofaScore IDs. Resolve the SportsAPI ID
-  // through the central-team bridge and use the already-linked API-Football
-  // crest whenever possible; this keeps image loading outside SportsAPI quota.
+  // Resolve the SportsAPI ID through the central-team bridge and use the free
+  // SofaScore image CDN; this keeps image loading outside SportsAPI quota.
   try {
     const db = await getDb();
     const central = await db.collection<any>("centralTeams").findOne(
