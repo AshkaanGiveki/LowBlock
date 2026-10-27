@@ -427,8 +427,8 @@ function MatchHeader({ match, language, number, score, t }: any) {
       (match.status === "SCHEDULED" &&
         new Date(match.kickoffAt).getTime() <= Date.now()));
 
-  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
-  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
+  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-logo/${match.homeTeam.id}` : null);
+  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-logo/${match.awayTeam.id}` : null);
 
   return (
     <div className="relative overflow-hidden rounded-[24px] border border-[#1a382d] bg-gradient-to-b from-[#091610] to-[#050b09] p-5 md:p-6 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
@@ -983,8 +983,8 @@ function CommentaryView({ incidents, match, language, t }: any) {
 
   const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name, undefined, match.homeTeam?.faName);
   const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name, undefined, match.awayTeam?.faName);
-  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
-  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
+  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-logo/${match.homeTeam.id}` : null);
+  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-logo/${match.awayTeam.id}` : null);
 
   // Counts for filter pills
   const goalsCount = incidents.filter((i: any) => i.type === "goal").length;

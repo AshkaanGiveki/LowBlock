@@ -6,8 +6,10 @@ import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { processLocalNotificationJobs, localNotificationQueueStatus } from "@/lib/notifications/localQueue";
 import { runDailyFootballCycle } from "./dailyCycle";
 import { isDailyWorkerWindow, localWorkerClock } from "./schedule";
+import { downloadMissingTeamLogos } from "@/lib/football/teamLogos";
 
 const DAILY_LEASE_MS = 90 * 60_000;
+let lastTeamLogoSyncAt = 0;
 
 async function claimRun(db: Db, runKey: string) {
   const now = new Date();
@@ -107,11 +109,21 @@ export async function runWorkerCycle() {
       }
     }
   }
+  let teamLogos = null;
+  if (Date.now() - lastTeamLogoSyncAt >= 15 * 60_000) {
+    lastTeamLogoSyncAt = Date.now();
+    try {
+      teamLogos = await downloadMissingTeamLogos(6);
+    } catch (error) {
+      console.error("team_logo_sync_failed", error instanceof Error ? error.message : String(error));
+    }
+  }
   return {
     notifications,
     jobs,
     daily,
     h2h,
+    teamLogos,
     errors: {
       notificationSchedulingError,
       notificationProcessingError,

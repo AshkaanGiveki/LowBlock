@@ -33,6 +33,7 @@
     "worker": "tsx scripts/lowblock-worker.ts",
     "worker:once": "tsx scripts/lowblock-worker.ts --once",
     "worker:status": "tsx scripts/worker-status.ts",
+    "download:team-logos": "tsx scripts/download-team-logos.ts",
     "rebuild:leaderboards": "tsx scripts/rebuild-leaderboards.ts",
     "validate:env": "tsx scripts/validate-env.ts",
     "probe:sportsapi-ws": "tsx scripts/probe-sportsapi-websocket.ts",

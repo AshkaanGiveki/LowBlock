@@ -267,8 +267,8 @@ export async function getMatchesPage(
   const centralFa = new Map(centralRows.map((row) => [row.centralTeamId, row.names?.fa]));
   const centralLogos = new Map(centralRows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
   const publicPage = page.map((match) => {
-    const homeLogo = centralLogos.get(match.homeTeam.centralTeamId) || match.homeTeam.logoUrl || (match.homeTeam as any).logo || null;
-    const awayLogo = centralLogos.get(match.awayTeam.centralTeamId) || match.awayTeam.logoUrl || (match.awayTeam as any).logo || null;
+    const homeLogo = centralLogos.get(match.homeTeam.centralTeamId) || null;
+    const awayLogo = centralLogos.get(match.awayTeam.centralTeamId) || null;
 
     return {
       provider: match.provider,
@@ -333,8 +333,8 @@ export async function getMatch(providerMatchId: string) {
   const logos = new Map(rows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
   return {
     ...match,
-    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName, logo: logos.get(match.homeTeam.centralTeamId) || match.homeTeam.logoUrl || null, logoUrl: logos.get(match.homeTeam.centralTeamId) || match.homeTeam.logoUrl || null },
-    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName, logo: logos.get(match.awayTeam.centralTeamId) || match.awayTeam.logoUrl || null, logoUrl: logos.get(match.awayTeam.centralTeamId) || match.awayTeam.logoUrl || null },
+    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName, logo: logos.get(match.homeTeam.centralTeamId) || null, logoUrl: logos.get(match.homeTeam.centralTeamId) || null },
+    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName, logo: logos.get(match.awayTeam.centralTeamId) || null, logoUrl: logos.get(match.awayTeam.centralTeamId) || null },
   };
 }
 

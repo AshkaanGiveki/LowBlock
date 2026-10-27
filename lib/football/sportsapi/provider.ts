@@ -104,7 +104,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
               provider: this.name,
               providerTeamId: String(team.id),
               sourceName: team.name,
-              crestUrl: team.logoUrl || (team as any).logo || (team.id ? `/api/team-image/${team.id}` : null),
+              crestUrl: team.id ? `/api/team-logo/${team.id}` : null,
               currentLeagueCodes: [team.leagueCode],
               updatedAt: new Date(),
             },

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db/mongo";
 import { repairPersianText, teamName } from "./team-names";
 import { reviewedPersianTeamName } from "./persian-team-names";
 import type { ProviderName } from "./types";
+import { teamLogoUrl } from "./teamLogos";
 
 export type CentralTeamRecord = {
   centralTeamId: string;
@@ -17,13 +18,11 @@ export type CentralTeamRecord = {
   updatedAt: Date;
 };
 
-/** Resolve SportsAPI team logos through the free SofaScore image CDN. */
+/** Resolve SportsAPI team logos through the persistent local logo cache. */
 export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds"> | null | undefined) {
   const sportsApiId = row?.providerIds?.sportsapi;
-  if (sportsApiId) return `https://img.sofascore.com/api/v1/team/${encodeURIComponent(sportsApiId)}/image`;
-  const footballApiId = row?.providerIds?.["football-api"];
-  if (footballApiId) return `https://media.api-sports.io/football/teams/${encodeURIComponent(footballApiId)}.png`;
-  return row?.logoUrl && /^https?:\/\//i.test(row.logoUrl) ? row.logoUrl : null;
+  if (sportsApiId) return teamLogoUrl(sportsApiId);
+  return row?.logoUrl && row.logoUrl.startsWith("/api/team-logo/") ? row.logoUrl : null;
 }
 
 const normalize = (value: string) => value.toLowerCase().trim().replace(/\b(fc|afc|cf|sc|club)\b/g, "").replace(/[^a-z0-9]/g, "");

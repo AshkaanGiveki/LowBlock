@@ -67,7 +67,7 @@ async function main() {
     );
   }
 
-  console.log("\n--- 3. Migrating flagcdn logos to /api/team-image/ ---");
+  console.log("\n--- 3. Migrating flagcdn logos to /api/team-logo/ ---");
   const flagMatches = await db
     .collection<any>("matches")
     .find({
@@ -83,17 +83,17 @@ async function main() {
   for (const m of flagMatches) {
     const update: any = {};
     if (m.homeTeam?.logoUrl?.includes("flagcdn.com") && m.homeTeam?.id) {
-      update["homeTeam.logoUrl"] = `/api/team-image/${m.homeTeam.id}`;
+      update["homeTeam.logoUrl"] = `/api/team-logo/${m.homeTeam.id}`;
     }
     if (m.awayTeam?.logoUrl?.includes("flagcdn.com") && m.awayTeam?.id) {
-      update["awayTeam.logoUrl"] = `/api/team-image/${m.awayTeam.id}`;
+      update["awayTeam.logoUrl"] = `/api/team-logo/${m.awayTeam.id}`;
     }
     if (Object.keys(update).length > 0) {
       await db.collection("matches").updateOne({ _id: m._id }, { $set: update });
       updatedLogosCount++;
     }
   }
-  console.log(`Updated ${updatedLogosCount} matches to use /api/team-image/`);
+  console.log(`Updated ${updatedLogosCount} matches to use /api/team-logo/`);
 
   // Run score engine if needed to recalculate scores for finished matches
   try {

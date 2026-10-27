@@ -170,8 +170,8 @@ export async function GET(
   const latestStatus = liveDetails?.score?.status ?? match.status;
   const latestElapsed = liveDetails?.score?.elapsed ?? match.elapsed;
 
-  const homeLogo = match.homeTeam?.logoUrl || match.homeTeam?.logo || (match.homeTeam?.id ? `/api/team-image/${match.homeTeam.id}` : null);
-  const awayLogo = match.awayTeam?.logoUrl || match.awayTeam?.logo || (match.awayTeam?.id ? `/api/team-image/${match.awayTeam.id}` : null);
+  const homeLogo = match.homeTeam?.centralTeamId ? `/api/team-logo/${match.homeTeam.centralTeamId}` : match.homeTeam?.logoUrl || null;
+  const awayLogo = match.awayTeam?.centralTeamId ? `/api/team-logo/${match.awayTeam.centralTeamId}` : match.awayTeam?.logoUrl || null;
   const homeTeamColors = match.homeTeam?.teamColors || match.rawApiResponse?.homeTeam?.teamColors || null;
   const awayTeamColors = match.awayTeam?.teamColors || match.rawApiResponse?.awayTeam?.teamColors || null;
 

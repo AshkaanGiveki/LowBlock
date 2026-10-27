@@ -8,6 +8,7 @@ import type {
   CanonicalScore,
   CanonicalIncidentType,
 } from "../types";
+import { teamLogoUrl } from "../teamLogos";
 
 function normalizeStatus(status?: { code?: number; type?: string; description?: string }): CanonicalStatus {
   if (!status) return "SCHEDULED";
@@ -57,7 +58,7 @@ function resolveTeamLogo(team: any): string | null {
   const teamId = team.id || team.eventId;
   // 1. All teams with an ID: Cached secure proxy (30 days cache)
   if (teamId) {
-    return `/api/team-image/${teamId}`;
+    return teamLogoUrl(teamId);
   }
 
   // 2. Fallback to country flag if no team ID is present
