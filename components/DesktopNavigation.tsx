@@ -33,7 +33,7 @@ const items = [
   },
 ];
 
-export function DesktopNavigation() {
+export function DesktopNavigation({ h2hEnabled }: { h2hEnabled: boolean }) {
   const pathname = usePathname();
   const { setLanguage, t, language } = useLanguage();
   const { data } = useQuery({
@@ -48,11 +48,6 @@ export function DesktopNavigation() {
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
-  });
-  const { data: h2hConfig } = useQuery({
-    queryKey: ["h2h-config"],
-    queryFn: () => fetch("/api/h2h/config").then((response) => response.json()),
-    staleTime: 60_000,
   });
   const avatar = data?.me?.user?.avatarUrl ?? null;
   const username = data?.me?.user?.username ?? null;
@@ -79,7 +74,7 @@ export function DesktopNavigation() {
           {t("فضای رقابت", "COMPETE")}
         </div>
         <nav className="desktop-rail-nav">
-          {[...items, ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Swords, fa: "رو در رو", en: "Head to Head" }] : [])].map(({ href, icon: Icon, fa, en }) => (
+          {[...items, ...(h2hEnabled ? [{ href: "/h2h", icon: Swords, fa: "رو در رو", en: "Head to Head" }] : [])].map(({ href, icon: Icon, fa, en }) => (
             <Link
               href={href}
               key={href}

@@ -25,7 +25,7 @@ const routes = [
   { href: "/lowblock", icon: Trophy, label: "Leaderboard" },
 ];
 
-export function Nav() {
+export function Nav({ h2hEnabled }: { h2hEnabled: boolean }) {
   const pathname = usePathname();
   const { language, setLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,6 @@ export function Nav() {
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
-  const { data: h2hConfig } = useQuery({ queryKey: ["h2h-config"], queryFn: () => fetch("/api/h2h/config").then((response) => response.json()), staleTime: 60_000 });
   const avatar = navData?.me?.user?.avatarUrl ?? null;
   const username = navData?.me?.user?.username ?? null;
   const profileHref = username ? `/u/${encodeURIComponent(username)}` : "/profile";
@@ -101,7 +100,7 @@ export function Nav() {
         )}
       </header>
       <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around xl:hidden">
-        {[routes[0], routes[1], ...(h2hConfig?.enabled ? [{ href: "/h2h", icon: Swords, label: "H2H" }] : []), routes[2]].map(({ href, icon: Component, label }) => (
+        {[routes[0], routes[1], ...(h2hEnabled ? [{ href: "/h2h", icon: Swords, label: "H2H" }] : []), routes[2]].map(({ href, icon: Component, label }) => (
           <Link
             key={href}
             href={href}
