@@ -7,6 +7,13 @@ if (typeof process !== "undefined" && existsSync(".env.local")) {
       process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, "");
   }
 }
+// Vercel/local env exports can occasionally contain the key name twice
+// (for example: MONGODB_URI="MONGODB_URI=mongodb://..."). Normalize it
+// before validating/using the connection string so a bad export cannot break
+// the entire home page render.
+if (process.env.MONGODB_URI?.startsWith("MONGODB_URI=")) {
+  process.env.MONGODB_URI = process.env.MONGODB_URI.slice("MONGODB_URI=".length);
+}
 const safeSecret = (value: string | undefined, fallback: string) =>
   value && value.length >= 16 ? value : fallback;
 const safeUrl = (value: string | undefined) => {

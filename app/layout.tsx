@@ -8,6 +8,7 @@ import { SwipeNavigation } from "@/components/SwipeNavigation";
 import { DesktopNavigation } from "@/components/DesktopNavigation";
 import { HelpShortcut } from "@/components/HelpShortcut";
 import { BrandSwitcher } from "@/components/BrandSwitcher";
+import { isH2HEnabled } from "@/lib/domain/h2h";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lowblock.ir"),
@@ -72,6 +73,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const h2hEnabled = isH2HEnabled();
   const organization = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -102,8 +104,8 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
         <Providers>
-          <DesktopNavigation />
-          <Nav />
+          <DesktopNavigation h2hEnabled={h2hEnabled} />
+          <Nav h2hEnabled={h2hEnabled} />
           <BrandSwitcher />
           <HelpShortcut />
           <SwipeNavigation />

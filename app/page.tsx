@@ -70,7 +70,10 @@ async function HomeData() {
       db
         .collection<any>("clubMemberships")
         .findOne({ userId, leftAt: null }, { projection: { clubId: 1 } }),
-      getViewerH2HTodayMatch(db, userId),
+      getViewerH2HTodayMatch(db, userId).catch((error) => {
+        console.error("[H2H] Home matchup lookup failed:", error);
+        return null;
+      }),
     ]);
     username = user?.username ?? "";
     h2hTodayMatch = todayMatch;
