@@ -75,7 +75,7 @@ const schema = z.object({
     .default("https://www.transfermarkt.com"),
   SPORTSAPI_API_KEY: z.string().optional(),
   SPORTSAPI_DAILY_LIMIT: z.coerce.number().int().positive().optional(),
-  SPORTSAPI_DAILY_REQUEST_BUDGET: z.coerce.number().int().positive().max(100).default(3),
+  SPORTSAPI_DAILY_REQUEST_BUDGET: z.coerce.number().int().positive().max(100).default(10),
   SPORTSAPI_BASE_URL: z
     .string()
     .url()
