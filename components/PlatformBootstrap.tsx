@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -11,6 +11,7 @@ export function PlatformBootstrap() {
   const { t } = useLanguage();
   const [boot, setBoot] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const attemptedSession = useRef<string | null>(null);
 
   const authenticate = useCallback(
     async (provider: Platform, raw: string) => {
@@ -31,12 +32,13 @@ export function PlatformBootstrap() {
         } | null;
         if (data?.ok) {
           const path = window.location.pathname;
+          const currentLocation = `${path}${window.location.search}${window.location.hash}`;
           const destination =
             path === "/" || path === "/platform-link"
               ? "/matches"
-              : `${path}${window.location.search}${window.location.hash}`;
-          router.replace(destination);
-          router.refresh();
+              : currentLocation;
+          if (destination !== currentLocation) router.replace(destination);
+          else router.refresh();
           return;
         }
         if (data?.error === "LINK_REQUIRED") {
@@ -84,12 +86,20 @@ export function PlatformBootstrap() {
     const tg = w.Telegram?.WebApp;
     const bale = w.Bale?.WebApp;
     if (tg?.initData) {
+      const sessionKey = `telegram:${tg.initData}`;
+      if (attemptedSession.current === sessionKey) return;
+      attemptedSession.current = sessionKey;
       tg.ready?.();
       tg.expand?.();
       void authenticate("telegram", tg.initData);
       return;
     }
-    if (bale?.initData) void authenticate("bale", bale.initData);
+    if (bale?.initData) {
+      const sessionKey = `bale:${bale.initData}`;
+      if (attemptedSession.current === sessionKey) return;
+      attemptedSession.current = sessionKey;
+      void authenticate("bale", bale.initData);
+    }
   }, [authenticate]);
 
   if (error && !boot)
