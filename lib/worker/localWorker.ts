@@ -19,7 +19,13 @@ async function claimRun(db: Db, runKey: string) {
         runKey,
         $or: [
           { status: { $exists: false } },
-          { status: "FAILED" },
+          {
+            status: "FAILED",
+            $or: [
+              { retryAfter: { $exists: false } },
+              { retryAfter: { $lte: now } },
+            ],
+          },
           { status: "RUNNING", leaseUntil: { $lte: now } },
         ],
       },
@@ -37,6 +43,9 @@ async function claimRun(db: Db, runKey: string) {
 }
 
 async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", result?: unknown, error?: unknown) {
+  const retryAfter = status === "FAILED"
+    ? new Date(Date.now() + 24 * 60 * 60_000)
+    : undefined;
   await db.collection("workerRuns").updateOne(
     { runKey, status: "RUNNING" },
     {
@@ -46,8 +55,9 @@ async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", resu
         error: error instanceof Error ? error.message : error ? String(error) : undefined,
         finishedAt: new Date(),
         updatedAt: new Date(),
+        ...(retryAfter ? { retryAfter } : {}),
       },
-      $unset: { leaseUntil: "" },
+      $unset: { leaseUntil: "", ...(status === "DONE" ? { retryAfter: "" } : {}) },
     },
   );
 }
@@ -88,7 +98,9 @@ export async function runWorkerCycle() {
     if (await claimRun(db, dailyRunKey)) {
       try {
         daily = await runDailyFootballCycle();
-        await finishRun(db, dailyRunKey, "DONE", { daily });
+        // A provider failure must remain retryable. In particular, do not
+        // mark the run DONE when one or more of the three date reads failed.
+        await finishRun(db, dailyRunKey, daily.ok ? "DONE" : "FAILED", { daily });
       } catch (error) {
         await finishRun(db, dailyRunKey, "FAILED", undefined, error);
         console.error("local_daily_cycle_failed", {

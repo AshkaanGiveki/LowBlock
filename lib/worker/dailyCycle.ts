@@ -11,7 +11,9 @@ export async function runDailyFootballCycle() {
     batchSize: 5000,
   });
   return {
-    ok: true,
+    // Scoring is still run against the data that is available, but the
+    // worker must retry the daily cycle when any provider date failed.
+    ok: (sync.failedDates?.length ?? 0) === 0,
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     sync,

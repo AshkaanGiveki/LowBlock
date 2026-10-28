@@ -19,7 +19,9 @@ async function main() {
   await cycle();
   if (once) return;
   const timer = setInterval(cycle, intervalMs);
-  timer.unref?.();
+  // Keep the worker process alive across the overnight schedule window.
+  // An unresolved Promise does not keep Node alive when the interval is
+  // unref'ed, so the old code could silently exit between cycles.
   await new Promise<void>(() => undefined);
 }
 
