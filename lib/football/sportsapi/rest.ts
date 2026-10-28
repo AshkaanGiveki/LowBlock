@@ -1,5 +1,5 @@
 import { env } from "@/lib/env";
-import { appDayBounds } from "../scheduleWindow";
+import { providerDayBounds } from "../scheduleWindow";
 import { getDb } from "@/lib/db/mongo";
 import { appDateKey } from "../scheduleWindow";
 
@@ -82,7 +82,9 @@ export async function fetchSportsApi<T>(
   // failed calls, and prevents optional paths from consuming the free quota.
   try {
     const db = await getDb();
-    const { start } = appDayBounds();
+    // SportsAPI resets quota at 00:00 UTC. Using Tehran midnight here
+    // incorrectly carried pre-reset usage into the new provider day.
+    const { start } = providerDayBounds();
     const used = await db.collection("sportsApiRequests").countDocuments({
       timestamp: { $gte: start },
     });
@@ -137,14 +139,11 @@ function firstHeader(headers: Headers, names: string[]) {
 }
 
 export async function getSportsApiQuota(): Promise<SportsApiQuota> {
-  const day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: env.APP_TIMEZONE || "Asia/Tehran",
-    year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-  const start = new Date(`${day}T00:00:00+03:30`);
+  const day = new Date().toISOString().slice(0, 10);
+  const { start, end } = providerDayBounds();
   const db = await getDb();
   const used = await db.collection<any>("sportsApiRequests").countDocuments({
-    timestamp: { $gte: start, $lt: new Date(start.getTime() + 86_400_000) },
+    timestamp: { $gte: start, $lt: end },
   });
   const latest = await db.collection<any>("sportsApiRequests").findOne(
     { timestamp: { $gte: start } },
