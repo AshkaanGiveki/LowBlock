@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
-import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getCachedCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { LeaderboardExplorer } from "@/components/LeaderboardExplorer";
 import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
@@ -30,7 +30,7 @@ async function LowBlockData({
   const db = await getDb();
   const year = await getLatestSeasonStartYear();
   const [rows, usersCount, picksCount, roundsCount, me] = await Promise.all([
-    getCanonicalLeaderboard(
+    getCachedCanonicalLeaderboard(
       db,
       {
         seasonStartYear: lifetime || weekly ? null : year,
