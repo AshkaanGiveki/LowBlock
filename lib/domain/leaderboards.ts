@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from "mongodb";
+import { unstable_cache } from "next/cache";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
@@ -351,6 +352,23 @@ export async function getCanonicalLeaderboard(
       userId: row.userId,
     },
   }));
+}
+
+/**
+ * Public leaderboard pages do not need a fresh aggregation on every request.
+ * Keep the read path fast while the worker continues to materialize updates.
+ */
+export async function getCachedCanonicalLeaderboard(
+  db: Db,
+  scope: LeaderboardScope,
+  limit = 100,
+) {
+  const cached = unstable_cache(
+    () => getCanonicalLeaderboard(db, scope, limit),
+    ["canonical-leaderboard-v1", JSON.stringify(scope), String(limit)],
+    { revalidate: 60, tags: ["leaderboards"] },
+  );
+  return cached();
 }
 
 export async function getLeaderboardSummary(

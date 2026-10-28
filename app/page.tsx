@@ -17,7 +17,7 @@ import {
 } from "@/lib/football/leagues";
 import { T } from "@/components/LanguageProvider";
 import { DesktopHomeDashboard } from "@/components/DesktopHomeDashboard";
-import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getCachedCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { getViewerH2HTodayMatch } from "@/lib/domain/h2h";
 import H2HHomeMatchupCard from "@/components/H2HHomeMatchupCard";
 
@@ -97,7 +97,7 @@ async function HomeData() {
   if (userId) {
     const db = await getDb();
     const year = await getLatestSeasonStartYear();
-    leaderboardRows = await getCanonicalLeaderboard(
+    leaderboardRows = await getCachedCanonicalLeaderboard(
       db,
       { seasonStartYear: year },
       7,

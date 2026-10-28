@@ -11,7 +11,7 @@ import {
   IMPORTANT_NATIONAL_TEAM_NAMES,
   isFeaturedFixture,
 } from "@/lib/football/leagues";
-import { appDayBounds, appDateKey } from "./scheduleWindow";
+import { appDayBounds } from "./scheduleWindow";
 
 export type MatchRecord = {
   _id?: unknown;
@@ -131,38 +131,12 @@ function todayBounds() {
   return appDayBounds();
 }
 
-/**
- * A partially populated matches collection is not evidence that today's
- * SportsAPI discovery completed. In particular, one live match can exist
- * while the rest of the daily schedule is still missing. The persisted
- * discovery record is the source of truth and keeps this fallback to one
- * daily REST discovery instead of repeating it on every page request.
- */
-async function ensureSportsApiTodayDiscovery(db: Awaited<ReturnType<typeof getDb>>) {
-  if (getFootballProvider().name !== "sportsapi") return;
-
-  const dateKey = appDateKey();
-  const discovery = await db
-    .collection("sportsApiDailyFixtures")
-    .findOne({ dateString: dateKey }, { projection: { dateString: 1 } });
-  if (discovery) return;
-
-  await getFootballProvider().syncDate(dateKey);
-}
-
 export async function getMatchesPage(
   limit = 30,
   cursor?: MatchPageCursor | null,
 ) {
   const db = await getDb();
   const bounds = todayBounds();
-  if (!cursor) {
-    try {
-      await ensureSportsApiTodayDiscovery(db);
-    } catch (err) {
-      console.error("[SportsAPI] Daily discovery check failed:", err);
-    }
-  }
   const query: any = {
     provider: getFootballProvider().name,
     rawApiResponse: { $exists: true },
