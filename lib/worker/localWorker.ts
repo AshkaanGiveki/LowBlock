@@ -35,7 +35,9 @@ async function claimRun(db: Db, runKey: string) {
       },
       { upsert: true },
     );
-    return result.upsertedCount === 1 || result.modifiedCount === 1;
+    const claimed = result.upsertedCount === 1 || result.modifiedCount === 1;
+    console.info(JSON.stringify({ type: "lowblock.worker.run_claim", runKey, claimed, at: now.toISOString() }));
+    return claimed;
   } catch (error: any) {
     if (error?.code === 11000) return false;
     throw error;
@@ -44,8 +46,12 @@ async function claimRun(db: Db, runKey: string) {
 
 async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", result?: unknown, error?: unknown) {
   const retryAfter = status === "FAILED"
-    ? new Date(Date.now() + 24 * 60 * 60_000)
+    // A transient provider/network failure must be retried during the same
+    // daily window. Waiting a full day made one failed run look like a
+    // successfully skipped day to users.
+    ? new Date(Date.now() + 15 * 60_000)
     : undefined;
+  const finishedAt = new Date();
   await db.collection("workerRuns").updateOne(
     { runKey, status: "RUNNING" },
     {
@@ -53,13 +59,14 @@ async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", resu
         status,
         result,
         error: error instanceof Error ? error.message : error ? String(error) : undefined,
-        finishedAt: new Date(),
-        updatedAt: new Date(),
+        finishedAt,
+        updatedAt: finishedAt,
         ...(retryAfter ? { retryAfter } : {}),
       },
       $unset: { leaseUntil: "", ...(status === "DONE" ? { retryAfter: "" } : {}) },
     },
   );
+  console.info(JSON.stringify({ type: "lowblock.worker.run_finished", runKey, status, retryAfter: retryAfter?.toISOString() ?? null, at: finishedAt.toISOString(), error: error instanceof Error ? error.message : error ? String(error) : null }));
 }
 
 export async function runH2HCycle() {
@@ -72,6 +79,20 @@ export async function runH2HCycle() {
 }
 
 export async function runWorkerCycle() {
+  const cycleStartedAt = new Date();
+  const cycleId = cycleStartedAt.toISOString();
+  const clock = localWorkerClock(cycleStartedAt);
+  console.info(JSON.stringify({ type: "lowblock.worker.cycle_started", cycleId, clock, timezone: process.env.APP_TIMEZONE || "Asia/Tehran", dailyWindow: isDailyWorkerWindow(cycleStartedAt) }));
+  try {
+    const heartbeatDb = await getDb();
+    await heartbeatDb.collection("workerHeartbeats").updateOne(
+      { worker: "lowblock" },
+      { $set: { worker: "lowblock", cycleId, pid: process.pid, at: cycleStartedAt, clock, updatedAt: cycleStartedAt } },
+      { upsert: true },
+    );
+  } catch (error) {
+    console.error("lowblock_worker_heartbeat_failed", { cycleId, error: error instanceof Error ? error.message : String(error) });
+  }
   let notifications = null;
   let notificationSchedulingError: string | null = null;
   try {
@@ -88,15 +109,16 @@ export async function runWorkerCycle() {
     notificationProcessingError = error instanceof Error ? error.message : String(error);
     console.error("local_notification_processing_failed", { error: notificationProcessingError });
   }
-  const clock = localWorkerClock();
   const today = clock.dateKey || appDateKey();
   let daily = null;
   let h2h = null;
-  if (isDailyWorkerWindow()) {
+  if (isDailyWorkerWindow(cycleStartedAt)) {
     const db = await getDb();
     const dailyRunKey = `daily-football:${today}`;
-    if (await claimRun(db, dailyRunKey)) {
+    const claimedDailyRun = await claimRun(db, dailyRunKey);
+    if (claimedDailyRun) {
       try {
+        console.info(JSON.stringify({ type: "lowblock.worker.daily_started", cycleId, runKey: dailyRunKey, dateKey: today }));
         daily = await runDailyFootballCycle();
         // A provider failure must remain retryable. In particular, do not
         // mark the run DONE when one or more of the three date reads failed.
@@ -107,6 +129,8 @@ export async function runWorkerCycle() {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+    } else {
+      console.info(JSON.stringify({ type: "lowblock.worker.daily_skipped", cycleId, runKey: dailyRunKey, reason: "lease-or-retry-window" }));
     }
     const h2hRunKey = `h2h:${today}`;
     if (await claimRun(db, h2hRunKey)) {
@@ -146,11 +170,15 @@ export async function runWorkerCycle() {
 export async function workerStatus() {
   const db = await getDb();
   const latestRun = await db.collection("workerRuns").findOne({}, { sort: { updatedAt: -1 } });
+  const latestDailyRun = await db.collection("workerRuns").findOne({ runKey: { $regex: /^daily-football:/ } }, { sort: { updatedAt: -1 } });
   const latestSync = await db.collection("syncRuns").findOne({}, { sort: { startedAt: -1 } });
+  const heartbeat = await db.collection("workerHeartbeats").findOne({ worker: "lowblock" });
   const requestSince = new Date(Date.now() - 24 * 60 * 60_000);
   return {
     notificationsEnabled: Boolean(process.env.TELEGRAM_BOT_TOKEN || process.env.BALE_BOT_TOKEN),
     latestRun,
+    latestDailyRun,
+    heartbeat,
     latestSync,
     notificationJobs: await localNotificationQueueStatus(),
     sportsApiRequestsLast24h: await db.collection("sportsApiRequests").countDocuments({

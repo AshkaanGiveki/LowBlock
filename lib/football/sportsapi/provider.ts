@@ -133,9 +133,18 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
     for (const date of dates) {
       try {
-        const response = await getSportsApiDailyFixtures(date);
+        let response = await getSportsApiDailyFixtures(date);
+        // SportsAPI has intermittently returned an HTTP-200 response with an
+        // empty/non-JSON body. Retry that specific transport failure once;
+        // normal provider errors must not multiply quota usage.
+        if (response.success === false && response.error?.code === 200) {
+          console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_retry", date, reason: "invalid_http_200_body" }));
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          response = await getSportsApiDailyFixtures(date);
+        }
         if (response.success === false || response.error) {
           failedDates.push(date);
+          console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_date_failed", date, error: response.error ?? null }));
           continue;
         }
         const resAny = response as any;
@@ -145,17 +154,20 @@ export class SportsApiFootballProvider implements FootballDataProvider {
           (Array.isArray(response) ? response : null) ||
           [];
 
+        let normalizedCount = 0;
         if (Array.isArray(rawList)) {
           for (const item of rawList) {
             const normalized = normalizeSportsApiMatch(item);
             if (normalized) {
               matchesMap.set(normalized.providerMatchId, normalized);
+              normalizedCount++;
             }
           }
         }
+        console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_date_finished", date, providerEvents: Array.isArray(rawList) ? rawList.length : 0, normalized: normalizedCount }));
       } catch (err) {
         failedDates.push(date);
-        console.error(`[SportsAPI] Failed to fetch fixtures for ${date}:`, err);
+        console.error("lowblock.sportsapi.daily_date_exception", { date, error: err instanceof Error ? err.message : String(err) });
       }
     }
 

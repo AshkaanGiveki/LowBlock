@@ -112,15 +112,44 @@ export async function fetchSportsApi<T>(
       headers: { "x-api-key": env.SPORTSAPI_API_KEY || "" },
       signal: AbortSignal.timeout(15_000),
     });
-    const body = (await response.json().catch(() => null)) as SportsApiRestResponse<T> | null;
+    const contentType = response.headers.get("content-type") || "";
+    const rawBody = await response.text();
+    let body: SportsApiRestResponse<T> | null = null;
+    let parseError: string | undefined;
+    try {
+      // Some upstream/proxy responses include a UTF-8 BOM before JSON.
+      body = JSON.parse(rawBody.replace(/^\uFEFF/, "")) as SportsApiRestResponse<T>;
+    } catch (error) {
+      parseError = error instanceof Error ? error.message : String(error);
+    }
     const remaining = firstHeader(response.headers, ["x-ratelimit-remaining", "x-rate-limit-remaining", "x-requests-remaining", "x-quota-remaining"]);
     const limit = firstHeader(response.headers, ["x-ratelimit-limit", "x-rate-limit-limit", "x-requests-limit", "x-quota-limit"]);
     const quota = { ...(remaining == null ? {} : { remaining }), ...(limit == null ? {} : { limit }) };
     if (!response.ok || !body) {
+      const preview = rawBody.replace(/\s+/g, " ").trim().slice(0, 240);
       const message = body?.error?.message || `SportsAPI REST request failed (${response.status})`;
-      await trackRequest(path, params, performance.now() - startedAt, "FAILED", message, quota);
+      const diagnostic = {
+        path,
+        httpStatus: response.status,
+        contentType,
+        bodyBytes: Buffer.byteLength(rawBody, "utf8"),
+        parseError: parseError || null,
+        bodyPreview: preview || null,
+      };
+      const recordedError = `${message}; response=${JSON.stringify(diagnostic)}`;
+      await trackRequest(path, params, performance.now() - startedAt, "FAILED", recordedError, quota);
+      console.error("lowblock.sportsapi.invalid_response", diagnostic);
       return { success: false, events: [], error: { code: response.status, message } };
     }
+    console.info(JSON.stringify({
+      type: "lowblock.sportsapi.response_parsed",
+      path,
+      httpStatus: response.status,
+      contentType,
+      bodyBytes: Buffer.byteLength(rawBody, "utf8"),
+      hasEvents: Array.isArray((body as any).events),
+      hasData: Array.isArray((body as any).data),
+    }));
     await trackRequest(path, params, performance.now() - startedAt, "OK", undefined, quota);
     return body;
   } catch (err) {
@@ -175,6 +204,7 @@ export async function getSportsApiDailyFixtures(
   const now = Date.now();
   const cached = dailyFixturesCache.get(dateString);
   if (cached && cached.expiresAt > now) {
+    console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_cache_hit", date: dateString, source: "memory" }));
     return cached.data;
   }
 
@@ -186,12 +216,14 @@ export async function getSportsApiDailyFixtures(
     if (
       persisted?.expiresAt &&
       new Date(persisted.expiresAt).getTime() > now &&
-      persisted.data
+      persisted.data &&
+      persisted.data.success !== false
     ) {
       dailyFixturesCache.set(dateString, {
         data: persisted.data,
         expiresAt: new Date(persisted.expiresAt).getTime(),
       });
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_cache_hit", date: dateString, source: "mongo" }));
       return persisted.data;
     }
   } catch (err) {
@@ -207,6 +239,7 @@ export async function getSportsApiDailyFixtures(
   // One request per requested date. Do not add a second /today request here:
   // the daily window is deliberately capped at three REST calls.
   try {
+    console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_started", date: dateString, path: `/schedule/${dateString}` }));
     const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
     if (res.success === false || res.error) {
       return {
@@ -215,7 +248,9 @@ export async function getSportsApiDailyFixtures(
         error: res.error ?? { code: 502, message: "SportsAPI returned an unsuccessful response" },
       };
     }
-    const events = res.events || res.data || (Array.isArray(res) ? res : null);
+    const events = res.events ||
+      (Array.isArray(res.data) ? res.data : (res.data as any)?.events) ||
+      (Array.isArray(res) ? res : null);
     if (Array.isArray(events)) {
       for (const ev of events) {
         const id = ev.id || ev.eventId;
@@ -224,6 +259,7 @@ export async function getSportsApiDailyFixtures(
         }
       }
     }
+    console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_finished", date: dateString, ok: true, providerEvents: eventsMap.size }));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[SportsAPI] /schedule/${dateString} failed:`, message);
@@ -232,24 +268,33 @@ export async function getSportsApiDailyFixtures(
 
   if (result.success !== false)
     result = { success: true, events: Array.from(eventsMap.values()) };
-  dailyFixturesCache.set(dateString, {
-    data: result,
-    expiresAt: now + DISCOVERY_CACHE_TTL_MS,
-  });
+  // Never cache an unsuccessful provider response. Caching a transient
+  // malformed/empty HTTP-200 response makes every retry during the cache
+  // window fail without contacting the provider again.
+  if (result.success !== false) {
+    dailyFixturesCache.set(dateString, {
+      data: result,
+      expiresAt: now + DISCOVERY_CACHE_TTL_MS,
+    });
+  } else {
+    dailyFixturesCache.delete(dateString);
+  }
   try {
     const db = await getDb();
-    await db.collection("sportsApiDailyFixtures").updateOne(
-      { dateString },
-      {
-        $set: {
-          dateString,
-          data: result,
-          expiresAt: new Date(now + DISCOVERY_CACHE_TTL_MS),
-          updatedAt: new Date(),
+    if (result.success !== false) {
+      await db.collection("sportsApiDailyFixtures").updateOne(
+        { dateString },
+        {
+          $set: {
+            dateString,
+            data: result,
+            expiresAt: new Date(now + DISCOVERY_CACHE_TTL_MS),
+            updatedAt: new Date(),
+          },
         },
-      },
-      { upsert: true },
-    );
+        { upsert: true },
+      );
+    }
   } catch (err) {
     console.warn("[SportsAPI] Failed to persist discovery cache:", err);
   }
