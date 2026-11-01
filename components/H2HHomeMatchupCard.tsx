@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Clock3, Swords } from "lucide-react";
+import { Clock3, Medal } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
@@ -60,7 +60,7 @@ export default function H2HHomeMatchupCard({ match }: { match: H2HTodayMatch }) 
 
           <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/40 bg-[#092216] text-brand shadow-[0_0_22px_rgba(32,184,121,.18)]">
             <span className="absolute inset-1 rounded-xl border border-brand/15" />
-            <Swords size={22} strokeWidth={2.1} />
+            <Medal size={22} strokeWidth={2.1} />
           </div>
 
           <div className="flex min-w-0 items-center justify-end gap-3">

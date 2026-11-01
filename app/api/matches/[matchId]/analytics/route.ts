@@ -6,6 +6,7 @@ import { isPredictionLocked } from "@/lib/domain/predictionLock";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
 import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
 import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backgroundService";
+import { centralTeamLogo } from "@/lib/football/centralTeams";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,28 @@ export async function GET(
     });
   if (!match)
     return NextResponse.json({ error: "match not found" }, { status: 404 });
+
+  // Keep the analytics drawer in sync with the match list: hydrate canonical
+  // Persian names and central-team crest URLs before returning the match.
+  const centralIds = [match.homeTeam?.centralTeamId, match.awayTeam?.centralTeamId].filter(Boolean);
+  const centralRows = centralIds.length
+    ? await db.collection<any>("centralTeams").find(
+        { centralTeamId: { $in: centralIds } },
+        { projection: { centralTeamId: 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } },
+      ).toArray()
+    : [];
+  const centralById = new Map(centralRows.map((row) => [String(row.centralTeamId), row]));
+  for (const side of ["homeTeam", "awayTeam"] as const) {
+    const team = match[side];
+    const central = centralById.get(String(team?.centralTeamId));
+    if (!team) continue;
+    match[side] = {
+      ...team,
+      faName: central?.names?.fa || team.faName,
+      logo: centralTeamLogo(central) || team.logoUrl || team.logo || null,
+      logoUrl: centralTeamLogo(central) || team.logoUrl || team.logo || null,
+    };
+  }
 
   let viewerClubId: string | null = null;
   if (viewer) {

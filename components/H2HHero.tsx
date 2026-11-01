@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowUpRight, Swords } from "lucide-react";
+import { ArrowUpRight, Medal } from "lucide-react";
 import { T } from "@/components/LanguageProvider";
 
 type H2HHeroProps = {
@@ -26,11 +26,11 @@ export default function H2HHero({ slateCount, activeSlate, progressSlate }: H2HH
       <div className="relative flex items-center gap-4">
         <motion.div initial={{ scale: .86, rotate: -8, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }} className="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-brand/35 bg-brand/15 text-brand shadow-[0_0_34px_rgba(32,184,121,.2)]">
           <motion.span animate={{ scale: [1, 1.18, 1], opacity: [.45, .1, .45] }} transition={{ duration: 2.8, repeat: Infinity }} className="absolute inset-0 rounded-2xl border border-brand/40" />
-          <Swords size={22} strokeWidth={2.2} />
+          <Medal size={22} strokeWidth={2.2} />
         </motion.div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="truncate text-2xl font-black tracking-tight text-white md:text-[2rem]"><T fa="رو در رو" en="Head to Head" /></h1>
+            <h1 className="truncate text-2xl font-black tracking-tight text-white md:text-[2rem]"><T fa="سوپرلیگ" en="SuperLeague" /></h1>
             <span className="rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[.18em] text-brand"><T fa="حالت رقابتی" en="Competitive mode" /></span>
           </div>
         </div>

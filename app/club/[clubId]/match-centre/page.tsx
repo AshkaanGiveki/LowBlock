@@ -71,7 +71,7 @@ export default async function ClubMatchCentre({
             className="mt-5 flex items-center justify-between rounded-2xl border border-[#eacb70]/30 bg-[linear-gradient(135deg,rgba(234,203,112,.16),rgba(16,21,18,.96))] p-5 transition hover:-translate-y-0.5 hover:border-[#eacb70]/60"
           >
             <span>
-              <b className="block text-lg text-[#eacb70]">H2H · Head to Head</b>
+              <b className="block text-lg text-[#eacb70]">SuperLeague</b>
               <small className="mt-1 block text-white/55">Face seven Club members this week</small>
             </span>
             <LocaleChevron className="text-[#eacb70]" />
