@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Crown, Swords, UserPlus, UsersRound } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Crown, Medal, UserPlus, UsersRound } from "lucide-react";
 import { T } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import H2HHero from "@/components/H2HHero";
@@ -22,7 +22,7 @@ function H2HStandings({ standings, viewerId }: { standings: any[]; viewerId: str
         <span className="text-center">W</span>
         <span className="text-center">D</span>
         <span className="text-center">L</span>
-        <span className="text-center"><T fa="امتیاز رو در رو" en="H2H" /></span>
+        <span className="text-center"><T fa="امتیاز سوپرلیگ" en="SUPERLEAGUE" /></span>
         <span className="text-center"><T fa="امتیاز پیش‌بینی" en="PRED" /></span>
       </div>
       <div className="divide-y divide-white/[.05]">
@@ -48,10 +48,10 @@ function H2HStandings({ standings, viewerId }: { standings: any[]; viewerId: str
 function H2HAccessCard({ reason, clubMemberCount, observer = false }: { reason?: string; clubMemberCount?: number; observer?: boolean }) {
   if (observer) return (
     <section className="mt-5 flex max-w-5xl items-center gap-3 rounded-2xl border border-white/[.08] bg-[#101713] px-4 py-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand"><Swords size={17} /></span>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand"><Medal size={17} /></span>
       <div className="min-w-0">
         <p className="text-[10px] font-black uppercase tracking-[.16em] text-brand"><T fa="این هفته صعود نکردید" en="NOT QUALIFIED THIS WEEK" /></p>
-        <p className="mt-0.5 text-xs text-white/55"><T fa="رویارویی‌ها و جدول را دنبال کنید؛ در جدول باشگاه بهتر رقابت کنید تا برای تورنمنت H2H هفته بعد انتخاب شوید." en="Follow the matchups and standings, then climb your Club leaderboard to qualify for next week’s H2H tournament." /></p>
+        <p className="mt-0.5 text-xs text-white/55"><T fa="رویارویی‌ها و جدول را دنبال کنید؛ در جدول باشگاه بهتر رقابت کنید تا برای تورنمنت سوپرلیگ هفته بعد انتخاب شوید." en="Follow the matchups and standings, then climb your Club leaderboard to qualify for next week’s SuperLeague tournament." /></p>
       </div>
       <Link href="/club" className="ms-auto inline-flex shrink-0 items-center rounded-lg border border-brand/25 bg-brand/10 px-2.5 py-1.5 text-[10px] font-black text-brand transition hover:bg-brand/20"><T fa="رقابت بیشتر" en="Compete harder" /></Link>
     </section>
@@ -66,9 +66,9 @@ function H2HAccessCard({ reason, clubMemberCount, observer = false }: { reason?:
       <div className="relative flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/25 bg-brand/10 text-brand">{icon}</span>
         <div className="min-w-0">
-          <p className="text-[9px] font-black uppercase tracking-[.18em] text-brand">{noClub ? <T fa="باشگاهت را پیدا کن" en="FIND YOUR CLUB" /> : tooSmall ? <T fa="رقابت رو در رو" en="HEAD TO HEAD" /> : <T fa="رقابت این هفته" en="THIS WEEK’S H2H" />}</p>
-          <h2 className="mt-1 text-lg font-black text-white">{noClub ? <T fa="برای ورود به H2H به یک باشگاه بپیوندید" en="Join a club to enter H2H" /> : tooSmall ? <T fa="باشگاهت برای H2H هنوز بازیکن کافی ندارد" en="Your club needs more H2H players" /> : <T fa="گروه H2H این هفته در حال آماده‌سازی است" en="This week’s H2H group is being prepared" />}</h2>
-          <p className="mt-1.5 max-w-xl text-xs leading-6 text-white/55">{noClub ? <T fa="به یک باشگاه بپیوند تا با هم‌تیمی‌هایت برای بازی‌های طلایی و جدول رو در رو رقابت کنی." en="Join a club to compete with teammates for Gold Picks and a place in the H2H standings." /> : tooSmall ? <T fa={`برای فعال‌شدن H2H، حداقل ۸ عضو آماده رقابت لازم است. اکنون ${clubMemberCount ?? 0} عضو دارید؛ چند بازیکن دیگر دعوت کنید و رقابت را شروع کنید.`} en={`H2H needs at least 8 willing players. Your club has ${clubMemberCount ?? 0} member${clubMemberCount === 1 ? "" : "s"}; invite a few more and start the race.`} /> : <T fa="به‌محض آماده‌شدن گروه، رویارویی‌ها و جدول اینجا نمایش داده می‌شوند." en="The matchups and standings will appear here as soon as the group is ready." />}</p>
+          <p className="text-[9px] font-black uppercase tracking-[.18em] text-brand">{noClub ? <T fa="باشگاهت را پیدا کن" en="FIND YOUR CLUB" /> : tooSmall ? <T fa="سوپرلیگ" en="SUPERLEAGUE" /> : <T fa="رقابت این هفته" en="THIS WEEK’S SUPERLEAGUE" />}</p>
+          <h2 className="mt-1 text-lg font-black text-white">{noClub ? <T fa="برای ورود به سوپرلیگ به یک باشگاه بپیوندید" en="Join a club to enter SuperLeague" /> : tooSmall ? <T fa="باشگاهت برای سوپرلیگ هنوز بازیکن کافی ندارد" en="Your club needs more SuperLeague players" /> : <T fa="گروه سوپرلیگ این هفته در حال آماده‌سازی است" en="This week’s SuperLeague group is being prepared" />}</h2>
+          <p className="mt-1.5 max-w-xl text-xs leading-6 text-white/55">{noClub ? <T fa="به یک باشگاه بپیوند تا با هم‌تیمی‌هایت برای بازی‌های طلایی و جدول سوپرلیگ رقابت کنی." en="Join a club to compete with teammates for Gold Picks and a place in the SuperLeague standings." /> : tooSmall ? <T fa={`برای فعال‌شدن سوپرلیگ، حداقل ۸ عضو آماده رقابت لازم است. اکنون ${clubMemberCount ?? 0} عضو دارید؛ چند بازیکن دیگر دعوت کنید و رقابت را شروع کنید.`} en={`SuperLeague needs at least 8 willing players. Your club has ${clubMemberCount ?? 0} member${clubMemberCount === 1 ? "" : "s"}; invite a few more and start the race.`} /> : <T fa="به‌محض آماده‌شدن گروه، رویارویی‌ها و جدول اینجا نمایش داده می‌شوند." en="The matchups and standings will appear here as soon as the group is ready." />}</p>
           <Link href="/club" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-3.5 py-2 text-[11px] font-black text-[#06120c] transition hover:bg-brand/90"><T fa={noClub ? "پیدا کردن باشگاه" : "رفتن به باشگاه"} en={noClub ? "Find a club" : "Open club"} /><ArrowRight size={14} /></Link>
         </div>
       </div>
@@ -81,11 +81,11 @@ function H2HInactiveCard() {
     <section dir="rtl" className="relative mt-6 max-w-2xl overflow-hidden rounded-[1.5rem] border border-brand/20 bg-[linear-gradient(135deg,rgba(32,184,121,.12),rgba(16,23,19,.96)_60%)] px-5 py-6 text-right">
       <div className="pointer-events-none absolute -end-10 -top-16 h-36 w-36 rounded-full bg-brand/10 blur-3xl" />
       <div className="relative flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/25 bg-brand/10 text-brand"><Swords size={20} /></span>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand/25 bg-brand/10 text-brand"><Medal size={20} /></span>
         <div>
-          <p className="text-[9px] font-black uppercase tracking-[.18em] text-brand">H2H</p>
+          <p className="text-[9px] font-black uppercase tracking-[.18em] text-brand">SUPERLEAGUE</p>
           <h2 className="mt-1 text-xl font-black text-white">در انتظار شروع راند بعدی</h2>
-          <p className="mt-2 text-xs leading-6 text-white/55">راند این هفته به پایان رسیده است. رقابت H2H از هفته‌ی آینده با نفرات برتر هفته‌ی قبل آغاز می‌شود.</p>
+          <p className="mt-2 text-xs leading-6 text-white/55">راند این هفته به پایان رسیده است. رقابت سوپرلیگ از هفته‌ی آینده با نفرات برتر هفته‌ی قبل آغاز می‌شود.</p>
         </div>
       </div>
     </section>
@@ -106,7 +106,7 @@ export default function H2HBoard() {
       setDay(upcoming?.matchday ?? next.league.slates[next.league.slates.length - 1].matchday);
       initialized.current = true;
     }
-  }).catch(() => setError("Could not load H2H"));
+  }).catch(() => setError("Could not load SuperLeague"));
   useEffect(() => {
     void load();
     const timer = window.setInterval(() => void load(), 60_000);

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 import { TeamCrest } from "./TeamCrest";
+import { teamName } from "@/lib/football/team-names";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -58,12 +59,14 @@ export function PitchLineup({ lineups, match, language, t, incidents }: LineupPr
 
   const currentTeam = activeSide === "home" ? lineups.home : lineups.away;
   const isHome = activeSide === "home";
+  const homeName = teamName(language, match.homeTeam?.id, match.homeTeam?.name, undefined, match.homeTeam?.faName);
+  const awayName = teamName(language, match.awayTeam?.id, match.awayTeam?.name, undefined, match.awayTeam?.faName);
 
   return (
     <div className="space-y-4">
       <div className="mb-2 flex rounded-xl border border-white/5 bg-black/40 p-1">
-        <TeamTab active={isHome} onClick={() => setActiveSide("home")} crest={<TeamCrest name={match.homeTeam.name} logo={match.homeTeam.logoUrl || match.homeTeam.logo} className="h-5 w-5 object-contain" />} name={match.homeTeam.name} />
-        <TeamTab active={!isHome} onClick={() => setActiveSide("away")} crest={<TeamCrest name={match.awayTeam.name} logo={match.awayTeam.logoUrl || match.awayTeam.logo} className="h-5 w-5 object-contain" />} name={match.awayTeam.name} />
+        <TeamTab active={isHome} onClick={() => setActiveSide("home")} crest={<TeamCrest name={homeName} logo={match.homeTeam.logoUrl || match.homeTeam.logo} className="h-5 w-5 object-contain" />} name={homeName} />
+        <TeamTab active={!isHome} onClick={() => setActiveSide("away")} crest={<TeamCrest name={awayName} logo={match.awayTeam.logoUrl || match.awayTeam.logo} className="h-5 w-5 object-contain" />} name={awayName} />
       </div>
 
       <div className="relative isolate w-full overflow-hidden rounded-[30px] border border-white/10 bg-[#050807] px-1 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.58)] sm:px-3 sm:py-5">

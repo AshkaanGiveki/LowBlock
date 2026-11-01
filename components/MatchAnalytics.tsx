@@ -447,7 +447,7 @@ function MatchHeader({ match, language, number, score, t }: any) {
         <div className="flex flex-col items-center flex-1">
           <div className="h-16 w-16 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-center p-2 mb-2 shadow-[0_4px_24px_rgba(0,0,0,.5)]">
             <TeamCrest
-              name={match.homeTeam?.name || home}
+              name={home}
               logo={homeLogo}
               className="h-12 w-12 object-contain"
             />
@@ -467,7 +467,7 @@ function MatchHeader({ match, language, number, score, t }: any) {
         <div className="flex flex-col items-center flex-1">
           <div className="h-16 w-16 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-center p-2 mb-2 shadow-[0_4px_24px_rgba(0,0,0,.5)]">
             <TeamCrest
-              name={match.awayTeam?.name || away}
+              name={away}
               logo={awayLogo}
               className="h-12 w-12 object-contain"
             />
