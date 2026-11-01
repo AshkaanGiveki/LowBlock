@@ -4,7 +4,9 @@ import { runDailyFootballCycle } from "../lib/worker/dailyCycle";
 /** Server-owned nightly sync; intentionally independent of Vercel Cron/QStash. */
 async function main() {
   try {
-    console.log(JSON.stringify(await runDailyFootballCycle()));
+    const result = await runDailyFootballCycle();
+    console.log(JSON.stringify(result));
+    if (!result.ok) process.exitCode = 1;
   } finally {
     await closeMongo();
   }
