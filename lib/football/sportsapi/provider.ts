@@ -137,8 +137,12 @@ export class SportsApiFootballProvider implements FootballDataProvider {
         // SportsAPI has intermittently returned an HTTP-200 response with an
         // empty/non-JSON body. Retry that specific transport failure once;
         // normal provider errors must not multiply quota usage.
-        if (response.success === false && response.error?.code === 200) {
-          console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_retry", date, reason: "invalid_http_200_body" }));
+        const retryableTransportFailure = response.success === false && (
+          response.error?.code === 200 ||
+          (response.error?.code === 500 && /timeout|aborted/i.test(response.error.message || ""))
+        );
+        if (retryableTransportFailure) {
+          console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_retry", date, reason: response.error?.code === 200 ? "invalid_http_200_body" : "timeout" }));
           await new Promise((resolve) => setTimeout(resolve, 500));
           response = await getSportsApiDailyFixtures(date);
         }

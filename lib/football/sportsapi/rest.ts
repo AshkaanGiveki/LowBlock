@@ -38,6 +38,10 @@ const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 m
 // paths from multiplying the same REST request while still allowing a manual
 // retry shortly after a provider outage.
 const DISCOVERY_CACHE_TTL_MS = CACHE_TTL * 1000;
+const SPORTSAPI_REQUEST_TIMEOUT_MS = Math.max(
+  15_000,
+  Number(process.env.SPORTSAPI_REQUEST_TIMEOUT_MS || 45_000),
+);
 
 async function trackRequest(
   path: string,
@@ -109,8 +113,12 @@ export async function fetchSportsApi<T>(
 
   try {
     const response = await fetch(url, {
-      headers: { "x-api-key": env.SPORTSAPI_API_KEY || "" },
-      signal: AbortSignal.timeout(15_000),
+      headers: {
+        "x-api-key": env.SPORTSAPI_API_KEY || "",
+        accept: "application/json",
+        "user-agent": "LowBlock/1.0 SportsAPI sync",
+      },
+      signal: AbortSignal.timeout(SPORTSAPI_REQUEST_TIMEOUT_MS),
     });
     const contentType = response.headers.get("content-type") || "";
     const rawBody = await response.text();
