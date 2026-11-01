@@ -133,7 +133,11 @@ export async function runWorkerCycle() {
       console.info(JSON.stringify({ type: "lowblock.worker.daily_skipped", cycleId, runKey: dailyRunKey, reason: "lease-or-retry-window" }));
     }
     const h2hRunKey = `h2h:${today}`;
-    if (await claimRun(db, h2hRunKey)) {
+    // H2H selection depends on the daily provider sync having persisted
+    // tomorrow's fixtures first. If that sync failed, leave H2H unclaimed so
+    // the retry window can select the slate after the provider recovers.
+    const dailySyncReady = daily?.ok !== false;
+    if (dailySyncReady && await claimRun(db, h2hRunKey)) {
       try {
         h2h = await runH2HCycle();
         await finishRun(db, h2hRunKey, "DONE", { h2h });
@@ -143,6 +147,8 @@ export async function runWorkerCycle() {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+    } else if (!dailySyncReady) {
+      console.info(JSON.stringify({ type: "lowblock.worker.h2h_skipped", cycleId, runKey: h2hRunKey, reason: "daily_provider_sync_incomplete" }));
     }
   }
   let teamLogos = null;
