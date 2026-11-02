@@ -1,7 +1,13 @@
+import dns from "node:dns";
 import { env } from "@/lib/env";
 import { providerDayBounds } from "../scheduleWindow";
 import { getDb } from "@/lib/db/mongo";
 import { appDateKey } from "../scheduleWindow";
+
+// The production host intermittently prefers an unreachable IPv6 route for
+// api.sportsapipro.com. Prefer IPv4 so the scheduled worker does not spend
+// its entire retry window waiting for connection timeouts.
+dns.setDefaultResultOrder("ipv4first");
 
 export type SportsApiRestResponse<T> = {
   success?: boolean;
