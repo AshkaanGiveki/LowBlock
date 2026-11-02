@@ -35,6 +35,8 @@ const schema = z.object({
   CRON_SECRET: z.string().min(8).optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_BOT_USERNAME: z.string().optional(),
+  TELEGRAM_RELAY_URL: z.string().url().optional(),
+  TELEGRAM_RELAY_SECRET: z.string().optional(),
   TELEGRAM_ADMIN_CHAT_ID: z
     .string()
     .regex(/^-?\d+$/)
@@ -132,6 +134,8 @@ export const env = schema.parse({
   CRON_SECRET: process.env.CRON_SECRET,
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_BOT_USERNAME: process.env.TELEGRAM_BOT_USERNAME,
+  TELEGRAM_RELAY_URL: process.env.TELEGRAM_RELAY_URL,
+  TELEGRAM_RELAY_SECRET: process.env.TELEGRAM_RELAY_SECRET,
   TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
   TELEGRAM_CHANNEL_ID: process.env.TELEGRAM_CHANNEL_ID,
   BALE_API_BASE_URL: process.env.BALE_API_BASE_URL,

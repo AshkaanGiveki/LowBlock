@@ -8,6 +8,7 @@ import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
 import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
+import { telegramApi, telegramEnabled } from "@/lib/telegram/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -551,11 +552,8 @@ async function handleSportsApiQuota(chatId: string, providerUserId: string, lang
 }
 
 async function answerCallback(callbackQueryId: string) {
-  if (!env.TELEGRAM_BOT_TOKEN) return;
-  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ callback_query_id: callbackQueryId }),
-  });
+  if (!telegramEnabled()) return;
+  await telegramApi("answerCallbackQuery", { callback_query_id: callbackQueryId });
 }
 
 async function getTelegramIdentity(providerUserId: string) {
@@ -678,6 +676,26 @@ async function send(
   text: string,
   keyboard: boolean | InlineKeyboard = false,
 ): Promise<number | null> {
+  if (env.TELEGRAM_RELAY_URL) {
+    try {
+      const result = await telegramApi<{ message_id?: number }>("sendMessage", {
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        reply_markup:
+          keyboard === true
+            ? { inline_keyboard: [[
+                greenButton({ text: "Leaderboard", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/lowblock` } }),
+                greenButton({ text: "Predict", web_app: { url: `${env.NEXT_PUBLIC_APP_URL}/matches` } }),
+              ]] }
+            : keyboard || undefined,
+      });
+      return result?.message_id ?? null;
+    } catch (error) {
+      console.error("Telegram relay sendMessage failed", { error: error instanceof Error ? error.message : String(error) });
+      return null;
+    }
+  }
   if (!env.TELEGRAM_BOT_TOKEN) return null;
 
   const response = await fetch(
@@ -726,6 +744,14 @@ async function send(
 }
 
 async function editMessage(chatId: string, messageId: number, text: string) {
+  if (env.TELEGRAM_RELAY_URL) {
+    try {
+      await telegramApi("editMessageText", { chat_id: chatId, message_id: messageId, text, parse_mode: "HTML" });
+    } catch (error) {
+      console.error("Telegram relay editMessageText failed", { error: error instanceof Error ? error.message : String(error) });
+    }
+    return;
+  }
   if (!env.TELEGRAM_BOT_TOKEN) return;
   try {
     const response = await fetch(

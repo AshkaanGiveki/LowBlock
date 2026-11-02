@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { enqueueLocalNotificationJob } from "./localQueue";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { scheduleMatchdayPolling } from "@/lib/notifications/matchday";
+import { telegramApi } from "@/lib/telegram/client";
 
 const CHANNEL_ID = env.TELEGRAM_CHANNEL_ID || "@lowblockapp";
 const CHANNEL_PUBLICATION_TYPES = [
@@ -44,6 +45,15 @@ async function sendChannelMessage(
   text: string,
   url = `${env.NEXT_PUBLIC_APP_URL}/matches`,
 ) {
+  if (env.TELEGRAM_RELAY_URL)
+    return telegramApi("sendMessage", {
+      chat_id: CHANNEL_ID,
+      text,
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [[{ text: "Predict now", style: "success", url: botLink(url) }]],
+      },
+    });
   if (!env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_NOT_CONFIGURED");
   const response = await fetch(
     `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
