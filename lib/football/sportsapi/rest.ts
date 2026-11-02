@@ -88,9 +88,14 @@ export async function fetchSportsApi<T>(
     const db = await getDb();
     // SportsAPI resets quota at 00:00 UTC. Using Tehran midnight here
     // incorrectly carried pre-reset usage into the new provider day.
+    // Count only successful provider responses for this guard. A connection
+    // timeout never gives us a provider quota response and must not consume
+    // the entire local budget, otherwise one production-network incident
+    // prevents every later recovery attempt until the next UTC day.
     const { start } = providerDayBounds();
     const used = await db.collection("sportsApiRequests").countDocuments({
       timestamp: { $gte: start },
+      status: "OK",
     });
     if (used >= env.SPORTSAPI_DAILY_REQUEST_BUDGET) {
       return {
@@ -181,6 +186,7 @@ export async function getSportsApiQuota(): Promise<SportsApiQuota> {
   const db = await getDb();
   const used = await db.collection<any>("sportsApiRequests").countDocuments({
     timestamp: { $gte: start, $lt: end },
+    status: "OK",
   });
   const latest = await db.collection<any>("sportsApiRequests").findOne(
     { timestamp: { $gte: start } },
