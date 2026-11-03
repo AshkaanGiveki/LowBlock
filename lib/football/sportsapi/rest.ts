@@ -1,4 +1,5 @@
 import dns from "node:dns";
+import { createHash } from "node:crypto";
 import { env } from "@/lib/env";
 import { providerDayBounds } from "../scheduleWindow";
 import { getDb } from "@/lib/db/mongo";
@@ -44,6 +45,9 @@ const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 m
 // paths from multiplying the same REST request while still allowing a manual
 // retry shortly after a provider outage.
 const DISCOVERY_CACHE_TTL_MS = CACHE_TTL * 1000;
+// Keep request accounting isolated when operations rotate the provider key.
+// This is a one-way fingerprint and never stores the API key itself.
+const requestKeyFingerprint = () => createHash("sha256").update(env.SPORTSAPI_API_KEY || "missing").digest("hex").slice(0, 16);
 const SPORTSAPI_REQUEST_TIMEOUT_MS = Math.max(
   15_000,
   Number(process.env.SPORTSAPI_REQUEST_TIMEOUT_MS || 45_000),
@@ -69,6 +73,7 @@ async function trackRequest(
       via: "rest",
       quotaRemaining: quota?.remaining,
       quotaLimit: quota?.limit,
+      keyFingerprint: requestKeyFingerprint(),
     });
   } catch (err) {
     console.error("[SportsAPI] Failed to track request:", err);
@@ -102,6 +107,7 @@ export async function fetchSportsApi<T>(
     const used = await db.collection("sportsApiRequests").countDocuments({
       timestamp: { $gte: start },
       status: "OK",
+      keyFingerprint: requestKeyFingerprint(),
     });
     if (used >= env.SPORTSAPI_DAILY_REQUEST_BUDGET) {
       return {
@@ -193,9 +199,10 @@ export async function getSportsApiQuota(): Promise<SportsApiQuota> {
   const used = await db.collection<any>("sportsApiRequests").countDocuments({
     timestamp: { $gte: start, $lt: end },
     status: "OK",
+    keyFingerprint: requestKeyFingerprint(),
   });
   const latest = await db.collection<any>("sportsApiRequests").findOne(
-    { timestamp: { $gte: start } },
+    { timestamp: { $gte: start }, keyFingerprint: requestKeyFingerprint() },
     { sort: { timestamp: -1 }, projection: { quotaRemaining: 1, quotaLimit: 1 } },
   );
   const limit = latest?.quotaLimit ?? env.SPORTSAPI_DAILY_LIMIT ?? null;
