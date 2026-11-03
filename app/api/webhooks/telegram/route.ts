@@ -1,12 +1,9 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db/mongo";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { consumeLinkToken } from "@/lib/platform/identity";
 import { ObjectId } from "mongodb";
-import { getFootballProvider } from "@/lib/football/providerRegistry";
-import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
-import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
 import { getSportsApiQuota } from "@/lib/football/sportsapi/rest";
 import { telegramApi, telegramEnabled } from "@/lib/telegram/client";
 
@@ -60,7 +57,7 @@ export async function POST(req: Request) {
     try {
       progressMessageId = await send(
         String(chatId),
-        "Sync accepted. I will refresh football results and rebuild the leaderboards when it finishes.",
+        "Sync accepted. I am starting the complete GitHub recovery workflow now.",
       );
     } catch (error) {
       console.error("telegram_sync_ack_failed", {
@@ -68,7 +65,10 @@ export async function POST(req: Request) {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-    after(() => handleAdminSync(String(chatId), progressMessageId));
+    // Dispatch before acknowledging the webhook. `after()` is not reliable on
+    // every production runtime and could return the old acknowledgement while
+    // silently dropping the workflow dispatch after the response was sent.
+    await handleAdminSync(String(chatId), progressMessageId);
     return NextResponse.json({ ok: true });
   }
 
@@ -172,48 +172,11 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
     await editMessage(chatId, progressMessageId, text);
   };
   try {
-    const provider = getFootballProvider();
-    // Use the same bounded daily REST window as the scheduled sync:
-    // yesterday, today, and tomorrow. The provider-level cache prevents this
-    // command from repeating requests already made by the cron path.
     await updateProgress(
-      "<b>Sync in progress</b>\n\nFetching yesterday, today, and tomorrow through SportsAPI REST...\nSaving fixtures and official statuses to MongoDB...",
+      "<b>Sync accepted</b>\n\nStarting the production recovery workflow. It will fetch yesterday, today, and tomorrow, refresh H2H, calculate scores, and rebuild all leaderboards...",
     );
-    const syncResult = await provider.sync({ deferScoring: true });
-    const scoring = await runLeaderboardEngine({
-      recentOnly: true,
-      batchIndex: 0,
-      batchSize: 5000,
-    });
-    await updateProgress(
-      `<b>REST sync complete</b>\n\nFixtures updated: <b>${syncResult.total}</b>\nREST requests attempted: <b>${syncResult.listRequests}</b>\n\nScore calculation and leaderboard rebuild completed: ${scoring.matches} matches, ${scoring.scores} scores.`,
-    );
-    let notifications = {
-      remindersScheduled: 0,
-      channelReminderScheduled: 0,
-      channelDailyPostsScheduled: 0,
-    };
-    let notificationWarning = "";
-    try {
-      notifications = await scheduleFootballNotifications();
-    } catch (error) {
-      notificationWarning =
-        error instanceof Error ? error.message : String(error);
-      console.error("telegram_admin_sync_notifications_failed", {
-        chatId,
-        error: notificationWarning,
-      });
-    }
-    await updateProgress(
-      [
-        (syncResult.failedDates?.length ?? 0) > 0
-          ? `<b>Sync completed with REST errors</b>\n\nFixtures updated: ${syncResult.total}. Failed dates: ${syncResult.failedDates?.join(", ")}.`
-          : `<b>Sync complete</b>\n\nFixtures updated: ${syncResult.total}.`,
-        `Score calculation and leaderboard rebuild completed: ${scoring.matches} matches, ${scoring.scores} scores.`,
-        `Notifications scheduled: ${notifications.remindersScheduled} match reminders and ${notifications.channelReminderScheduled + notifications.channelDailyPostsScheduled} channel posts/reminders.`,
-        notificationWarning ? `\nNotification warning: <code>${escapeHtml(notificationWarning)}</code>` : "",
-      ].filter(Boolean).join("\n"),
-    );
+    await dispatchDailyRecoveryWorkflow();
+    await updateProgress("<b>Recovery workflow started ✓</b>\n\nGitHub is running the complete football sync now. Run /sync_now again safely if the workflow reports a failure.");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await updateProgress(
@@ -223,6 +186,24 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
       chatId,
       error: message,
     });
+  }
+}
+
+async function dispatchDailyRecoveryWorkflow() {
+  if (!env.LOWBLOCK_GITHUB_TOKEN) throw new Error("LOWBLOCK_GITHUB_TOKEN is not configured");
+  const response = await fetch(`https://api.github.com/repos/${env.LOWBLOCK_GITHUB_REPOSITORY}/actions/workflows/${encodeURIComponent(env.LOWBLOCK_GITHUB_WORKFLOW)}/dispatches`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${env.LOWBLOCK_GITHUB_TOKEN}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ ref: "main", inputs: { reason: "telegram_sync_now" } }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`GitHub workflow dispatch failed (${response.status}): ${body.slice(0, 300)}`);
   }
 }
 

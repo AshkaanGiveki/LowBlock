@@ -27,6 +27,7 @@ export class CurrentFootballProvider implements FootballDataProvider {
       listRequests: result.listRequests,
       detailRequests: result.detailRequests,
       rounds: result.rounds,
+      failedDates: (result as { failedDates?: string[] }).failedDates,
       insights: result.insights,
       scoreEngine: result.scoreEngine,
       leaderboardEngine: result.leaderboardEngine,

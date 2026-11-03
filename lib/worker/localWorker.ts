@@ -4,7 +4,7 @@ import { appDateKey } from "@/lib/football/scheduleWindow";
 import { ensureCurrentH2HLeagues, getH2HWeek, isH2HEnabled, refreshActiveH2HResults } from "@/lib/domain/h2h";
 import { scheduleFootballNotifications } from "@/lib/notifications/scheduling";
 import { processLocalNotificationJobs, localNotificationQueueStatus } from "@/lib/notifications/localQueue";
-import { runDailyFootballCycle } from "./dailyCycle";
+import { runCompleteDailyFootballCycle } from "./dailyRecovery";
 import { isDailyWorkerWindow, localWorkerClock } from "./schedule";
 import { downloadMissingTeamLogos } from "@/lib/football/teamLogos";
 
@@ -119,7 +119,7 @@ export async function runWorkerCycle() {
     if (claimedDailyRun) {
       try {
         console.info(JSON.stringify({ type: "lowblock.worker.daily_started", cycleId, runKey: dailyRunKey, dateKey: today }));
-        daily = await runDailyFootballCycle();
+        daily = await runCompleteDailyFootballCycle();
         // A provider failure must remain retryable. In particular, do not
         // mark the run DONE when one or more of the three date reads failed.
         await finishRun(db, dailyRunKey, daily.ok ? "DONE" : "FAILED", { daily });
@@ -132,24 +132,7 @@ export async function runWorkerCycle() {
     } else {
       console.info(JSON.stringify({ type: "lowblock.worker.daily_skipped", cycleId, runKey: dailyRunKey, reason: "lease-or-retry-window" }));
     }
-    const h2hRunKey = `h2h:${today}`;
-    // H2H selection depends on the daily provider sync having persisted
-    // tomorrow's fixtures first. If that sync failed, leave H2H unclaimed so
-    // the retry window can select the slate after the provider recovers.
-    const dailySyncReady = daily?.ok !== false;
-    if (dailySyncReady && await claimRun(db, h2hRunKey)) {
-      try {
-        h2h = await runH2HCycle();
-        await finishRun(db, h2hRunKey, "DONE", { h2h });
-      } catch (error) {
-        await finishRun(db, h2hRunKey, "FAILED", undefined, error);
-        console.error("local_h2h_cycle_failed", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    } else if (!dailySyncReady) {
-      console.info(JSON.stringify({ type: "lowblock.worker.h2h_skipped", cycleId, runKey: h2hRunKey, reason: "daily_provider_sync_incomplete" }));
-    }
+    h2h = (daily as any)?.h2h ?? null;
   }
   let teamLogos = null;
   if (Date.now() - lastTeamLogoSyncAt >= 15 * 60_000) {

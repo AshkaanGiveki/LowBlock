@@ -29,6 +29,7 @@
     "backfill:central-team-persian": "tsx scripts/backfill-central-team-persian-names.ts",
     "report:today-predictions": "tsx scripts/report-today-predictions.ts",
     "sync:daily": "tsx scripts/daily-football-cycle.ts",
+    "recover:daily": "tsx scripts/daily-football-cycle.ts",
     "recover:football-date": "tsx scripts/recover-football-date.ts",
     "worker": "tsx scripts/lowblock-worker.ts",
     "worker:once": "tsx scripts/lowblock-worker.ts --once",
