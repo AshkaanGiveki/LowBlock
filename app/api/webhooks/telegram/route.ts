@@ -191,7 +191,12 @@ async function handleAdminSync(chatId: string, progressMessageId: number | null)
 
 async function dispatchDailyRecoveryWorkflow() {
   if (!env.LOWBLOCK_GITHUB_TOKEN) throw new Error("LOWBLOCK_GITHUB_TOKEN is not configured");
-  const response = await fetch(`https://api.github.com/repos/${env.LOWBLOCK_GITHUB_REPOSITORY}/actions/workflows/${encodeURIComponent(env.LOWBLOCK_GITHUB_WORKFLOW)}/dispatches`, {
+  // Keep the operational entrypoint canonical. A stale env override previously
+  // pointed at the reusable/scheduled workflow and produced GitHub 422 errors.
+  // The wrapper is the only workflow intended for external dispatches.
+  const repository = "AshkaanGiveki/server-deploy";
+  const workflow = "recover-lowblock-daily.yml";
+  const response = await fetch(`https://api.github.com/repos/${repository}/actions/workflows/${workflow}/dispatches`, {
     method: "POST",
     headers: {
       Accept: "application/vnd.github+json",
