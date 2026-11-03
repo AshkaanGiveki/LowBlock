@@ -155,7 +155,7 @@ Never commit `.env.local`, API tokens, MongoDB credentials, or session secrets.
 | `TELEGRAM_ADMIN_CHAT_ID`         | Exact Telegram chat ID allowed to run the private `/sync_now` result-sync command          |
 | `TELEGRAM_WEBHOOK_SECRET`        | Secret token configured with Telegram’s webhook and required for the private admin command |
 | `LOWBLOCK_GITHUB_TOKEN`          | GitHub token with Actions: write permission, used by the admin `/sync_now` command         |
-| `LOWBLOCK_GITHUB_REPOSITORY`     | Recovery workflow repository; defaults to `AshkaanGiveki/LowBlock`                         |
+| `LOWBLOCK_GITHUB_REPOSITORY`     | Recovery workflow repository; defaults to `AshkaanGiveki/server-deploy`                    |
 | `LOWBLOCK_GITHUB_WORKFLOW`       | Recovery workflow filename; defaults to `recover-lowblock-daily.yml`                       |
 | `BALE_BOT_TOKEN`                 | Server-only Bale bot token used for Mini App verification                                  |
 | `BALE_BOT_USERNAME`              | Bale bot username used for account-link deep links                                         |

@@ -43,7 +43,7 @@ const schema = z.object({
     .optional(),
   TELEGRAM_CHANNEL_ID: z.string().default("@lowblockapp"),
   LOWBLOCK_GITHUB_TOKEN: z.string().optional(),
-  LOWBLOCK_GITHUB_REPOSITORY: z.string().default("AshkaanGiveki/LowBlock"),
+  LOWBLOCK_GITHUB_REPOSITORY: z.string().default("AshkaanGiveki/server-deploy"),
   LOWBLOCK_GITHUB_WORKFLOW: z.string().default("recover-lowblock-daily.yml"),
   BALE_API_BASE_URL: z.string().url().default("https://tapi.bale.ai/bot"),
   BALE_BOT_TOKEN: z.string().optional(),
