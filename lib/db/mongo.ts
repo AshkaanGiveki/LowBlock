@@ -160,6 +160,12 @@ export async function ensureIndexes() {
       .collection("sessions")
       .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db
+      .collection("sportsApiResponseSnapshots")
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db
+      .collection("sportsApiResponseSnapshots")
+      .createIndex({ capturedAt: -1 }),
+    db
       .collection("telegramWebhookUpdates")
       .createIndex({ updateId: 1 }, { unique: true }),
     db

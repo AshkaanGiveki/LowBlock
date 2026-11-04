@@ -19,13 +19,6 @@ async function claimRun(db: Db, runKey: string) {
         runKey,
         $or: [
           { status: { $exists: false } },
-          {
-            status: "FAILED",
-            $or: [
-              { retryAfter: { $exists: false } },
-              { retryAfter: { $lte: now } },
-            ],
-          },
           { status: "RUNNING", leaseUntil: { $lte: now } },
         ],
       },
@@ -45,12 +38,6 @@ async function claimRun(db: Db, runKey: string) {
 }
 
 async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", result?: unknown, error?: unknown) {
-  const retryAfter = status === "FAILED"
-    // A transient provider/network failure must be retried during the same
-    // daily window. Waiting a full day made one failed run look like a
-    // successfully skipped day to users.
-    ? new Date(Date.now() + 15 * 60_000)
-    : undefined;
   const finishedAt = new Date();
   await db.collection("workerRuns").updateOne(
     { runKey, status: "RUNNING" },
@@ -61,12 +48,11 @@ async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", resu
         error: error instanceof Error ? error.message : error ? String(error) : undefined,
         finishedAt,
         updatedAt: finishedAt,
-        ...(retryAfter ? { retryAfter } : {}),
       },
-      $unset: { leaseUntil: "", ...(status === "DONE" ? { retryAfter: "" } : {}) },
+      $unset: { leaseUntil: "", retryAfter: "" },
     },
   );
-  console.info(JSON.stringify({ type: "lowblock.worker.run_finished", runKey, status, retryAfter: retryAfter?.toISOString() ?? null, at: finishedAt.toISOString(), error: error instanceof Error ? error.message : error ? String(error) : null }));
+  console.info(JSON.stringify({ type: "lowblock.worker.run_finished", runKey, status, retryAfter: null, at: finishedAt.toISOString(), error: error instanceof Error ? error.message : error ? String(error) : null }));
 }
 
 export async function runH2HCycle() {
@@ -120,8 +106,9 @@ export async function runWorkerCycle() {
       try {
         console.info(JSON.stringify({ type: "lowblock.worker.daily_started", cycleId, runKey: dailyRunKey, dateKey: today }));
         daily = await runCompleteDailyFootballCycle();
-        // A provider failure must remain retryable. In particular, do not
-        // mark the run DONE when one or more of the three date reads failed.
+        // A failed daily run is terminal for this date. Recovery is explicit
+        // through the GitHub workflow or /sync_now, so a provider outage
+        // cannot trigger another quota-consuming cycle every 15 minutes.
         await finishRun(db, dailyRunKey, daily.ok ? "DONE" : "FAILED", { daily });
       } catch (error) {
         await finishRun(db, dailyRunKey, "FAILED", undefined, error);
@@ -130,7 +117,7 @@ export async function runWorkerCycle() {
         });
       }
     } else {
-      console.info(JSON.stringify({ type: "lowblock.worker.daily_skipped", cycleId, runKey: dailyRunKey, reason: "lease-or-retry-window" }));
+      console.info(JSON.stringify({ type: "lowblock.worker.daily_skipped", cycleId, runKey: dailyRunKey, reason: "already-claimed-or-terminal" }));
     }
     h2h = (daily as any)?.h2h ?? null;
   }

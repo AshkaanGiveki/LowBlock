@@ -133,19 +133,10 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
     for (const date of dates) {
       try {
-        let response = await getSportsApiDailyFixtures(date);
-        // SportsAPI has intermittently returned an HTTP-200 response with an
-        // empty/non-JSON body. Retry that specific transport failure once;
-        // normal provider errors must not multiply quota usage.
-        const retryableTransportFailure = response.success === false && (
-          response.error?.code === 200 ||
-          (response.error?.code === 500 && /timeout|aborted/i.test(response.error.message || ""))
-        );
-        if (retryableTransportFailure) {
-          console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_retry", date, reason: response.error?.code === 200 ? "invalid_http_200_body" : "timeout" }));
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          response = await getSportsApiDailyFixtures(date);
-        }
+        // One provider response is authoritative for this cycle. Retrying
+        // here multiplied quota usage and could exhaust the allowance when a
+        // failed daily run was reclaimed by the worker.
+        const response = await getSportsApiDailyFixtures(date);
         if (response.success === false || response.error) {
           failedDates.push(date);
           console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_date_failed", date, error: response.error ?? null }));

@@ -52,6 +52,37 @@ const SPORTSAPI_REQUEST_TIMEOUT_MS = Math.max(
   15_000,
   Number(process.env.SPORTSAPI_REQUEST_TIMEOUT_MS || 45_000),
 );
+const RESPONSE_TRACE_TTL_MS = 24 * 60 * 60_000;
+
+async function saveResponseTrace(input: {
+  path: string;
+  params: Record<string, string>;
+  status: "OK" | "FAILED";
+  httpStatus?: number;
+  headers?: Record<string, string>;
+  rawBody?: string;
+  error?: string;
+}) {
+  try {
+    const capturedAt = new Date();
+    const db = await getDb();
+    await db.collection("sportsApiResponseSnapshots").insertOne({
+      capturedAt,
+      expiresAt: new Date(capturedAt.getTime() + RESPONSE_TRACE_TTL_MS),
+      path: input.path,
+      params: input.params,
+      status: input.status,
+      httpStatus: input.httpStatus ?? null,
+      headers: input.headers ?? {},
+      rawBody: input.rawBody ?? null,
+      error: input.error ?? null,
+      keyFingerprint: requestKeyFingerprint(),
+      source: "lowblock-rest",
+    });
+  } catch (error) {
+    console.error("[SportsAPI] Failed to save response trace:", error);
+  }
+}
 
 async function trackRequest(
   path: string,
@@ -150,6 +181,7 @@ export async function fetchSportsApi<T>(
     const remaining = firstHeader(response.headers, ["x-ratelimit-remaining", "x-rate-limit-remaining", "x-requests-remaining", "x-quota-remaining"]);
     const limit = firstHeader(response.headers, ["x-ratelimit-limit", "x-rate-limit-limit", "x-requests-limit", "x-quota-limit"]);
     const quota = { ...(remaining == null ? {} : { remaining }), ...(limit == null ? {} : { limit }) };
+    const headers = Object.fromEntries(Array.from(response.headers.entries()));
     if (!response.ok || !body) {
       const preview = rawBody.replace(/\s+/g, " ").trim().slice(0, 240);
       const message = body?.error?.message || `SportsAPI REST request failed (${response.status})`;
@@ -162,6 +194,7 @@ export async function fetchSportsApi<T>(
         bodyPreview: preview || null,
       };
       const recordedError = `${message}; response=${JSON.stringify(diagnostic)}`;
+      await saveResponseTrace({ path, params, status: "FAILED", httpStatus: response.status, headers, rawBody, error: recordedError });
       await trackRequest(path, params, performance.now() - startedAt, "FAILED", recordedError, quota);
       console.error("lowblock.sportsapi.invalid_response", diagnostic);
       return { success: false, events: [], error: { code: response.status, message } };
@@ -175,10 +208,12 @@ export async function fetchSportsApi<T>(
       hasEvents: Array.isArray((body as any).events),
       hasData: Array.isArray((body as any).data),
     }));
+    await saveResponseTrace({ path, params, status: "OK", httpStatus: response.status, headers, rawBody });
     await trackRequest(path, params, performance.now() - startedAt, "OK", undefined, quota);
     return body;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    await saveResponseTrace({ path, params, status: "FAILED", error: message });
     await trackRequest(path, params, performance.now() - startedAt, "FAILED", message);
     return { success: false, events: [], error: { code: 500, message } };
   }
