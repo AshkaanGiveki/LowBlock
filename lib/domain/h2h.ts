@@ -498,9 +498,14 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
   const matchById = new Map(matchRows.map((match) => [String(match.providerMatchId), match]));
   const centralIds = [...new Set(league.slates.flatMap((slate: H2HSlate) => slate.fixtures.flatMap((fixture) => [fixture.homeTeam?.centralTeamId, fixture.awayTeam?.centralTeamId]).filter(Boolean)))];
   const centralRows = centralIds.length
-    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, logoUrl: 1, providerIds: 1 } }).toArray()
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.en": 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } }).toArray()
     : [];
   const centralLogos = new Map(centralRows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
+  const centralNames = new Map(centralRows.map((row) => [row.centralTeamId, row.names ?? {}]));
+  const canonicalTeam = (team: any) => {
+    const names = centralNames.get(team?.centralTeamId);
+    return { ...team, name: names?.en || team?.name, faName: names?.fa || team?.faName };
+  };
   const playerById = new Map(league.players.map((id: string) => [String(id), { userId: String(id), username: userById.get(String(id))?.username ?? "LowBlock Player", avatarUrl: userById.get(String(id))?.avatarUrl ?? null }]));
   const predictionByKey = new Map(predictions.map((prediction: any) => [`${viewerId}:${String(prediction.matchId)}`, prediction]));
   for (const prediction of revealed) predictionByKey.set(`${String(prediction.userId)}:${String(prediction.matchId)}`, prediction);
@@ -530,7 +535,7 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
         };
         const homeLogo = centralLogos.get(fixture.homeTeam?.centralTeamId) || fixture.homeTeam?.logoUrl || null;
         const awayLogo = centralLogos.get(fixture.awayTeam?.centralTeamId) || fixture.awayTeam?.logoUrl || null;
-        return { ...fixture, homeTeam: { ...fixture.homeTeam, logo: homeLogo, logoUrl: homeLogo }, awayTeam: { ...fixture.awayTeam, logo: awayLogo, logoUrl: awayLogo }, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isResolved: isH2HFixtureResolved(match), isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, hasPrediction: { playerA: aHasPrediction, playerB: bHasPrediction }, predictions: { playerA: aVisiblePrediction, playerB: bVisiblePrediction }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
+        return { ...fixture, homeTeam: { ...canonicalTeam(fixture.homeTeam), logo: homeLogo, logoUrl: homeLogo }, awayTeam: { ...canonicalTeam(fixture.awayTeam), logo: awayLogo, logoUrl: awayLogo }, status: match?.status ?? "SCHEDULED", homeGoals: match?.homeGoals ?? null, awayGoals: match?.awayGoals ?? null, isResolved: isH2HFixtureResolved(match), isGold: { playerA: goldByPlayerSlate.get(`${pairing.playerA}:${slate.matchday}`) === fixture.matchId, playerB: goldByPlayerSlate.get(`${pairing.playerB}:${slate.matchday}`) === fixture.matchId }, hasPrediction: { playerA: aHasPrediction, playerB: bHasPrediction }, predictions: { playerA: aVisiblePrediction, playerB: bVisiblePrediction }, scores: { playerA: scoreFor(aPrediction, pairing.playerA), playerB: scoreFor(bPrediction, pairing.playerB) } };
       });
       const scoreA = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerA.points, 0);
       const scoreB = fixtureDetails.reduce((sum, fixture) => sum + fixture.scores.playerB.points, 0);
@@ -544,6 +549,6 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
     players: league.players.map((id: string) => ({ userId: id, username: userById.get(id)?.username ?? "LowBlock Player", avatarUrl: userById.get(id)?.avatarUrl ?? null })),
     standings: standings.map(({ slateScores: _slateScores, ...row }: any) => ({ ...row, username: userById.get(row.userId)?.username ?? "LowBlock Player", avatarUrl: userById.get(row.userId)?.avatarUrl ?? null })),
     h2hMatches,
-    slates: league.slates.map((slate: H2HSlate) => ({ ...slate, fixtures: slate.fixtures.map((fixture) => { const homeLogo = centralLogos.get(fixture.homeTeam?.centralTeamId) || fixture.homeTeam?.logoUrl || null; const awayLogo = centralLogos.get(fixture.awayTeam?.centralTeamId) || fixture.awayTeam?.logoUrl || null; return { ...fixture, homeTeam: { ...fixture.homeTeam, logo: homeLogo, logoUrl: homeLogo }, awayTeam: { ...fixture.awayTeam, logo: awayLogo, logoUrl: awayLogo }, kickoffAt: fixture.kickoffAt, prediction: predictions.find((p) => String(p.matchId) === fixture.matchId) ?? null, opponentPredictions: new Date() >= new Date(fixture.kickoffAt) ? revealed.filter((p) => String(p.matchId) === fixture.matchId && String(p.userId) !== viewerId) : [], isGold: goldBySlate.get(slate.matchday) === fixture.matchId }; }) })),
+    slates: league.slates.map((slate: H2HSlate) => ({ ...slate, fixtures: slate.fixtures.map((fixture) => { const homeLogo = centralLogos.get(fixture.homeTeam?.centralTeamId) || fixture.homeTeam?.logoUrl || null; const awayLogo = centralLogos.get(fixture.awayTeam?.centralTeamId) || fixture.awayTeam?.logoUrl || null; return { ...fixture, homeTeam: { ...canonicalTeam(fixture.homeTeam), logo: homeLogo, logoUrl: homeLogo }, awayTeam: { ...canonicalTeam(fixture.awayTeam), logo: awayLogo, logoUrl: awayLogo }, kickoffAt: fixture.kickoffAt, prediction: predictions.find((p) => String(p.matchId) === fixture.matchId) ?? null, opponentPredictions: new Date() >= new Date(fixture.kickoffAt) ? revealed.filter((p) => String(p.matchId) === fixture.matchId && String(p.userId) !== viewerId) : [], isGold: goldBySlate.get(slate.matchday) === fixture.matchId }; }) })),
   };
 }

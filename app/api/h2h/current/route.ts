@@ -18,9 +18,10 @@ export async function GET() {
   const [clubMemberCount, league, clubWeeks] = await Promise.all([
     db.collection<any>("clubMemberships").countDocuments({ clubId: membership.clubId, leftAt: null }),
     db.collection<any>("h2hLeagues").findOne({ clubId: membership.clubId, weekKey: week.key, groupNumber: 1 }, { projection: { _id: 1, weekKey: 1, status: 1, players: 1 } }),
-    db.collection<any>("h2hLeagues").find({ clubId: membership.clubId, groupNumber: 1 }, { projection: { weekKey: 1 } }).sort({ weekKey: -1 }).limit(8).toArray(),
+    db.collection<any>("h2hLeagues").find({ clubId: membership.clubId, groupNumber: 1 }, { projection: { weekKey: 1, slates: 1 } }).sort({ weekKey: -1 }).limit(12).toArray(),
   ]);
-  const availableWeeks = [...new Set([week.key, ...clubWeeks.map((item) => String(item.weekKey))])];
+  const validClubWeeks = clubWeeks.filter((item) => Array.isArray(item.slates) && item.slates.length === 7 && item.slates.every((slate: any) => Array.isArray(slate.fixtures) && slate.fixtures.length >= 4));
+  const availableWeeks = [...new Set([week.key, ...validClubWeeks.map((item) => String(item.weekKey))])].sort();
   if (!league) return NextResponse.json({ enabled: true, league: null, weekKey: week.key, reason: clubMemberCount < 8 ? "CLUB_TOO_SMALL" : "NOT_CREATED", clubMemberCount, availableWeeks });
   if (league.status !== "ACTIVE") {
     return NextResponse.json({ enabled: true, league: null, weekKey: week.key, reason: "NEXT_WEEK", clubMemberCount, availableWeeks });
