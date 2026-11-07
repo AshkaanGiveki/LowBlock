@@ -43,7 +43,7 @@ export default function H2HHomeMatchupCard({ match }: { match: H2HTodayMatch }) 
         <div className="absolute -bottom-20 start-1/3 h-32 w-32 rounded-full bg-emerald-950/80 blur-3xl" />
       </div>
 
-      <Link href="/h2h" dir="ltr" className="group relative block">
+      <Link href="/superleague" dir="ltr" className="group relative block">
         <div className="absolute left-1/2 top-0 z-20 flex h-[54px] min-w-[184px] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-2 overflow-hidden rounded-2xl border border-brand/50 bg-[#091a12]/[.98] px-4 shadow-[0_10px_28px_rgba(0,0,0,.32),0_0_26px_rgba(32,184,121,.16)]">
           <span className="pointer-events-none absolute inset-1 rounded-xl border border-brand/15" />
           <span className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-brand/80 to-transparent" />
