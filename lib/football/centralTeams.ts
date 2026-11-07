@@ -90,8 +90,20 @@ export async function ensureCentralTeam(input: {
     { upsert: true, returnDocument: "after" },
   );
   record.numericTeamId = Number(counter?.nextValue ?? 1);
-  await db.collection("centralTeams").insertOne(record as any);
-  return record.centralTeamId;
+  try {
+    await db.collection("centralTeams").insertOne(record as any);
+    return record.centralTeamId;
+  } catch (error) {
+    // Another worker may have resolved the same provider team between the
+    // lookup and insert. The unique provider-id index is the arbiter; reuse
+    // the record that won the race instead of aborting the whole sync.
+    if ((error as { code?: number })?.code !== 11000) throw error;
+    const winner = await db.collection<CentralTeamRecord>("centralTeams").findOne({
+      [`providerIds.${input.provider}`]: providerTeamId,
+    });
+    if (!winner) throw error;
+    return winner.centralTeamId;
+  }
 }
 
 export async function ensureCentralTeamIndexes() {
