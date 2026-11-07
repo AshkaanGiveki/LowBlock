@@ -51,11 +51,18 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     if (!matches.length) return 0;
 
     const centralIds = new Map<string, string>();
-    await Promise.all(matches.flatMap((match) => [match.homeTeam, match.awayTeam]).map(async (team) => {
+    const teamsByProviderId = new Map<string, CanonicalMatch["homeTeam"]>();
+    for (const team of matches.flatMap((match) => [match.homeTeam, match.awayTeam])) {
+      teamsByProviderId.set(String(team.id), team);
+    }
+    // Resolve each provider team once and in order. Concurrent calls for the
+    // same new team raced on the unique providerIds index and could abort the
+    // entire match import with E11000.
+    for (const team of teamsByProviderId.values()) {
       const providerTeamId = String(team.id);
       const centralId = await ensureCentralTeam({ provider: "sportsapi", providerTeamId, sourceName: team.name, logoUrl: team.logoUrl });
       centralIds.set(providerTeamId, centralId);
-    }));
+    }
 
     const ops = matches.map((match) => {
       const { createdAt, _id, ...matchData } = match as any;
