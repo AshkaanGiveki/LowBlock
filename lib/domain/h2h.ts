@@ -1,7 +1,7 @@
 import type { Db } from "mongodb";
 import { ObjectId } from "mongodb";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
-import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getCanonicalLeaderboard, getLeaderboardSummary } from "@/lib/domain/leaderboards";
 import { currentUserId } from "@/lib/auth/session";
 import { env } from "@/lib/env";
 import { appDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
@@ -410,7 +410,7 @@ export async function refreshActiveH2HResults(db: Db, weekKey = getH2HWeek().key
 }
 
 export async function calculateH2HStandings(db: Db, league: any) {
-  const ids = league.players.map(String);
+  const ids: string[] = league.players.map((id: any) => String(id));
   const fixtureIds = league.slates.flatMap((slate: H2HSlate) => slate.fixtureIds);
   const [matches, predictions, gold] = await Promise.all([
     db.collection<any>("matches").find({ providerMatchId: { $in: fixtureIds } }).toArray(),
@@ -420,8 +420,16 @@ export async function calculateH2HStandings(db: Db, league: any) {
   const byMatch = new Map(matches.map((match) => [String(match.providerMatchId), match]));
   const byPrediction = new Map(predictions.map((prediction) => [`${prediction.userId}:${prediction.matchId}`, prediction]));
   const byGold = new Set(gold.map((pick) => `${pick.userId}:${pick.matchday}:${pick.matchId}`));
-  type Standing = { userId: string; h2hPoints: number; wins: number; draws: number; losses: number; predictionPoints: number };
+  type Standing = { userId: string; h2hPoints: number; wins: number; draws: number; losses: number; predictionPoints: number; globalRank?: number };
   const totals = new Map<string, Standing & { slateScores: Record<string, number> }>(ids.map((id: string) => [id, { userId: id, h2hPoints: 0, wins: 0, draws: 0, losses: 0, predictionPoints: 0, slateScores: {} }]));
+  const globalRankByUser = new Map<string, number>(ids.map((id: string) => [id, Number.MAX_SAFE_INTEGER]));
+  const matchesCollection = db.collection<any>("matches");
+  if (typeof matchesCollection.findOne === "function") {
+    const latestSeason = await matchesCollection.findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } });
+    const seasonStartYear = Number(latestSeason?.seasonStartYear ?? new Date().getUTCFullYear());
+    const globalSummaries = await Promise.all(ids.map((id: string) => getLeaderboardSummary(db, id, { seasonStartYear })));
+    ids.forEach((id: string, index: number) => globalRankByUser.set(id, Number(globalSummaries[index]?.rank ?? Number.MAX_SAFE_INTEGER)));
+  }
   for (const slate of league.slates as H2HSlate[]) {
     const slateMatches = slate.fixtureIds.map((matchId) => byMatch.get(matchId)).filter(Boolean);
     const completedMatches = slateMatches.filter((match: any) => match.homeGoals != null && match.awayGoals != null);
@@ -452,7 +460,7 @@ export async function calculateH2HStandings(db: Db, league: any) {
       else { a.h2hPoints++; b.h2hPoints++; a.draws++; b.draws++; }
     }
   }
-  return [...totals.values()].sort((a, b) => b.h2hPoints - a.h2hPoints || b.wins - a.wins || b.predictionPoints - a.predictionPoints || a.userId.localeCompare(b.userId)).map((row, index) => ({ ...row, rank: index + 1 }));
+  return [...totals.values()].map((row) => ({ ...row, globalRank: globalRankByUser.get(row.userId) ?? Number.MAX_SAFE_INTEGER })).sort((a, b) => b.h2hPoints - a.h2hPoints || b.predictionPoints - a.predictionPoints || a.globalRank - b.globalRank || a.userId.localeCompare(b.userId)).map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
 export async function getViewerH2HTodayMatch(db: Db, userId: string, now = new Date()) {
