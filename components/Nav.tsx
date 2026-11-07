@@ -100,7 +100,7 @@ export function Nav({ h2hEnabled }: { h2hEnabled: boolean }) {
         )}
       </header>
       <nav className="bottom-nav-dock fixed inset-x-3 z-50 flex items-center justify-around xl:hidden">
-        {[routes[0], routes[1], ...(h2hEnabled ? [{ href: "/h2h", icon: Medal, label: "SuperLeague" }] : []), routes[2]].map(({ href, icon: Component, label }) => (
+        {[routes[0], routes[1], ...(h2hEnabled ? [{ href: "/superleague", icon: Medal, label: "SuperLeague" }] : []), routes[2]].map(({ href, icon: Component, label }) => (
           <Link
             key={href}
             href={href}

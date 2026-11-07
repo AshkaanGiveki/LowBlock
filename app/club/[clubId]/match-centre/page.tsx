@@ -67,7 +67,7 @@ export default async function ClubMatchCentre({
         </section>
         {env.H2H_ENABLED && (
           <Link
-            href="/h2h"
+          href="/superleague"
             className="mt-5 flex items-center justify-between rounded-2xl border border-[#eacb70]/30 bg-[linear-gradient(135deg,rgba(234,203,112,.16),rgba(16,21,18,.96))] p-5 transition hover:-translate-y-0.5 hover:border-[#eacb70]/60"
           >
             <span>
