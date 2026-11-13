@@ -18,6 +18,7 @@ export type MatchRecord = {
   provider: ProviderName;
   providerMatchId: string;
   leagueCode: string;
+  featuredNationalFixture?: boolean;
   matchday: number;
   kickoffAt: Date | string;
   status: string;
@@ -51,6 +52,7 @@ const getCachedMatches = unstable_cache(
       ...(leagueCode ? { leagueCode } : {}),
       ...(matchday !== null ? { matchday } : {}),
       $or: [
+        { featuredNationalFixture: true },
         { leagueCode: { $nin: INTERNATIONAL_LEAGUE_CODES } },
         { "homeTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
         { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
@@ -64,6 +66,7 @@ const getCachedMatches = unstable_cache(
       .toArray();
     rows = rows
       .filter((row) =>
+        row.featuredNationalFixture === true ||
         isEligibleInternationalFixture(
           row.leagueCode,
           row.homeTeam.name,
@@ -144,6 +147,7 @@ export async function getMatchesPage(
     status: { $nin: ["VOID", "CANCELLED"] },
     kickoffAt: { $gte: bounds.start, $lt: bounds.end },
     $or: [
+      { featuredNationalFixture: true },
       { leagueCode: { $nin: INTERNATIONAL_LEAGUE_CODES } },
       { "homeTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
       { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
@@ -169,6 +173,7 @@ export async function getMatchesPage(
           $cond: [
             {
               $or: [
+                { $eq: ["$featuredNationalFixture", true] },
                 { $in: ["$leagueCode", GLOBAL_LEAGUE_CODES] },
                 { $eq: ["$leagueCode", "FRIENDLY"] },
                 {
@@ -248,6 +253,7 @@ export async function getMatchesPage(
       provider: match.provider,
       providerMatchId: match.providerMatchId,
       leagueCode: match.leagueCode,
+      featuredNationalFixture: match.featuredNationalFixture === true,
       matchday: match.matchday,
       kickoffAt: new Date(match.kickoffAt).toISOString(),
       status: match.status,

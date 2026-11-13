@@ -248,6 +248,45 @@ export const LEAGUES = [
     kind: "INTERNATIONAL",
   },
   {
+    code: "AFCONQ",
+    apiLeagueId: 0,
+    slug: "africa-cup-of-nations-qualification",
+    logo: "/leagues/world-cup.png",
+    faName: "انتخابی جام ملت‌های آفریقا",
+    enName: "Africa Cup of Nations Qualifiers",
+    short: "AFCON Qual.",
+    globalLeaderboard: false,
+    h2h: false,
+    defaultClubLeaderboard: false,
+    kind: "INTERNATIONAL",
+  },
+  {
+    code: "CONCACAF_NATIONS",
+    apiLeagueId: 0,
+    slug: "concacaf-nations-league",
+    logo: "/leagues/world-cup.png",
+    faName: "لیگ ملت‌های کونکاکاف",
+    enName: "CONCACAF Nations League",
+    short: "CONCACAF Nations",
+    globalLeaderboard: false,
+    h2h: false,
+    defaultClubLeaderboard: false,
+    kind: "INTERNATIONAL",
+  },
+  {
+    code: "INTL_OTHER",
+    apiLeagueId: 0,
+    slug: "other-international-matches",
+    logo: "/leagues/international.png",
+    faName: "سایر بازی‌های ملی",
+    enName: "Other National Team Matches",
+    short: "National Teams",
+    globalLeaderboard: false,
+    h2h: false,
+    defaultClubLeaderboard: false,
+    kind: "INTERNATIONAL",
+  },
+  {
     code: "AFC_ASIAN_CUP",
     apiLeagueId: 7,
     slug: "afc-asian-cup",
@@ -702,7 +741,7 @@ export const IMPORTANT_NATIONAL_TEAM_NAMES = [
 "Bosnia and Herzegovina",
 "Romania",
  ] as const;
-const IMPORTANT_NATIONAL_TEAMS = new Set<string>(IMPORTANT_NATIONAL_TEAM_NAMES);
+const IMPORTANT_NATIONAL_TEAMS = new Set<string>(IMPORTANT_NATIONAL_TEAM_NAMES.map(normalizeNationalTeamName));
 const NATIONAL_TEAM_ALIASES: Record<string, string> = {
   turkiye: "Turkey",
   turkey: "Turkey",
@@ -717,6 +756,8 @@ const NATIONAL_TEAM_ALIASES: Record<string, string> = {
   "democratic republic of the congo": "Congo DR",
   "united states": "USA",
   "korea republic": "South Korea",
+  "cote d ivoire": "Ivory Coast",
+  "cote divoire": "Ivory Coast",
   "republic of korea": "South Korea",
 };
 export const IMPORTANT_NATIONAL_TEAM_QUERY_NAMES = [
@@ -730,6 +771,8 @@ export const IMPORTANT_NATIONAL_TEAM_QUERY_NAMES = [
   "Bosnia & Herzegovina",
   "DR Congo",
   "Korea Republic",
+  "Côte d’Ivoire",
+  "Côte d'Ivoire",
 ] as const;
 function normalizeNationalTeamName(name: string) {
   return name
@@ -741,8 +784,8 @@ function normalizeNationalTeamName(name: string) {
 }
 export function isImportantNationalTeam(name: string) {
   const normalized = normalizeNationalTeamName(name);
-  const canonical = NATIONAL_TEAM_ALIASES[normalized] ?? name;
-  return IMPORTANT_NATIONAL_TEAMS.has(canonical);
+  const canonical = NATIONAL_TEAM_ALIASES[normalized] ?? normalized;
+  return IMPORTANT_NATIONAL_TEAMS.has(normalizeNationalTeamName(canonical));
 }
 export function isQualityInternationalFriendly(home: string, away: string) {
   return isImportantNationalTeam(home) && isImportantNationalTeam(away);

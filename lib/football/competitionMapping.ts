@@ -156,6 +156,22 @@ export const COMPETITION_MAPPINGS: readonly CompetitionMappingEntry[] = [
     aliases: ["Africa Cup of Nations", "AFCON"],
   },
   {
+    code: "AFCONQ",
+    apiSportsId: 0,
+    sportsApiUniqueTournamentId: 1848,
+    expectedCategories: ["Africa", "africa"],
+    slugs: ["africa-cup-of-nations-qual", "africa-cup-of-nations-qualification"],
+    aliases: ["Africa Cup of Nations Qual.", "Africa Cup of Nations Qualification"],
+  },
+  {
+    code: "CONCACAF_NATIONS",
+    apiSportsId: 0,
+    sportsApiUniqueTournamentId: 14100,
+    expectedCategories: ["North & Central America", "north-central-america", "CONCACAF"],
+    slugs: ["concacaf-nations-league"],
+    aliases: ["CONCACAF Nations League"],
+  },
+  {
     code: "AFC_ASIAN_CUP",
     apiSportsId: 7,
     sportsApiUniqueTournamentId: 268,

@@ -82,21 +82,21 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
     rawEvent.tournament ||
     (rawEvent.uniqueTournament ? { uniqueTournament: rawEvent.uniqueTournament } : null);
 
-  const leagueCode = getLeagueCodeFromSportsApi(rawTournament);
-
-  // If we can't map the league, we drop it (Competition filtering is strictly preserved)
-  if (!leagueCode) return null;
-
-  // Keep the API-Football eligibility rule: for national-team international
-  // competitions, at least one side must be an important national team.
-  // Club competitions such as UCL remain unrestricted.
-  const league = getLeague(leagueCode);
   const homeName = String(rawEvent.homeTeam?.name ?? "");
   const awayName = String(rawEvent.awayTeam?.name ?? "");
-  if (
-    league?.kind === "INTERNATIONAL" &&
-    !isFeaturedFixture(leagueCode, homeName, awayName)
-  )
+  const importantNationalFixture =
+    rawEvent.homeTeam?.national === true &&
+    rawEvent.awayTeam?.national === true &&
+    isFeaturedFixture("", homeName, awayName);
+  // Preserve explicit competition mappings. Include important senior national
+  // teams even when their competition is not explicitly configured.
+  const leagueCode =
+    getLeagueCodeFromSportsApi(rawTournament) ??
+    (importantNationalFixture ? "INTL_OTHER" : null);
+  if (!leagueCode) return null;
+
+  const league = getLeague(leagueCode);
+  if (league?.kind === "INTERNATIONAL" && !isFeaturedFixture(leagueCode, homeName, awayName))
     return null;
 
   const rawId = rawEvent.id || rawEvent.eventId;
@@ -192,6 +192,7 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   const awayLogo = awayCanonical.logoUrl || resolveTeamLogo(rawEvent.awayTeam);
 
   return {
+    featuredNationalFixture: importantNationalFixture,
     provider: "sportsapi",
     providerMatchId: String(rawId),
     sportsApiId: Number(rawId),
