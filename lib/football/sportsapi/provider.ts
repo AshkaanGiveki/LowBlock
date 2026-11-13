@@ -52,15 +52,21 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
     const centralIds = new Map<string, string>();
     const teamsByProviderId = new Map<string, CanonicalMatch["homeTeam"]>();
-    for (const team of matches.flatMap((match) => [match.homeTeam, match.awayTeam])) {
-      teamsByProviderId.set(String(team.id), team);
+    const nationalProviderIds = new Set<string>();
+    for (const match of matches) {
+      const raw = (match as any).rawApiResponse?.event ?? (match as any).rawApiResponse;
+      for (const side of ["home", "away"] as const) {
+        const team = side === "home" ? match.homeTeam : match.awayTeam;
+        teamsByProviderId.set(String(team.id), team);
+        if (raw?.[side + "Team"]?.national === true) nationalProviderIds.add(String(team.id));
+      }
     }
     // Resolve each provider team once and in order. Concurrent calls for the
     // same new team raced on the unique providerIds index and could abort the
     // entire match import with E11000.
     for (const team of teamsByProviderId.values()) {
       const providerTeamId = String(team.id);
-      const centralId = await ensureCentralTeam({ provider: "sportsapi", providerTeamId, sourceName: team.name, logoUrl: team.logoUrl });
+      const centralId = await ensureCentralTeam({ provider: "sportsapi", providerTeamId, sourceName: team.name, logoUrl: team.logoUrl, isNational: nationalProviderIds.has(providerTeamId) });
       centralIds.set(providerTeamId, centralId);
     }
 

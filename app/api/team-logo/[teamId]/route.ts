@@ -14,7 +14,7 @@ export async function GET(
   try {
     return new NextResponse(await readFile(file), {
       status: 200,
-      headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=2592000, immutable" },
+      headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
     });
   } catch {
     return new NextResponse(null, { status: 404 });

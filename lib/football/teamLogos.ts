@@ -13,8 +13,49 @@ export function cleanSportsApiTeamId(value: unknown): string | null {
 }
 
 export function teamLogoFile(id: unknown): string | null {
-  const clean = cleanSportsApiTeamId(id);
-  return clean ? path.join(LOGO_DIR, `${clean}.png`) : null;
+  const input = String(id ?? "").replace(/\.png$/i, "").trim();
+  const numeric = cleanSportsApiTeamId(input);
+  if (numeric) return path.join(LOGO_DIR, `${numeric}.png`);
+  // Provider-specific names avoid mapping a Football-API ID to a different
+  // team with the same numeric SofaScore ID.
+  if (/^football-api-[1-9]\d*$/.test(input)) return path.join(LOGO_DIR, `${input}.png`);
+  if (/^national-[a-z0-9]+(?:-[a-z0-9]+)*-national-team(?:-[a-z0-9]+)*$/.test(input))
+    return path.join(LOGO_DIR, `${input}.png`);
+  return null;
+}
+
+export function nationalTeamCrestSlug(name: string): string | null {
+  const nameKey = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/&/g, " and ").replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const exceptions: Record<string, string> = {
+    netherlands: "netherlands-national-team-dutch",
+    turkiye: "turkey-national-team",
+    turkey: "turkey-national-team",
+    kyrgyzstan: "kyrgyztan-national-team",
+    ireland: "republic-of-ireland-national-team",
+    "republic-of-ireland": "republic-of-ireland-national-team",
+    "cote-divoire": "cote-d-ivoire-national-team",
+    "cote-d-ivoire": "cote-d-ivoire-national-team",
+    "ivory-coast": "cote-d-ivoire-national-team",
+    "korea-republic": "south-korea-national-team",
+    "cape-verde": "cabo-verde-national-team",
+    "czech-republic": "czechia-national-team",
+    uae: "united-arab-emirates-national-team",
+  };
+  // An unverified national crest must not be replaced by another flag/crest.
+  if (!nameKey || nameKey === "cook-islands" || nameKey === "tahiti") return null;
+  return exceptions[nameKey] ?? `${nameKey}-national-team`;
+}
+
+export function nationalTeamCrestUrl(name: string): string | null {
+  const slug = nationalTeamCrestSlug(name);
+  return slug ? `/api/team-logo/national-${slug}` : null;
+}
+
+export function footballApiTeamLogoUrl(id: unknown): string | null {
+  const valid = cleanSportsApiTeamId(id);
+  return valid ? `/api/team-logo/football-api-${valid}` : null;
 }
 
 export function teamLogoUrl(id: unknown): string | null {

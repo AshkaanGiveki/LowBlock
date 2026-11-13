@@ -1,6 +1,7 @@
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { centralTeamLogo } from "./centralTeams";
+import { nationalTeamCrestUrl } from "./teamLogos";
 import { unstable_cache } from "next/cache";
 import type { ProviderName } from "./types";
 import {
@@ -241,13 +242,18 @@ export async function getMatchesPage(
   const page = hasMore ? matches.slice(0, -1) : matches;
   const centralIds = [...new Set(page.flatMap((match) => [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId]).filter(Boolean))];
   const centralRows = centralIds.length
-    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } }).toArray()
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.fa": 1, "names.en": 1, isNational: 1, logoUrl: 1, providerIds: 1 } }).toArray()
     : [];
   const centralFa = new Map(centralRows.map((row) => [row.centralTeamId, row.names?.fa]));
   const centralLogos = new Map(centralRows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
   const publicPage = page.map((match) => {
-    const homeLogo = centralLogos.get(match.homeTeam.centralTeamId) || null;
-    const awayLogo = centralLogos.get(match.awayTeam.centralTeamId) || null;
+    const isInternational = INTERNATIONAL_LEAGUE_CODES.includes(match.leagueCode);
+    const homeLogo = isInternational
+      ? nationalTeamCrestUrl(match.homeTeam.name)
+      : (centralLogos.get(match.homeTeam.centralTeamId) || null);
+    const awayLogo = isInternational
+      ? nationalTeamCrestUrl(match.awayTeam.name)
+      : (centralLogos.get(match.awayTeam.centralTeamId) || null);
 
     return {
       provider: match.provider,
@@ -307,14 +313,17 @@ export async function getMatch(providerMatchId: string) {
   if (!match) return null;
   const ids = [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId].filter(Boolean);
   const rows = ids.length
-    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } }).toArray()
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1, "names.en": 1, isNational: 1, logoUrl: 1, providerIds: 1 } }).toArray()
     : [];
   const fa = new Map(rows.map((row) => [row.centralTeamId, row.names?.fa]));
   const logos = new Map(rows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
+  const international = INTERNATIONAL_LEAGUE_CODES.includes(match.leagueCode);
+  const homeLogo = international ? nationalTeamCrestUrl(match.homeTeam.name) : (logos.get(match.homeTeam.centralTeamId) || null);
+  const awayLogo = international ? nationalTeamCrestUrl(match.awayTeam.name) : (logos.get(match.awayTeam.centralTeamId) || null);
   return {
     ...match,
-    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName, logo: logos.get(match.homeTeam.centralTeamId) || null, logoUrl: logos.get(match.homeTeam.centralTeamId) || null },
-    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName, logo: logos.get(match.awayTeam.centralTeamId) || null, logoUrl: logos.get(match.awayTeam.centralTeamId) || null },
+    homeTeam: { ...match.homeTeam, faName: fa.get(match.homeTeam.centralTeamId) || match.homeTeam.faName, logo: homeLogo, logoUrl: homeLogo },
+    awayTeam: { ...match.awayTeam, faName: fa.get(match.awayTeam.centralTeamId) || match.awayTeam.faName, logo: awayLogo, logoUrl: awayLogo },
   };
 }
 

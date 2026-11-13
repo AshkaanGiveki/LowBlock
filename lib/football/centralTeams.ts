@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db/mongo";
 import { repairPersianText, teamName } from "./team-names";
 import { reviewedPersianTeamName } from "./persian-team-names";
 import type { ProviderName } from "./types";
-import { teamLogoUrl } from "./teamLogos";
+import { teamLogoUrl, footballApiTeamLogoUrl, nationalTeamCrestUrl } from "./teamLogos";
 
 export type CentralTeamRecord = {
   centralTeamId: string;
@@ -19,10 +19,14 @@ export type CentralTeamRecord = {
 };
 
 /** Resolve SportsAPI team logos through the persistent local logo cache. */
-export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds"> | null | undefined) {
-  const sportsApiId = row?.providerIds?.sportsapi;
-  if (sportsApiId) return teamLogoUrl(sportsApiId);
-  return row?.logoUrl && row.logoUrl.startsWith("/api/team-logo/") ? row.logoUrl : null;
+export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds" | "isNational" | "names"> | null | undefined) {
+  if (!row) return null;
+  if (row.isNational) return nationalTeamCrestUrl(row.names?.en || "");
+  const sportsId = row.providerIds?.sportsapi;
+  if (sportsId) return teamLogoUrl(sportsId);
+  const footballId = row.providerIds?.["football-api"];
+  if (footballId) return footballApiTeamLogoUrl(footballId);
+  return row.logoUrl?.startsWith("/api/team-logo/") ? row.logoUrl : null;
 }
 
 const normalize = (value: string) => value.toLowerCase().trim().replace(/\b(fc|afc|cf|sc|club)\b/g, "").replace(/[^a-z0-9]/g, "");
@@ -58,7 +62,7 @@ export async function ensureCentralTeam(input: {
   if (byProvider) {
     await db.collection("centralTeams").updateOne(
       { _id: (byProvider as any)._id },
-      { $set: { [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}) }, $addToSet: { aliases: input.sourceName } },
+      { $set: { [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}), ...(input.isNational ? { isNational: true } : {}) }, $addToSet: { aliases: input.sourceName } },
     );
     return byProvider.centralTeamId;
   }
@@ -68,7 +72,7 @@ export async function ensureCentralTeam(input: {
   if (existing) {
     await db.collection("centralTeams").updateOne(
       { _id: (existing as any)._id },
-      { $set: { [`providerIds.${input.provider}`]: providerTeamId, [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date() }, $addToSet: { aliases: input.sourceName } },
+      { $set: { [`providerIds.${input.provider}`]: providerTeamId, [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.isNational ? { isNational: true } : {}) }, $addToSet: { aliases: input.sourceName } },
     );
     return existing.centralTeamId;
   }
