@@ -96,7 +96,10 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   if (!leagueCode) return null;
 
   const league = getLeague(leagueCode);
-  if (league?.kind === "INTERNATIONAL" && !isFeaturedFixture(leagueCode, homeName, awayName))
+  // UEFA Nations League is a featured competition: include its complete
+  // schedule, even when neither national side is on the curated team list.
+  const isFeaturedCompetition = leagueCode === "NATIONS";
+  if (league?.kind === "INTERNATIONAL" && !isFeaturedCompetition && !isFeaturedFixture(leagueCode, homeName, awayName))
     return null;
 
   const rawId = rawEvent.id || rawEvent.eventId;
@@ -192,7 +195,7 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   const awayLogo = awayCanonical.logoUrl || resolveTeamLogo(rawEvent.awayTeam);
 
   return {
-    featuredNationalFixture: importantNationalFixture,
+    featuredNationalFixture: importantNationalFixture || isFeaturedCompetition,
     provider: "sportsapi",
     providerMatchId: String(rawId),
     sportsApiId: Number(rawId),
