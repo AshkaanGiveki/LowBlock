@@ -506,7 +506,7 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
   const matchById = new Map(matchRows.map((match) => [String(match.providerMatchId), match]));
   const centralIds = [...new Set(league.slates.flatMap((slate: H2HSlate) => slate.fixtures.flatMap((fixture) => [fixture.homeTeam?.centralTeamId, fixture.awayTeam?.centralTeamId]).filter(Boolean)))];
   const centralRows = centralIds.length
-    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.en": 1, "names.fa": 1, logoUrl: 1, providerIds: 1 } }).toArray()
+    ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: centralIds } }, { projection: { centralTeamId: 1, "names.en": 1, "names.fa": 1, logoUrl: 1, providerIds: 1, isNational: 1 } }).toArray()
     : [];
   const centralLogos = new Map(centralRows.map((row) => [row.centralTeamId, centralTeamLogo(row)]));
   const centralNames = new Map(centralRows.map((row) => [row.centralTeamId, row.names ?? {}]));
