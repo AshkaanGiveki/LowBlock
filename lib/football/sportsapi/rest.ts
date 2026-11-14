@@ -304,7 +304,7 @@ export async function getSportsApiDailyFixtures(
     let totalPages = 1;
     for (let page = 1; page <= totalPages; page += 1) {
       if (page > 20) throw new Error("SportsAPI schedule exceeded the 20-page safety limit");
-      const params = page === 1 ? {} : { page: String(page) };
+      const params: Record<string, string> = page === 1 ? {} : { page: String(page) };
       console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_started", date: dateString, page }));
       const res = await fetchSportsApi<any>(`/schedule/${dateString}`, params);
       if (res.success === false || res.error) {
