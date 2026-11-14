@@ -85,15 +85,22 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   const homeName = String(rawEvent.homeTeam?.name ?? "");
   const awayName = String(rawEvent.awayTeam?.name ?? "");
   const isNationalMatch = rawEvent.homeTeam?.national === true && rawEvent.awayTeam?.national === true;
+  const importantNationalFixture = isFeaturedFixture(
+    "",
+    homeName,
+    awayName,
+  );
   const mappedLeagueCode = getLeagueCodeFromSportsApi(rawTournament);
-  // Preserve all mapped international competitions, including friendlies,
-  // qualifiers and Nations League. Unmapped national-team fixtures are still
-  // eligible for global scoring through INTL_OTHER.
-  const leagueCode = mappedLeagueCode ?? (isNationalMatch ? "INTL_OTHER" : null);
+  // Keep all Nations League fixtures. In other international competitions,
+  // include only fixtures featuring at least one important national team.
+  const leagueCode = mappedLeagueCode ??
+    (isNationalMatch && importantNationalFixture ? "INTL_OTHER" : null);
   if (!leagueCode) return null;
   const league = getLeague(leagueCode);
-  const importantNationalFixture = isNationalMatch;
-  const isFeaturedCompetition = league?.kind === "INTERNATIONAL";
+  const isFeaturedCompetition = leagueCode === "NATIONS";
+  if (league?.kind === "INTERNATIONAL" &&
+      !isFeaturedCompetition &&
+      !importantNationalFixture) return null;
 
   const rawId = rawEvent.id || rawEvent.eventId;
   if (!rawId) return null;
