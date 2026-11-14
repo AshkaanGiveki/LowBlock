@@ -10,7 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ teamId: string }> },
 ) {
   const { teamId } = await params;
-  // The frontend sometimes passes a centralTeamId (sportsapi:123) rather than a numeric provider ID.\n  const embeddedId = /^sportsapi:(\\d+)$/.exec(teamId)?.[1];\n  const resolvedId = embeddedId || teamId;\n  const file = teamLogoFile(resolvedId);
+  // The frontend sometimes passes a centralTeamId (sportsapi:123) rather than a numeric provider ID.
+  const embeddedId = /^sportsapi:(\\d+)$/.exec(teamId)?.[1];
+  const resolvedId = embeddedId || teamId;
+  const file = teamLogoFile(resolvedId);
   if (file) {
     try {
       return new NextResponse(await readFile(file), {
