@@ -16,6 +16,8 @@ export type SportsApiRestResponse<T> = {
   data?: T[];
   tournaments?: number;
   totalTournamentsOnDate?: number;
+  page?: number;
+  totalPages?: number;
   error?: { code: number; message: string };
 };
 
@@ -254,11 +256,9 @@ const dailyFixturesCache = new Map<
 /**
  * Fetches one calendar day's fixtures through the provider REST API.
  *
- * The scheduled sync deliberately uses one `/schedule/{date}` request per
- * date. The WebSocket remains responsible for realtime deltas; REST is the
- * authoritative daily snapshot/discovery path. Keeping this function to one
- * request per date makes the normal yesterday/today/tomorrow sync three
- * provider calls at most.
+ * Fetch every reported `/schedule/{date}` page and merge by provider event ID.
+ * The WebSocket remains responsible for realtime deltas; REST is the
+ * authoritative daily snapshot/discovery path.
  */
 export async function getSportsApiDailyFixtures(
   dateString: string,
@@ -298,30 +298,39 @@ export async function getSportsApiDailyFixtures(
     events: [],
   };
 
-  // One request per requested date. Do not add a second /today request here:
-  // the daily window is deliberately capped at three REST calls.
+  // The provider paginates /schedule. A single successful page is not a
+  // complete daily snapshot. Fetch every advertised page before caching.
   try {
-    console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_started", date: dateString, path: `/schedule/${dateString}` }));
-    const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
-    if (res.success === false || res.error) {
-      return {
-        success: false,
-        events: [],
-        error: res.error ?? { code: 502, message: "SportsAPI returned an unsuccessful response" },
-      };
-    }
-    const events = res.events ||
-      (Array.isArray(res.data) ? res.data : (res.data as any)?.events) ||
-      (Array.isArray(res) ? res : null);
-    if (Array.isArray(events)) {
-      for (const ev of events) {
-        const id = ev.id || ev.eventId;
-        if (id && !eventsMap.has(id)) {
-          eventsMap.set(id, ev);
-        }
+    let totalPages = 1;
+    for (let page = 1; page <= totalPages; page += 1) {
+      if (page > 20) throw new Error("SportsAPI schedule exceeded the 20-page safety limit");
+      const params = page === 1 ? {} : { page: String(page) };
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_started", date: dateString, page }));
+      const res = await fetchSportsApi<any>(`/schedule/${dateString}`, params);
+      if (res.success === false || res.error) {
+        result = { success: false, events: [], error: res.error ?? { code: 502, message: "SportsAPI returned an unsuccessful response" } };
+        break;
       }
+      if (res.page != null && Number(res.page) !== page)
+        throw new Error(`SportsAPI schedule page mismatch: expected ${page}, received ${res.page}`);
+      const reportedPages = Number(res.totalPages ?? 1);
+      if (!Number.isInteger(reportedPages) || reportedPages < 1 || reportedPages > 20)
+        throw new Error(`Invalid SportsAPI schedule totalPages: ${res.totalPages}`);
+      if (page > 1 && reportedPages !== totalPages)
+        throw new Error(`SportsAPI schedule pagination changed from ${totalPages} to ${reportedPages}`);
+      totalPages = reportedPages;
+      const events = res.events ??
+        (Array.isArray(res.data) ? res.data : (res.data as any)?.events);
+      if (!Array.isArray(events))
+        throw new Error(`SportsAPI schedule page ${page} has no events array`);
+      for (const ev of events) {
+        const id = ev.id ?? ev.eventId;
+        if (id != null && !eventsMap.has(String(id))) eventsMap.set(String(id), ev);
+      }
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_page_finished", date: dateString, page, totalPages, providerEvents: events.length, uniqueEvents: eventsMap.size }));
     }
-    console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_finished", date: dateString, ok: true, providerEvents: eventsMap.size }));
+    if (result.success !== false)
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_finished", date: dateString, ok: true, totalPages, providerEvents: eventsMap.size }));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[SportsAPI] /schedule/${dateString} failed:`, message);
