@@ -202,14 +202,7 @@ export async function runScoreEngine(
   );
   const scoreOps = predictions.map((prediction) => {
     const match = byMatch.get(prediction.matchId)!;
-    const globalEligible =
-      isGlobalCompetition(match.leagueCode) &&
-      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
-        isFeaturedFixture(
-          match.leagueCode,
-          match.homeTeam.name,
-          match.awayTeam.name,
-        ));
+    const globalEligible = isGlobalCompetition(match.leagueCode);
     const score = calculatePredictionScore(
       prediction.homeGoals,
       prediction.awayGoals,
@@ -275,14 +268,7 @@ export async function runScoreEngine(
   >();
   for (const prediction of predictions) {
     const match = byMatch.get(prediction.matchId)!;
-    const globalEligible =
-      isGlobalCompetition(match.leagueCode) &&
-      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
-        isFeaturedFixture(
-          match.leagueCode,
-          match.homeTeam.name,
-          match.awayTeam.name,
-        ));
+    const globalEligible = isGlobalCompetition(match.leagueCode);
     const score = calculatePredictionScore(
       prediction.homeGoals,
       prediction.awayGoals,
