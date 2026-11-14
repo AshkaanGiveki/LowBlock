@@ -25,7 +25,7 @@ export async function GET(
   if (!sportsApiId) {
     try {
       const db = await getDb();
-      const central = await db.collection("centralTeams").findOne({ id: teamId });
+      const central = await db.collection("centralTeams").findOne({ centralTeamId: teamId });
       sportsApiId = cleanSportsApiTeamId(central?.providerIds?.sportsapi);
     } catch {}
   }
