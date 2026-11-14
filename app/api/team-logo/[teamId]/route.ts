@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ teamId: string }> },
 ) {
   const { teamId } = await params;
-  const file = teamLogoFile(teamId);
+  // The frontend sometimes passes a centralTeamId (sportsapi:123) rather than a numeric provider ID.\n  const embeddedId = /^sportsapi:(\\d+)$/.exec(teamId)?.[1];\n  const resolvedId = embeddedId || teamId;\n  const file = teamLogoFile(resolvedId);
   if (file) {
     try {
       return new NextResponse(await readFile(file), {
@@ -21,7 +21,7 @@ export async function GET(
       // Restore the previous working remote image fallback on a cache miss.
     }
   }
-  let sportsApiId = cleanSportsApiTeamId(teamId);
+  let sportsApiId = cleanSportsApiTeamId(resolvedId);
   if (!sportsApiId) {
     try {
       const db = await getDb();
