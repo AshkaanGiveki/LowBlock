@@ -690,18 +690,36 @@ class MatchMonitorService {
 
   private lastDbSync = new Map<string, number>();
   private persistInFlight = new Map<string, Promise<void>>();
+  private persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private scoredFinishedMatches = new Set<string>();
 
+  private scheduleTrailingPersist(matchId: string, snapshot: LiveMatchSnapshot, delayMs: number) {
+    if (this.persistTimers.has(matchId)) return;
+    const timer = setTimeout(() => {
+      this.persistTimers.delete(matchId);
+      // Read the latest mutable snapshot. Persisting the first delta would
+      // otherwise overwrite later score, lineup or final-whistle updates.
+      void this.persistMatchState(matchId, this.snapshots.get(matchId) ?? snapshot);
+    }, Math.max(1, delayMs));
+    timer.unref?.();
+    this.persistTimers.set(matchId, timer);
+  }
+
   private async persistMatchState(matchId: string, snapshot: LiveMatchSnapshot) {
+    // A second update arriving during an active write must eventually flush.
+    // A bare 5-second early return can permanently lose the final whistle
+    // when no further WebSocket message arrives.
+    if (this.persistInFlight.has(matchId)) {
+      this.scheduleTrailingPersist(matchId, snapshot, 1_000);
+      return;
+    }
     const now = Date.now();
     const last = this.lastDbSync.get(matchId) || 0;
-    if (now - last < 5_000) return; // Debounce 5s
+    if (now - last < 5_000) {
+      this.scheduleTrailingPersist(matchId, snapshot, 5_000 - (now - last));
+      return;
+    }
     this.lastDbSync.set(matchId, now);
-
-    // WebSocket deltas can arrive concurrently. Never let several Mongo
-    // persistence jobs for the same match pile up behind one another.
-    if (this.persistInFlight.has(matchId)) return;
-
     const persistJob = this.persistMatchStateInternal(matchId, snapshot).finally(() => {
       this.persistInFlight.delete(matchId);
     });
@@ -787,6 +805,11 @@ class MatchMonitorService {
       }
     } catch (err) {
       console.error("[MatchMonitor] Failed to persist state to MongoDB:", err);
+      // Preserve live updates through transient Mongo outages. Never retry
+      // from unit tests or browser processes, only the ingestion worker.
+      if (process.env.LOWBLOCK_LIVE_INGESTION_WORKER === "true") {
+        this.scheduleTrailingPersist(matchId, snapshot, 30_000);
+      }
     }
   }
 }
