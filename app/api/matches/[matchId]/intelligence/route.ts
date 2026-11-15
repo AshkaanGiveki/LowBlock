@@ -28,7 +28,9 @@ export async function GET(
         { provider: { $in: ["sportsapi", "football-api"] }, providerMatchId: matchId },
         { projection: { _id: 0, provider: 1, providerMatchId: 1, leagueCode: 1, kickoffAt: 1, status: 1, homeTeam: 1, awayTeam: 1, homeGoals: 1, awayGoals: 1 } },
       ),
-      db.collection<any>("matchInsights").findOne({ matchId }, { projection: { _id: 0 } }),
+      db.collection<any>("footballMatchIntelligence")
+        .find({ _id: { $in: ["sportsapi:" + matchId, "football-api:" + matchId] } })
+        .limit(2).toArray(),
       readCachedLiveMatch(matchId),
     ]);
     if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
@@ -44,7 +46,9 @@ export async function GET(
     // Provider IDs are not interchangeable. SportsAPI snapshots must never be
     // attached to an API-Football fixture with a coincidentally equal ID.
     const snapshot = match.provider === "sportsapi" && details?.provider === "sportsapi" ? details : null;
-    const historical = insights?.provider === match.provider ? insights : null;
+    const historical = Array.isArray(insights)
+      ? insights.find((item) => item.provider === match.provider) ?? null
+      : null;
     const local = historical?.local ?? null;
     const payload = {
       match,
