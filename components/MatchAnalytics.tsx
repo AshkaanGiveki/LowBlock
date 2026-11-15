@@ -138,57 +138,64 @@ export function MatchAnalytics({
     };
   }, [matchId, query]);
 
+  // Legacy SSE streams were opening serverless connections per viewer.
+  // Read the shared worker snapshots instead. The new intelligence tab has
+  // its own visibility-aware polling, so avoid duplicating its requests.
   useEffect(() => {
+    if (tab === "intelligence") return;
     const status = String(data?.match?.status || initialMatch?.status || "");
-    const shouldStream =
-      Boolean(status) &&
-      !["FINISHED", "CANCELLED", "POSTPONED", "VOID"].includes(status);
-    if (!shouldStream) return;
-
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource(`/api/matches/${matchId}/live?stream=true`);
-
-      eventSource.onopen = () => setIsLiveConnected(true);
-
-      const applySnapshot = (snapshot: LiveMatchSnapshot) => {
-        setData((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            match: {
-              ...prev.match,
-              homeGoals: snapshot.score.home ?? prev.match.homeGoals,
-              awayGoals: snapshot.score.away ?? prev.match.awayGoals,
-              status: snapshot.score.status ?? prev.match.status,
-              elapsed: snapshot.score.elapsed ?? prev.match.elapsed,
-            },
-            liveDetails: snapshot,
-          };
+    if (["FINISHED", "CANCELLED", "POSTPONED", "VOID"].includes(status)) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let etag: string | null = null;
+    const refresh = async () => {
+      if (!active || document.visibilityState === "hidden") return;
+      try {
+        const response = await fetch("/api/matches/" + encodeURIComponent(matchId) + "/intelligence", {
+          cache: "no-store",
+          headers: etag ? { "If-None-Match": etag } : {},
         });
-        setIsLiveConnected(true);
-      };
-
-      eventSource.addEventListener("snapshot", (e) => {
-        try {
-          applySnapshot(JSON.parse(e.data));
-        } catch {}
-      });
-
-      eventSource.addEventListener("update", (e) => {
-        try {
-          applySnapshot(JSON.parse(e.data));
-        } catch {}
-      });
-
-      eventSource.onerror = () => setIsLiveConnected(false);
-    } catch {}
-
+        if (response.ok && response.status !== 304) {
+          const payload = await response.json();
+          etag = response.headers.get("etag");
+          const snapshot = payload.live;
+          if (snapshot) {
+            const nextScore = snapshot.score || {};
+            setData((previous) => previous ? ({
+              ...previous,
+              match: {
+                ...previous.match,
+                homeGoals: nextScore.home ?? previous.match.homeGoals,
+                awayGoals: nextScore.away ?? previous.match.awayGoals,
+                status: nextScore.status ?? previous.match.status,
+                elapsed: nextScore.elapsed ?? previous.match.elapsed,
+              },
+              liveDetails: { ...snapshot, matchId, lastUpdateAt: snapshot.updatedAt ? new Date(snapshot.updatedAt).getTime() : 0 },
+            }) : previous);
+            setIsLiveConnected(["LIVE", "IN_PLAY", "PAUSED"].includes(String(nextScore.status)));
+          }
+        }
+      } catch {
+        setIsLiveConnected(false);
+      } finally {
+        if (active && document.visibilityState === "visible") {
+          timer = setTimeout(refresh, 30_000 + Math.floor(Math.random() * 5000));
+        }
+      }
+    };
+    const visibility = () => {
+      if (timer) clearTimeout(timer);
+      if (document.visibilityState === "visible") void refresh();
+    };
+    void refresh();
+    document.addEventListener("visibilitychange", visibility);
     return () => {
-      if (eventSource) eventSource.close();
+      active = false;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", visibility);
       setIsLiveConnected(false);
     };
-  }, [data?.match?.status, initialMatch?.status, matchId]);
+  }, [tab, data?.match?.status, initialMatch?.status, matchId]);
 
   const close = () => {
     setVisible(false);
