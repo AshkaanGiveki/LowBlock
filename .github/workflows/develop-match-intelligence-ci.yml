@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SPORTSAPI_WS_ENABLED: "false"
+      SPORTSAPI_WS_ENABLED: "true"
       SPORTSAPI_DAILY_REQUEST_BUDGET: "1"
     steps:
       - uses: actions/checkout@v4
