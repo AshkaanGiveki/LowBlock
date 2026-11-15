@@ -276,4 +276,10 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(monitor.getSnapshot(ignored).score.home).toBeNull();
   });
 
+  it("bounds dormant snapshots on the long-running ingestion worker", () => {
+    const monitor = getMatchMonitorService();
+    for (let n = 0; n < 400; n++) monitor.getSnapshot(String(800000 + n));
+    expect(monitor.getMetrics().trackedSnapshots).toBeLessThanOrEqual(256);
+  });
+
 });
