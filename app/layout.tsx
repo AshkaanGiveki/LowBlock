@@ -92,9 +92,9 @@ export default function RootLayout({
     <html lang="fa" dir="rtl">
       <body>
         {process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW === "true" && (
-          <div role="status" className="pointer-events-none fixed bottom-20 left-3 z-[120] rounded-xl border border-amber-500/50 bg-[#111d16]/95 px-3 py-2 text-[11px] font-black text-amber-200 shadow-lg" dir="ltr">
-            DEVELOP PREVIEW · ISOLATED DATA
-          </div>
+          <a href="/preview" className="fixed bottom-20 left-3 z-[120] rounded-xl border border-amber-500/50 bg-[#111d16]/95 px-3 py-2 text-[11px] font-black text-amber-200 shadow-lg transition hover:bg-amber-500/20" dir="ltr">
+            DEVELOP PREVIEW · EXPLORE MATCHES ↗
+          </a>
         )}
         <script
           type="application/ld+json"
