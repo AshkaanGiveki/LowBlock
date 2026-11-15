@@ -110,7 +110,7 @@ export async function syncVerifiedSportsApiStandings(db: Db, now = new Date()) {
       await runs.updateOne({ _id: dailyKey }, { $set: { status: "UNVERIFIED", finishedAt: new Date() } });
       continue;
     }
-    await db.collection("leagueStandings").updateOne(
+    await db.collection<any>("leagueStandings").updateOne(
       { _id: "sportsapi:" + leagueCode + ":" + seasonYear },
       { $set: { rows, verified: true, provider: "sportsapi", leagueCode, seasonStartYear: seasonYear, source: "sportsapi-official", updatedAt: new Date() } },
       { upsert: true },
