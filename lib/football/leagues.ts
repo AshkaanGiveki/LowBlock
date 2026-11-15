@@ -333,7 +333,7 @@ export const LEAGUES = [
     faName: "لیگ قهرمانان الیت آسیا",
     enName: "AFC Champions League Elite",
     short: "ACLE",
-    globalLeaderboard: true,
+    globalLeaderboard: false,
     h2h: false,
     defaultClubLeaderboard: false,
     kind: "TOURNAMENT",
