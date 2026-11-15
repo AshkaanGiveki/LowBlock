@@ -34,7 +34,11 @@ async function main() {
     try {
       const { getDb } = await import("../lib/db/mongo");
       const { refreshLocalMatchIntelligence } = await import("../lib/football/intelligence/history");
-      const results = await refreshLocalMatchIntelligence(await getDb());
+      const { syncVerifiedSportsApiStandings } = await import("../lib/football/intelligence/standings");
+      const db = await getDb();
+      const officialTables = await syncVerifiedSportsApiStandings(db);
+      const results = await refreshLocalMatchIntelligence(db);
+      console.info(JSON.stringify({ type: "lowblock.intelligence.official_standings", ...officialTables }));
       console.info(JSON.stringify({ type: "lowblock.intelligence.refreshed", ...results }));
     } catch (error) {
       console.error("lowblock_intelligence_refresh_failed", error);
