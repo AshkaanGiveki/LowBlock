@@ -1,5 +1,6 @@
 import { getSportsApiWsManager, isSportsApiRealtimeEnabled } from "./ws";
 import { getDb } from "@/lib/db/mongo";
+import { writeCachedLiveMatch } from "@/lib/football/intelligence/liveCache";
 
 export type LiveMatchScore = {
   home: number | null;
@@ -263,7 +264,8 @@ class MatchMonitorService {
         lastUpdateAt: Date.now(),
       };
       this.snapshots.set(matchId, snapshot);
-      this.subscribeMatchChannels(matchId);
+      // The background worker alone manages bounded subscriptions.
+      // Receiving a global score event must not add subscriptions forever.
     }
     return snapshot;
   }
@@ -768,6 +770,14 @@ class MatchMonitorService {
         },
         { upsert: true },
       );
+
+      // Redis holds the latest lightweight live state; Mongo remains durable.
+      await writeCachedLiveMatch(matchId, {
+        score: snapshot.score,
+        incidents: snapshot.incidents,
+        stats: snapshot.stats,
+        lineups: snapshot.lineups,
+      });
 
       // 3. Trigger score engine if match is newly finished
       if (snapshot.score.status === "FINISHED" && !this.scoredFinishedMatches.has(matchId)) {
