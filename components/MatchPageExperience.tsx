@@ -27,9 +27,10 @@ type Props = {
   relatedMatches: any[];
   isLive: boolean;
   isFinished: boolean;
+  showIntelligence?: boolean;
 };
 
-export function MatchPageExperience({ match, initial, leagueName, leagueFaName, relatedMatches, isLive, isFinished }: Props) {
+export function MatchPageExperience({ match, initial, leagueName, leagueFaName, relatedMatches, isLive, isFinished, showIntelligence = false }: Props) {
   const { language, t } = useLanguage();
   const fa = language === "fa";
   const displayLeagueName = fa ? leagueFaName : leagueName;
@@ -72,7 +73,7 @@ export function MatchPageExperience({ match, initial, leagueName, leagueFaName, 
           <aside className="space-y-4"><div className="rounded-[1.5rem] border border-brand/20 bg-brand/[.07] p-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-[#07100b]"><BarChart3 size={17} /></span><div><h2 className="text-sm font-black text-white">{t("برتری‌ات را حفظ کن", "Keep your edge")}</h2><p className="mt-1 text-xs leading-5 text-white/50">{t("پیش‌بینی تو بخشی از داستان مسابقه و مسیر صعودت در جدول می‌شود.", "Your prediction becomes part of the live match story and your leaderboard climb.")}</p></div></div><a href="/leaderboard" className="mt-4 inline-flex items-center gap-2 text-xs font-black text-brand transition hover:text-white">{t("جدول امتیازات", "See the leaderboard")} <ChevronRight size={14} className={fa ? "rotate-180" : ""} /></a></div><a href="/h2h" className="group flex items-center justify-between rounded-[1.5rem] border border-white/[.08] bg-white/[.035] p-5 transition hover:border-brand/30 hover:bg-white/[.06]"><span><span className="block text-[10px] font-black uppercase tracking-[.18em] text-white/35">{t("بیشتر کشف کن", "Go deeper")}</span><span className="mt-1 block text-sm font-black text-white">{t("ذهن‌های فوتبالی را مقایسه کن", "Compare football minds")}</span></span><span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-white/45 transition group-hover:border-brand group-hover:text-brand"><ChevronRight size={16} className={fa ? "rotate-180" : ""} /></span></a></aside>
         </div>
 
-        <div className="mt-8"><MatchIntelligence matchId={String(match.providerMatchId)} initialMatch={match} /></div>
+        {showIntelligence && <div className="mt-8"><MatchIntelligence matchId={String(match.providerMatchId)} initialMatch={match} /></div>}
 
         {relatedMatches.length > 0 && <section className="mt-14"><div className="mb-4 flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-brand">{t("اینجا متوقف نشو", "Don’t stop here")}</p><h2 className="mt-1 text-2xl font-black tracking-tight">{t(`بیشتر از ${leagueFaName}`, `More from ${leagueName}`)}</h2></div><a href="/matches" className="inline-flex items-center gap-1 text-xs font-black text-brand">{t("مشاهده همه", "View all")} <ChevronRight size={14} className={fa ? "rotate-180" : ""} /></a></div><div className="grid gap-3 md:grid-cols-3">{relatedMatches.map((item) => <RelatedMatch key={item.providerMatchId} match={item} language={language} />)}</div></section>}
       </div>
