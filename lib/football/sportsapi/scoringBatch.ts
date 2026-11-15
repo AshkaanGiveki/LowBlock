@@ -25,12 +25,12 @@ export async function flushFinishedMatchScoring(): Promise<void> {
   try {
     const db = await getDb();
     const now = new Date();
-    await db.collection("lowblockWorkerLeases").updateOne(
+    await db.collection<any>("lowblockWorkerLeases").updateOne(
       { _id: "finished-match-scoring" },
       { $setOnInsert: { expiresAt: new Date(0), createdAt: now } },
       { upsert: true },
     );
-    const lease = await db.collection("lowblockWorkerLeases").findOneAndUpdate(
+    const lease = await db.collection<any>("lowblockWorkerLeases").findOneAndUpdate(
       {
         _id: "finished-match-scoring",
         $or: [{ expiresAt: { $lte: now } }, { expiresAt: { $exists: false } }],
@@ -49,7 +49,7 @@ export async function flushFinishedMatchScoring(): Promise<void> {
     if (acquired) {
       try {
         const db = await getDb();
-        await db.collection("lowblockWorkerLeases").updateOne(
+        await db.collection<any>("lowblockWorkerLeases").updateOne(
           { _id: "finished-match-scoring", owner },
           { $set: { expiresAt: new Date(0) } },
         );
