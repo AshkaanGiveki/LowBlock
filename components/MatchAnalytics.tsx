@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   BarChart3,
+  Activity,
   CalendarDays,
   Check,
   ChevronDown,
@@ -28,6 +29,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
+import { MatchIntelligence } from "@/components/MatchIntelligence";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber } from "@/lib/text";
 import { teamName } from "@/lib/football/team-names";
@@ -48,7 +50,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
-type TabType = "lineups" | "stats" | "timeline" | "replay" | "predictions";
+type TabType = "intelligence" | "lineups" | "stats" | "timeline" | "replay" | "predictions";
 
 type AnalyticsData = {
   match: any;
@@ -75,7 +77,7 @@ export function MatchAnalytics({
 }) {
   const { language, t } = useLanguage();
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [tab, setTab] = useState<TabType>("predictions");
+  const [tab, setTab] = useState<TabType>("intelligence");
   const [visible, setVisible] = useState(true);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
@@ -271,6 +273,12 @@ export function MatchAnalytics({
                   {/* 4-Tab Navigation */}
                   <div className="mt-6 flex rounded-2xl border border-[#1a382d] bg-[#07100c] p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,.02)] overflow-x-auto no-scrollbar">
                     <TabButton
+                      active={tab === "intelligence"}
+                      onClick={() => selectTab("intelligence")}
+                      icon={<Activity size={18} strokeWidth={2.2} />}
+                      label={t("اطلاعات", "Match intel")}
+                    />
+                    <TabButton
                       active={tab === "lineups"}
                       onClick={() => selectTab("lineups")}
                       icon={<Users size={18} strokeWidth={2.2} />}
@@ -314,6 +322,9 @@ export function MatchAnalytics({
                       </div>
                     ) : (
                       <>
+                        {tab === "intelligence" && (
+                          <MatchIntelligence matchId={matchId} initialMatch={match} />
+                        )}
                         {tab === "lineups" && (
                           <PitchLineup
                             lineups={lineups}
