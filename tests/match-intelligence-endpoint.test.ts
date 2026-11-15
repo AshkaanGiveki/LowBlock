@@ -41,10 +41,10 @@ describe("quota-free Match Intelligence reader", () => {
     });
     mockGetDb.mockResolvedValue({
       collection: (name: string) => ({
+        find: () => ({ limit: () => ({ toArray: async () => name === "footballMatchIntelligence" ? [{ matchId: "777", provider: "sportsapi", local: { form: { home: [{ result: "W" }], away: [] }, h2h: [] } }] : [] }) }),
         findOne: async () => {
           calls.push(name);
           if (name === "matches") return match;
-          if (name === "matchInsights") return { matchId: "777", provider: "sportsapi", local: { form: { home: [{ result: "W" }], away: [] }, h2h: [] } };
           return null;
         },
       }),
@@ -74,9 +74,12 @@ describe("quota-free Match Intelligence reader", () => {
     mockGetDb.mockResolvedValue({
       collection: (name: string) => ({
         findOne: async () => name === "matches" ? { ...match, provider: "football-api" } : null,
+        find: () => ({ limit: () => ({ toArray: async () => [{ provider: "sportsapi", local: { form: { home: [{ result: "W" }], away: [] } } }] }) }),
       }),
     });
     const response = await GET(request(), params);
-    expect((await response.json()).live).toBeNull();
+    const payload = await response.json();
+    expect(payload.live).toBeNull();
+    expect(payload.historical).toBeNull();
   });
 });
