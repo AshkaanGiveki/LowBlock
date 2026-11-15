@@ -264,10 +264,39 @@ class MatchMonitorService {
         lastUpdateAt: Date.now(),
       };
       this.snapshots.set(matchId, snapshot);
+      this.pruneOldSnapshots();
       // The background worker alone manages bounded subscriptions.
       // Receiving a global score event must not add subscriptions forever.
     }
     return snapshot;
+  }
+
+  /**
+   * The global worker is long-lived. Evict dormant cached snapshots rather
+   * than retaining every historical fixture and its raw WS payload forever.
+   * Never evict a subscribed match or a write waiting to be persisted.
+   */
+  private pruneOldSnapshots() {
+    if (this.snapshots.size <= 256) return;
+    const active = new Set(getSportsApiWsManager().getStatus().activeSubscriptions);
+    for (const [id] of this.snapshots) {
+      if (this.snapshots.size <= 192) break;
+      if (active.has(`match:${id}`) || this.listeners.has(id) ||
+          this.persistInFlight.has(id) || this.persistTimers.has(id)) continue;
+      this.snapshots.delete(id);
+      this.lastDbSync.delete(id);
+      this.scoredFinishedMatches.delete(id);
+    }
+  }
+
+  /** Bounded worker-health counters; no personal data or raw match payloads. */
+  public getMetrics() {
+    return {
+      trackedSnapshots: this.snapshots.size,
+      activeListeners: [...this.listeners.values()].reduce((total, set) => total + set.size, 0),
+      pendingWrites: this.persistTimers.size,
+      inFlightWrites: this.persistInFlight.size,
+    };
   }
 
   public updateFromSnapshot(snapshot: LiveMatchSnapshot): void {
