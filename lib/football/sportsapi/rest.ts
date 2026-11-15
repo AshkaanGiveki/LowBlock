@@ -125,39 +125,46 @@ export async function fetchSportsApi<T>(
   const url = new URL(`${env.SPORTSAPI_BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
-  // Fail closed before making a provider request once the configured daily
-  // budget is exhausted. This counts all attempted REST calls, including
-  // failed calls, and prevents optional paths from consuming the free quota.
+  // Reserve quota atomically BEFORE every outbound attempt. Failed requests,
+  // timeouts and retries consume a reservation too. The shared Mongo counter
+  // prevents multiple workers from racing past the daily cap.
   try {
     const db = await getDb();
-    // SportsAPI resets quota at 00:00 UTC. Using Tehran midnight here
-    // incorrectly carried pre-reset usage into the new provider day.
-    // Count only successful provider responses for this guard. A connection
-    // timeout never gives us a provider quota response and must not consume
-    // the entire local budget, otherwise one production-network incident
-    // prevents every later recovery attempt until the next UTC day.
-    const { start } = providerDayBounds();
-    const used = await db.collection("sportsApiRequests").countDocuments({
-      timestamp: { $gte: start },
-      status: "OK",
-      keyFingerprint: requestKeyFingerprint(),
+    const { start: dayStart, end: dayEnd } = providerDayBounds();
+    const day = dayStart.toISOString().slice(0, 10);
+    const keyFingerprint = requestKeyFingerprint();
+    const hardLimit = Math.min(60, Math.max(0, Number(env.SPORTSAPI_DAILY_REQUEST_BUDGET) || 0));
+    const _id = `${day}:${keyFingerprint}`;
+    const priorAttempts = await db.collection("sportsApiRequests").countDocuments({
+      timestamp: { $gte: dayStart, $lt: dayEnd },
+      keyFingerprint,
     });
-    if (used >= env.SPORTSAPI_DAILY_REQUEST_BUDGET) {
+    await db.collection("sportsApiQuotaReservations").updateOne(
+      { _id },
+      {
+        $setOnInsert: { day, keyFingerprint, createdAt: new Date() },
+        $max: { used: priorAttempts },
+      },
+      { upsert: true },
+    );
+    const reservation = await db.collection("sportsApiQuotaReservations").findOneAndUpdate(
+      { _id, used: { $lt: hardLimit } },
+      { $inc: { used: 1 }, $set: { updatedAt: new Date() } },
+      { returnDocument: "after" },
+    );
+    if (!reservation) {
       return {
         success: false,
         events: [],
-        error: {
-          code: 429,
-          message: `SportsAPI local daily request budget exhausted (${used}/${env.SPORTSAPI_DAILY_REQUEST_BUDGET})`,
-        },
+        error: { code: 429, message: `SportsAPI hard daily REST cap reached (max ${hardLimit}, reserve 40 of 100)` },
       };
     }
   } catch (error) {
-    console.error("[SportsAPI] Could not verify local request budget:", error);
+    console.error("[SportsAPI] Could not atomically reserve REST quota:", error);
     return {
       success: false,
       events: [],
-      error: { code: 503, message: "SportsAPI local request budget unavailable" },
+      error: { code: 503, message: "SportsAPI shared REST quota unavailable" },
     };
   }
 
