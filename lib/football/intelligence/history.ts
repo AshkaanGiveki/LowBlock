@@ -130,19 +130,17 @@ export async function refreshLocalMatchIntelligence(db: Db, now = new Date()) {
     const items = await Promise.all(batch.map(async (match) => ({
       match,
       local: await buildLocalHistory(db, match),
+      table: tableByKey.get(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear),
     })));
     if (!items.length) continue;
-    await db.collection("matchInsights").bulkWrite(items.map(({ match, local }) => ({
+    await db.collection("matchInsights").bulkWrite(items.map(({ match, local, table }) => ({
       updateOne: {
         filter: { matchId: String(match.providerMatchId) },
         update: {
           $set: {
             local, localUpdatedAt: now, provider: match.provider,
-            standingsVerified: Boolean(tableByKey.has(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear)),
-            ...(tableByKey.has(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear)
-              ? { standings: tableByKey.get(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear).rows,
-                  standingsUpdatedAt: tableByKey.get(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear).updatedAt }
-              : {}),
+            standingsVerified: Boolean(table),
+            ...(table ? { standings: table.rows, standingsUpdatedAt: table.updatedAt } : {}),
           },
           $setOnInsert: { matchId: String(match.providerMatchId), createdAt: now },
         },
