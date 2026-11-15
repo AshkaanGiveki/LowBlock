@@ -73,7 +73,7 @@ export function LeaderboardView({
               <Metric
                 icon={<Sparkles size={16} />}
                 value={picksCount}
-                label={t("پیش‌بینی ثبت‌شده", "Submitted picks")}
+                label={t("پیش‌بینی امتیازدهی‌شده", "Scored picks")}
                 language={language}
               />
               <Metric
@@ -136,7 +136,7 @@ export function LeaderboardView({
                         </h3>
                         <p className="text-[10px] text-[var(--muted)]">
                           {number(row.predictions)}{" "}
-                          {t("پیش‌بینی", "predictions")} · {number(row.exact)}{" "}
+                          {t("پیش‌بینی امتیازدهی‌شده", "scored predictions")} · {number(row.exact)}{" "}
                           {t("دقیق", "exact")}
                         </p>
                       </div>
@@ -270,7 +270,7 @@ function PodiumCard({
       </div>
       <p className="truncate text-sm font-black text-white">{row.username}</p>
       <p className="mt-1 text-[10px] text-white/50">
-        {number(row.predictions, language)} {t("پیش‌بینی", "picks")} ·{" "}
+        {number(row.predictions, language)} {t("پیش‌بینی امتیازدهی‌شده", "scored picks")} ·{" "}
         {number(row.exact, language)} {t("دقیق", "exact")}
       </p>
       <div className="mt-4 flex items-center justify-center gap-1.5 text-xl font-black text-brand">
