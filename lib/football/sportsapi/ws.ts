@@ -162,6 +162,8 @@ export class SportsApiWebSocketManager {
     // Jitter prevents multiple reconnecting processes from synchronizing.
     const jitteredDelay = Math.min(env.SPORTSAPI_RECONNECT_MAX_DELAY_MS, delay + Math.floor(Math.random() * delay * 0.2));
     setTimeout(() => {
+      // A lease may have been lost after this reconnect was scheduled.
+      if (this.manualDisconnect || !isSportsApiRealtimeEnabled()) return;
       this.connect();
     }, jitteredDelay);
   }
