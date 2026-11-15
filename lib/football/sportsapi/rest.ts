@@ -139,7 +139,7 @@ export async function fetchSportsApi<T>(
       timestamp: { $gte: dayStart, $lt: dayEnd },
       keyFingerprint,
     });
-    await db.collection("sportsApiQuotaReservations").updateOne(
+    await db.collection<any>("sportsApiQuotaReservations").updateOne(
       { _id },
       {
         $setOnInsert: { day, keyFingerprint, createdAt: new Date() },
@@ -147,7 +147,7 @@ export async function fetchSportsApi<T>(
       },
       { upsert: true },
     );
-    const reservation = await db.collection("sportsApiQuotaReservations").findOneAndUpdate(
+    const reservation = await db.collection<any>("sportsApiQuotaReservations").findOneAndUpdate(
       { _id, used: { $lt: hardLimit } },
       { $inc: { used: 1 }, $set: { updatedAt: new Date() } },
       { returnDocument: "after" },
