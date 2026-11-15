@@ -136,8 +136,11 @@ export function LeaderboardView({
                           {row.username}
                         </h3>
                         <p className="text-[10px] text-[var(--muted)]">
-                          {number(row.submittedPredictions ?? row.predictions)} {t("ثبت‌شده", "submitted")} · {number(row.predictions)} {t("امتیازدهی‌شده", "scored")} · {number(row.exact)}{" "}
-                          {t("دقیق", "exact")}
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="rounded-md bg-white/[.07] px-1.5 py-0.5" title={t("کل پیش‌بینی‌های ثبت‌شده", "All submitted predictions")}>{number(row.submittedPredictions ?? row.predictions)} {t("کل", "all")}</span>
+                            <span className="rounded-md bg-brand/10 px-1.5 py-0.5 text-brand" title={t("پیش‌بینی‌های امتیازدهی‌شده", "Scored predictions")}>{number(row.predictions)} {t("معتبر", "scored")}</span>
+                            <span>{number(row.exact)} {t("دقیق", "exact")}</span>
+                          </span>
                         </p>
                       </div>
                     </Link>
@@ -270,8 +273,11 @@ function PodiumCard({
       </div>
       <p className="truncate text-sm font-black text-white">{row.username}</p>
       <p className="mt-1 text-[10px] text-white/50">
-        {number(row.submittedPredictions ?? row.predictions, language)} {t("ثبت‌شده", "submitted")} · {number(row.predictions, language)} {t("امتیازدهی‌شده", "scored")} ·{" "}
-        {number(row.exact, language)} {t("دقیق", "exact")}
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span className="rounded-md bg-white/10 px-1.5 py-0.5" title={t("کل پیش‌بینی‌های ثبت‌شده", "All submitted predictions")}>{number(row.submittedPredictions ?? row.predictions, language)} {t("کل", "all")}</span>
+          <span className="rounded-md bg-brand/15 px-1.5 py-0.5 text-brand" title={t("پیش‌بینی‌های امتیازدهی‌شده", "Scored predictions")}>{number(row.predictions, language)} {t("معتبر", "scored")}</span>
+          <span>{number(row.exact, language)} {t("دقیق", "exact")}</span>
+        </span>
       </p>
       <div className="mt-4 flex items-center justify-center gap-1.5 text-xl font-black text-brand">
         <Sparkles size={15} />
