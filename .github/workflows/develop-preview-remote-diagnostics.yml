@@ -19,12 +19,15 @@ jobs:
         run: |
           set -u
           base=https://lowblock-preview.45.11.186.199.sslip.io
-          for path in '/api/matches?limit=1' '/api/matches?limit=30' '/matches' '/preview'; do
+          for path in '/api/matches?limit=1' '/api/matches?limit=30' '/matches' '/preview' '/login' '/help' '/this-page-is-missing'; do
             echo "=== $path ==="
-            curl --silent --show-error --location --max-time 18 \
+            curl --silent --show-error --location --max-time 12 \
               -w 'status=%{http_code} bytes=%{size_download} first_byte=%{time_starttransfer}s total=%{time_total}s\\n' \
               "$base$path" -o /tmp/lowblock-diagnostic-response || true
             head -c 100 /tmp/lowblock-diagnostic-response | tr '\n' ' ' || true
+            echo
+            echo 'Last 160 response bytes:'
+            tail -c 160 /tmp/lowblock-diagnostic-response | tr '\n' ' ' || true
             echo
           done
           echo "Diagnostic complete; no SportsAPI endpoints contacted."
