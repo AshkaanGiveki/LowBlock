@@ -30,4 +30,15 @@ jobs:
             tail -c 160 /tmp/lowblock-diagnostic-response | tr '\n' ' ' || true
             echo
           done
+          echo '=== Protocol and response-header comparison ==='
+          for protocol in --http1.1 --http2; do
+            for path in '/api/matches?limit=30' '/matches'; do
+              echo "$protocol $path"
+              curl "$protocol" --silent --show-error --max-time 15 --location \
+                -D /tmp/preview-protocol-headers \
+                -w 'status=%{http_code} http_version=%{http_version} bytes=%{size_download} total=%{time_total}s\\n' \
+                "$base$path" -o /tmp/preview-protocol-response || true
+              grep -Ei '^(server|content-length|transfer-encoding|content-type|content-encoding):' /tmp/preview-protocol-headers | tail -6 || true
+            done
+          done
           echo "Diagnostic complete; no SportsAPI endpoints contacted."
