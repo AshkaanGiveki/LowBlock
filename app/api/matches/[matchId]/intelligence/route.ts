@@ -28,13 +28,15 @@ export async function GET(
         { projection: { _id: 0, provider: 1, providerMatchId: 1, leagueCode: 1, kickoffAt: 1, status: 1, homeTeam: 1, awayTeam: 1, homeGoals: 1, awayGoals: 1 } },
       ),
       db.collection<any>("matchInsights").findOne({ matchId }, { projection: { _id: 0 } }),
-      db.collection<any>("matchDetails").findOne({ matchId }, { projection: { _id: 0, score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 } }),
+      db.collection<any>("matchDetails").findOne({ matchId }, { projection: { _id: 0, provider: 1, score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 } }),
     ]);
     if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
 
     // Provider IDs are not interchangeable. SportsAPI snapshots must never be
     // attached to an API-Football fixture with a coincidentally equal ID.
-    const snapshot = match.provider === "sportsapi" ? details ?? null : null;
+    const snapshot = match.provider === "sportsapi" && details?.provider === "sportsapi" ? details : null;
+    const historical = insights?.provider === match.provider ? insights : null;
+    const local = historical?.local ?? null;
     const payload = {
       match,
       live: snapshot ? {
@@ -44,15 +46,15 @@ export async function GET(
         lineups: snapshot.lineups ?? null,
         updatedAt: details?.updatedAt ?? null,
       } : null,
-      historical: insights ?? null,
+      historical,
       availability: {
         live: Boolean(snapshot),
         incidents: Boolean(snapshot?.incidents?.length),
         stats: Boolean(snapshot?.stats?.length),
         lineups: Boolean(snapshot?.lineups?.home?.players?.length || snapshot?.lineups?.away?.players?.length),
-        h2h: Boolean(insights?.h2h?.length),
-        form: Boolean(insights?.form?.length || insights?.homeForm?.length || insights?.awayForm?.length),
-        standings: Boolean(insights?.standings),
+        h2h: Boolean(local?.h2h?.length || historical?.h2h?.length),
+        form: Boolean(local?.form?.home?.length || local?.form?.away?.length),
+        standings: Boolean(historical?.standingsVerified === true && historical?.standings?.length),
       },
     };
     // Conditional responses reduce bandwidth when the worker has not changed
