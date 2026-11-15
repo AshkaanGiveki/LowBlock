@@ -165,6 +165,17 @@ function scoreMatch(scope: LeaderboardScope) {
   };
 }
 
+async function attachSubmittedPredictionCounts<T extends { userId: string }>(db: Db, rows: T[]): Promise<Array<T & { submittedPredictions: number }>> {
+  if (!rows.length) return [];
+  const ids = rows.map(row => String(row.userId));
+  const counts = await db.collection("predictions").aggregate([
+    { $match: { userId: { $in: ids } } },
+    { $group: { _id: "$userId", count: { $sum: 1 } } },
+  ]).toArray();
+  const byUser = new Map(counts.map(row => [String(row._id), Number(row.count)]));
+  return rows.map(row => ({ ...row, submittedPredictions: byUser.get(String(row.userId)) ?? 0 }));
+}
+
 export async function getCanonicalLeaderboard(
   db: Db,
   scope: LeaderboardScope,
@@ -186,7 +197,7 @@ export async function getCanonicalLeaderboard(
     cursor,
   );
   if (materialized)
-    return rankRows(materialized).map((row) => ({
+    return attachSubmittedPredictionCounts(db, rankRows(materialized).map((row) => ({
       ...row,
       cursor: {
         points: row.points,
@@ -197,7 +208,7 @@ export async function getCanonicalLeaderboard(
         predictions: row.predictions,
         userId: row.userId,
       },
-    }));
+    })));
   let allowedClubCodes: string[] | null = null;
   if (scope.clubId) {
     const club = await db
@@ -343,7 +354,7 @@ export async function getCanonicalLeaderboard(
     avatarUrl: byId.get(String(row._id))?.avatarUrl ?? null,
     isDefendingChampion: String(row._id) === championId,
   }));
-  return rankRows(mapped).map((row) => ({
+  return attachSubmittedPredictionCounts(db, rankRows(mapped).map((row) => ({
     ...row,
     cursor: {
       points: row.points,
@@ -351,7 +362,7 @@ export async function getCanonicalLeaderboard(
       predictions: row.predictions,
       userId: row.userId,
     },
-  }));
+  })));
 }
 
 /**
