@@ -1,4 +1,4 @@
-import { getSportsApiWsManager } from "./ws";
+import { getSportsApiWsManager, isSportsApiRealtimeEnabled } from "./ws";
 import { getDb } from "@/lib/db/mongo";
 
 export type LiveMatchScore = {
@@ -228,6 +228,7 @@ class MatchMonitorService {
 
   private ensureInitialized() {
     if (this.initialized) return;
+    if (!isSportsApiRealtimeEnabled()) return;
     this.initialized = true;
 
     const ws = getSportsApiWsManager();
@@ -236,6 +237,10 @@ class MatchMonitorService {
     ws.addListener((channel: string, payload: any) => {
       this.handleWsMessage(channel, payload);
     });
+  }
+
+  public startIngestion(): void {
+    this.ensureInitialized();
   }
 
   public getSnapshot(matchId: string): LiveMatchSnapshot {
@@ -381,12 +386,12 @@ class MatchMonitorService {
   }
 
   public subscribeMatchChannels(matchId: string) {
+    if (!isSportsApiRealtimeEnabled()) return;
     const ws = getSportsApiWsManager();
     ws.subscribeToChannel(`match:${matchId}`);
     ws.subscribeToChannel(`match:${matchId}:incidents`);
     ws.subscribeToChannel(`match:${matchId}:stats`);
     ws.subscribeToChannel(`match:${matchId}:lineups`);
-    ws.subscribeToChannel(`match:${matchId}:odds`);
   }
 
   public handleWsMessage(channel: string, payload: any) {
