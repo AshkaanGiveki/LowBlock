@@ -180,7 +180,7 @@ export function InfiniteLeaderboard({
               <b className="block truncate">{row.username}</b>
               <small className="text-[10px] text-[var(--muted)]">
                 {n(row.exact)} {t("دقیق", "exact")} · {n(row.predictions)}{" "}
-                {t("پیش‌بینی", "picks")}
+                {t("پیش‌بینی امتیازدهی‌شده", "scored picks")}
               </small>
             </span>
             <span className="flex items-center gap-2 text-sm font-black text-brand">
@@ -247,7 +247,7 @@ function PodiumCard({
       </div>
       <p className="truncate text-sm font-black text-white">{row.username}</p>
       <p className="mt-1 text-[10px] text-white/50">
-        {n(row.predictions, language)} {t("پیش‌بینی", "picks")} ·{" "}
+        {n(row.predictions, language)} {t("پیش‌بینی امتیازدهی‌شده", "scored picks")} ·{" "}
         {n(row.exact, language)} {t("دقیق", "exact")}
       </p>
       <div className="mt-4 flex items-center justify-center gap-1.5 text-xl font-black text-brand">
