@@ -418,7 +418,9 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
     let finalManifest: SportsApiDiscoveryManifest | null = null;
     let selectedEvents: any[] = [];
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      const schedule = await fetchSportsApi<any>(`/schedule/${dateString}`);
+      // Reuse the fully paginated, cross-worker cached schedule reader.
+      // A direct first-page fetch silently omits Nations League fixtures.
+      const schedule = await getSportsApiDailyFixtures(dateString);
       const scheduleEvents = eventList(schedule);
       const todayAttempted = dateString === todayStr;
       const today = todayAttempted ? await fetchSportsApi<any>("/today") : null;
