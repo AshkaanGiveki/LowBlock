@@ -5,6 +5,7 @@ import { getMatch, getMatches, getPredictions } from "@/lib/football/data";
 import { getLeague } from "@/lib/football/leagues";
 import { teamName } from "@/lib/football/team-names";
 import { MatchPageExperience } from "@/components/MatchPageExperience";
+import { matchIntelligenceRolloutEnabled } from "@/lib/football/intelligence/rollout";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ matchId: string }> };
@@ -32,6 +33,11 @@ export default async function MatchPage({ params }: Props) {
   const match = await matchFromParams(params);
   if (!match) notFound();
   const userId = await currentUserId();
+  const intelligenceEnabled = matchIntelligenceRolloutEnabled(
+    userId,
+    Number(process.env.MATCH_INTELLIGENCE_ROLLOUT_PERCENT ?? 0),
+    process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW === "true",
+  );
   const predictions = await getPredictions([match.providerMatchId], userId ?? "guest");
   const league = getLeague(match.leagueCode);
   const relatedMatches = (await getMatches({ leagueCode: match.leagueCode, limit: 8 }))
@@ -54,7 +60,7 @@ export default async function MatchPage({ params }: Props) {
   };
 
   return <>
-    <MatchPageExperience match={match} initial={predictions.get(match.providerMatchId)} leagueName={league?.enName ?? "Football match"} leagueFaName={league?.faName ?? "مسابقه فوتبال"} relatedMatches={relatedMatches} isLive={isLive} isFinished={isFinished} />
+    <MatchPageExperience match={match} initial={predictions.get(match.providerMatchId)} leagueName={league?.enName ?? "Football match"} leagueFaName={league?.faName ?? "مسابقه فوتبال"} relatedMatches={relatedMatches} isLive={isLive} isFinished={isFinished} showIntelligence={intelligenceEnabled} />
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
   </>;
 }
