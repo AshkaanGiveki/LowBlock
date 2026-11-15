@@ -22,6 +22,7 @@ export class SportsApiWebSocketManager {
   }
 
   public subscribeToChannel(channel: string) {
+    if (this.activeSubscriptions.has(channel)) return;
     this.activeSubscriptions.add(channel);
     if (this.ws !== null && this.ws.readyState === 1) {
       this.ws.send(JSON.stringify({ action: "subscribe", channel }));
@@ -29,6 +30,7 @@ export class SportsApiWebSocketManager {
   }
 
   public unsubscribeFromChannel(channel: string) {
+    if (!this.activeSubscriptions.has(channel)) return;
     this.activeSubscriptions.delete(channel);
     if (this.ws !== null && this.ws.readyState === 1) {
       this.ws.send(JSON.stringify({ action: "unsubscribe", channel }));
