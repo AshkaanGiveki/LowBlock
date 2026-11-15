@@ -240,18 +240,21 @@ export async function getSportsApiQuota(): Promise<SportsApiQuota> {
   const day = new Date().toISOString().slice(0, 10);
   const { start, end } = providerDayBounds();
   const db = await getDb();
-  const used = await db.collection<any>("sportsApiRequests").countDocuments({
+  const reservation = await db.collection<any>("sportsApiQuotaReservations").findOne({
+    _id: `${start.toISOString().slice(0, 10)}:${requestKeyFingerprint()}`,
+  });
+  const loggedAttempts = await db.collection<any>("sportsApiRequests").countDocuments({
     timestamp: { $gte: start, $lt: end },
-    status: "OK",
     keyFingerprint: requestKeyFingerprint(),
   });
+  const used = Math.max(Number(reservation?.used ?? 0), loggedAttempts);
   const latest = await db.collection<any>("sportsApiRequests").findOne(
     { timestamp: { $gte: start }, keyFingerprint: requestKeyFingerprint() },
     { sort: { timestamp: -1 }, projection: { quotaRemaining: 1, quotaLimit: 1 } },
   );
-  const limit = latest?.quotaLimit ?? env.SPORTSAPI_DAILY_LIMIT ?? null;
-  const remaining = latest?.quotaRemaining ?? (limit == null ? null : Math.max(0, limit - used));
-  return { used, limit, remaining, source: latest?.quotaRemaining != null ? "provider-header" : limit == null ? "usage-only" : "configured-limit", day };
+  const limit = Math.min(60, Math.max(0, Number(env.SPORTSAPI_DAILY_REQUEST_BUDGET) || 0));
+  const remaining = Math.max(0, limit - used);
+  return { used, limit, remaining, source: "configured-limit", day };
 }
 
 // In-memory cache for daily discovery to support all execution environments
