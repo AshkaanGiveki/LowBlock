@@ -5,6 +5,7 @@ type Fixture = {
   providerMatchId: string;
   provider: string;
   leagueCode?: string;
+  seasonStartYear?: number;
   kickoffAt: Date | string;
   status: string;
   homeTeam: { id: number; name: string; logoUrl?: string | null };
@@ -114,6 +115,14 @@ export async function refreshLocalMatchIntelligence(db: Db, now = new Date()) {
     },
   }).sort({ kickoffAt: 1 }).limit(80).toArray();
 
+  // Official tables are materialized once by the worker and reused for every
+  // match in the same competition/season. Never compute standings per viewer.
+  const keys = [...new Set(matches.filter((match) => match.leagueCode && match.seasonStartYear)
+    .map((match) => match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear))];
+  const standings = keys.length ? await db.collection<any>("leagueStandings")
+    .find({ _id: { $in: keys }, verified: true })
+    .project({ _id: 1, rows: 1, updatedAt: 1 }).toArray() : [];
+  const tableByKey = new Map(standings.map((row) => [row._id, row]));
   // Four at a time bounds the database load even on a busy matchday.
   let updated = 0;
   for (let i = 0; i < matches.length; i += 4) {
@@ -127,7 +136,14 @@ export async function refreshLocalMatchIntelligence(db: Db, now = new Date()) {
       updateOne: {
         filter: { matchId: String(match.providerMatchId) },
         update: {
-          $set: { local, localUpdatedAt: now, provider: match.provider },
+          $set: {
+            local, localUpdatedAt: now, provider: match.provider,
+            standingsVerified: Boolean(tableByKey.has(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear)),
+            ...(tableByKey.has(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear)
+              ? { standings: tableByKey.get(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear).rows,
+                  standingsUpdatedAt: tableByKey.get(match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear).updatedAt }
+              : {}),
+          },
           $setOnInsert: { matchId: String(match.providerMatchId), createdAt: now },
         },
         upsert: true,
