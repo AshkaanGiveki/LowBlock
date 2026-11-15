@@ -21,9 +21,15 @@ export async function flushFinishedMatchScoring(): Promise<void> {
   running = true;
   const owner = `${process.pid}:${Math.random().toString(36).slice(2)}`;
   let acquired = false;
+  let shouldRetry = false;
   try {
     const db = await getDb();
     const now = new Date();
+    await db.collection("lowblockWorkerLeases").updateOne(
+      { _id: "finished-match-scoring" },
+      { $setOnInsert: { expiresAt: new Date(0), createdAt: now } },
+      { upsert: true },
+    );
     const lease = await db.collection("lowblockWorkerLeases").findOneAndUpdate(
       {
         _id: "finished-match-scoring",
@@ -38,7 +44,7 @@ export async function flushFinishedMatchScoring(): Promise<void> {
     await runScoreEngine({ rebuildLeaderboards: true });
   } catch (error) {
     console.error("[LowBlock] Batched finished-match scoring failed:", error);
-    queueFinishedMatchScoring();
+    shouldRetry = true;
   } finally {
     if (acquired) {
       try {
@@ -52,5 +58,6 @@ export async function flushFinishedMatchScoring(): Promise<void> {
       }
     }
     running = false;
+    if (shouldRetry) queueFinishedMatchScoring();
   }
 }
