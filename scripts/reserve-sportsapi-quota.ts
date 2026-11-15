@@ -16,8 +16,11 @@ async function main() {
   }
   const key = env.SPORTSAPI_API_KEY;
   const expected = process.env.SPORTSAPI_EXPECTED_KEY_FINGERPRINT;
+  if (!key || !expected) {
+    throw new Error("SportsAPI key or expected fingerprint missing; quota reservation refused");
+  }
   const actual = createHash("sha256").update(key).digest("hex").slice(0, 16);
-  if (!key || !expected || expected !== actual) {
+  if (expected !== actual) {
     throw new Error("Hosted and worker SportsAPI keys do not match; quota reservation refused");
   }
   const result = await reserveSportsApiQuotaBatch(attempts, "github-hosted-daily");
