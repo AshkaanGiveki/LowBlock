@@ -10,6 +10,7 @@ import { useLanguage, T } from "@/components/LanguageProvider";
 
 type Match = React.ComponentProps<typeof MatchAnalyticsCard>["match"] & {
   leagueCode: string;
+  featuredNationalFixture?: boolean;
 };
 type Tab = "open" | "started";
 type Cursor = {
@@ -97,6 +98,7 @@ export function MatchesView({
         (match) =>
           (showAllMatches ||
             selected.includes(match.leagueCode) ||
+            match.featuredNationalFixture === true ||
             isFeaturedFixture(
               match.leagueCode,
               match.homeTeam.name,

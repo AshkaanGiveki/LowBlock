@@ -34,3 +34,9 @@ export function appDayBounds(value = new Date()) {
   const start = new Date(`${today}T00:00:00+03:30`);
   return { start, end: new Date(start.getTime() + DAY_MS) };
 }
+
+/** SportsAPI quota days reset at 00:00 UTC, not at the Tehran calendar day. */
+export function providerDayBounds(value = new Date()) {
+  const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  return { start, end: new Date(start.getTime() + DAY_MS) };
+}

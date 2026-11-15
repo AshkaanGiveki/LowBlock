@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db/mongo";
 import { repairPersianText, teamName } from "./team-names";
 import { reviewedPersianTeamName } from "./persian-team-names";
 import type { ProviderName } from "./types";
+import { teamLogoUrl, footballApiTeamLogoUrl, nationalTeamCrestUrl } from "./teamLogos";
 
 export type CentralTeamRecord = {
   centralTeamId: string;
@@ -17,13 +18,15 @@ export type CentralTeamRecord = {
   updatedAt: Date;
 };
 
-/** Resolve SportsAPI team logos through the free SofaScore image CDN. */
-export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds"> | null | undefined) {
-  const sportsApiId = row?.providerIds?.sportsapi;
-  if (sportsApiId) return `https://img.sofascore.com/api/v1/team/${encodeURIComponent(sportsApiId)}/image`;
-  const footballApiId = row?.providerIds?.["football-api"];
-  if (footballApiId) return `https://media.api-sports.io/football/teams/${encodeURIComponent(footballApiId)}.png`;
-  return row?.logoUrl && /^https?:\/\//i.test(row.logoUrl) ? row.logoUrl : null;
+/** Resolve SportsAPI team logos through the persistent local logo cache. */
+export function centralTeamLogo(row: Pick<CentralTeamRecord, "logoUrl" | "providerIds" | "isNational" | "names"> | null | undefined) {
+  if (!row) return null;
+  if (row.isNational) return nationalTeamCrestUrl(row.names?.en || "");
+  const sportsId = row.providerIds?.sportsapi;
+  if (sportsId) return teamLogoUrl(sportsId);
+  const footballId = row.providerIds?.["football-api"];
+  if (footballId) return footballApiTeamLogoUrl(footballId);
+  return row.logoUrl?.startsWith("/api/team-logo/") ? row.logoUrl : null;
 }
 
 const normalize = (value: string) => value.toLowerCase().trim().replace(/\b(fc|afc|cf|sc|club)\b/g, "").replace(/[^a-z0-9]/g, "");
@@ -59,7 +62,7 @@ export async function ensureCentralTeam(input: {
   if (byProvider) {
     await db.collection("centralTeams").updateOne(
       { _id: (byProvider as any)._id },
-      { $set: { [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}) }, $addToSet: { aliases: input.sourceName } },
+      { $set: { [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}), ...(input.isNational ? { isNational: true } : {}) }, $addToSet: { aliases: input.sourceName } },
     );
     return byProvider.centralTeamId;
   }
@@ -69,7 +72,7 @@ export async function ensureCentralTeam(input: {
   if (existing) {
     await db.collection("centralTeams").updateOne(
       { _id: (existing as any)._id },
-      { $set: { [`providerIds.${input.provider}`]: providerTeamId, [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date() }, $addToSet: { aliases: input.sourceName } },
+      { $set: { [`providerIds.${input.provider}`]: providerTeamId, [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.isNational ? { isNational: true } : {}) }, $addToSet: { aliases: input.sourceName } },
     );
     return existing.centralTeamId;
   }
@@ -91,8 +94,20 @@ export async function ensureCentralTeam(input: {
     { upsert: true, returnDocument: "after" },
   );
   record.numericTeamId = Number(counter?.nextValue ?? 1);
-  await db.collection("centralTeams").insertOne(record as any);
-  return record.centralTeamId;
+  try {
+    await db.collection("centralTeams").insertOne(record as any);
+    return record.centralTeamId;
+  } catch (error) {
+    // Another worker may have resolved the same provider team between the
+    // lookup and insert. The unique provider-id index is the arbiter; reuse
+    // the record that won the race instead of aborting the whole sync.
+    if ((error as { code?: number })?.code !== 11000) throw error;
+    const winner = await db.collection<CentralTeamRecord>("centralTeams").findOne({
+      [`providerIds.${input.provider}`]: providerTeamId,
+    });
+    if (!winner) throw error;
+    return winner.centralTeamId;
+  }
 }
 
 export async function ensureCentralTeamIndexes() {

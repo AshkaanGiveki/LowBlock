@@ -1,7 +1,14 @@
+import dns from "node:dns";
+import { createHash } from "node:crypto";
 import { env } from "@/lib/env";
-import { appDayBounds } from "../scheduleWindow";
+import { providerDayBounds } from "../scheduleWindow";
 import { getDb } from "@/lib/db/mongo";
 import { appDateKey } from "../scheduleWindow";
+
+// The production host intermittently prefers an unreachable IPv6 route for
+// api.sportsapipro.com. Prefer IPv4 so the scheduled worker does not spend
+// its entire retry window waiting for connection timeouts.
+dns.setDefaultResultOrder("ipv4first");
 
 export type SportsApiRestResponse<T> = {
   success?: boolean;
@@ -9,6 +16,8 @@ export type SportsApiRestResponse<T> = {
   data?: T[];
   tournaments?: number;
   totalTournamentsOnDate?: number;
+  page?: number;
+  totalPages?: number;
   error?: { code: number; message: string };
 };
 
@@ -38,6 +47,44 @@ const CACHE_TTL = env.SPORTSAPI_DAILY_DISCOVERY_CACHE_TTL || 300; // default 5 m
 // paths from multiplying the same REST request while still allowing a manual
 // retry shortly after a provider outage.
 const DISCOVERY_CACHE_TTL_MS = CACHE_TTL * 1000;
+// Keep request accounting isolated when operations rotate the provider key.
+// This is a one-way fingerprint and never stores the API key itself.
+const requestKeyFingerprint = () => createHash("sha256").update(env.SPORTSAPI_API_KEY || "missing").digest("hex").slice(0, 16);
+const SPORTSAPI_REQUEST_TIMEOUT_MS = Math.max(
+  15_000,
+  Number(process.env.SPORTSAPI_REQUEST_TIMEOUT_MS || 45_000),
+);
+const RESPONSE_TRACE_TTL_MS = 24 * 60 * 60_000;
+
+async function saveResponseTrace(input: {
+  path: string;
+  params: Record<string, string>;
+  status: "OK" | "FAILED";
+  httpStatus?: number;
+  headers?: Record<string, string>;
+  rawBody?: string;
+  error?: string;
+}) {
+  try {
+    const capturedAt = new Date();
+    const db = await getDb();
+    await db.collection("sportsApiResponseSnapshots").insertOne({
+      capturedAt,
+      expiresAt: new Date(capturedAt.getTime() + RESPONSE_TRACE_TTL_MS),
+      path: input.path,
+      params: input.params,
+      status: input.status,
+      httpStatus: input.httpStatus ?? null,
+      headers: input.headers ?? {},
+      rawBody: input.rawBody ?? null,
+      error: input.error ?? null,
+      keyFingerprint: requestKeyFingerprint(),
+      source: "lowblock-rest",
+    });
+  } catch (error) {
+    console.error("[SportsAPI] Failed to save response trace:", error);
+  }
+}
 
 async function trackRequest(
   path: string,
@@ -59,6 +106,7 @@ async function trackRequest(
       via: "rest",
       quotaRemaining: quota?.remaining,
       quotaLimit: quota?.limit,
+      keyFingerprint: requestKeyFingerprint(),
     });
   } catch (err) {
     console.error("[SportsAPI] Failed to track request:", err);
@@ -82,9 +130,17 @@ export async function fetchSportsApi<T>(
   // failed calls, and prevents optional paths from consuming the free quota.
   try {
     const db = await getDb();
-    const { start } = appDayBounds();
+    // SportsAPI resets quota at 00:00 UTC. Using Tehran midnight here
+    // incorrectly carried pre-reset usage into the new provider day.
+    // Count only successful provider responses for this guard. A connection
+    // timeout never gives us a provider quota response and must not consume
+    // the entire local budget, otherwise one production-network incident
+    // prevents every later recovery attempt until the next UTC day.
+    const { start } = providerDayBounds();
     const used = await db.collection("sportsApiRequests").countDocuments({
       timestamp: { $gte: start },
+      status: "OK",
+      keyFingerprint: requestKeyFingerprint(),
     });
     if (used >= env.SPORTSAPI_DAILY_REQUEST_BUDGET) {
       return {
@@ -107,22 +163,59 @@ export async function fetchSportsApi<T>(
 
   try {
     const response = await fetch(url, {
-      headers: { "x-api-key": env.SPORTSAPI_API_KEY || "" },
-      signal: AbortSignal.timeout(15_000),
+      headers: {
+        "x-api-key": env.SPORTSAPI_API_KEY || "",
+        accept: "application/json",
+        "user-agent": "LowBlock/1.0 SportsAPI sync",
+      },
+      signal: AbortSignal.timeout(SPORTSAPI_REQUEST_TIMEOUT_MS),
     });
-    const body = (await response.json().catch(() => null)) as SportsApiRestResponse<T> | null;
+    const contentType = response.headers.get("content-type") || "";
+    const rawBody = await response.text();
+    let body: SportsApiRestResponse<T> | null = null;
+    let parseError: string | undefined;
+    try {
+      // Some upstream/proxy responses include a UTF-8 BOM before JSON.
+      body = JSON.parse(rawBody.replace(/^\uFEFF/, "")) as SportsApiRestResponse<T>;
+    } catch (error) {
+      parseError = error instanceof Error ? error.message : String(error);
+    }
     const remaining = firstHeader(response.headers, ["x-ratelimit-remaining", "x-rate-limit-remaining", "x-requests-remaining", "x-quota-remaining"]);
     const limit = firstHeader(response.headers, ["x-ratelimit-limit", "x-rate-limit-limit", "x-requests-limit", "x-quota-limit"]);
     const quota = { ...(remaining == null ? {} : { remaining }), ...(limit == null ? {} : { limit }) };
+    const headers = Object.fromEntries(Array.from(response.headers.entries()));
     if (!response.ok || !body) {
+      const preview = rawBody.replace(/\s+/g, " ").trim().slice(0, 240);
       const message = body?.error?.message || `SportsAPI REST request failed (${response.status})`;
-      await trackRequest(path, params, performance.now() - startedAt, "FAILED", message, quota);
+      const diagnostic = {
+        path,
+        httpStatus: response.status,
+        contentType,
+        bodyBytes: Buffer.byteLength(rawBody, "utf8"),
+        parseError: parseError || null,
+        bodyPreview: preview || null,
+      };
+      const recordedError = `${message}; response=${JSON.stringify(diagnostic)}`;
+      await saveResponseTrace({ path, params, status: "FAILED", httpStatus: response.status, headers, rawBody, error: recordedError });
+      await trackRequest(path, params, performance.now() - startedAt, "FAILED", recordedError, quota);
+      console.error("lowblock.sportsapi.invalid_response", diagnostic);
       return { success: false, events: [], error: { code: response.status, message } };
     }
+    console.info(JSON.stringify({
+      type: "lowblock.sportsapi.response_parsed",
+      path,
+      httpStatus: response.status,
+      contentType,
+      bodyBytes: Buffer.byteLength(rawBody, "utf8"),
+      hasEvents: Array.isArray((body as any).events),
+      hasData: Array.isArray((body as any).data),
+    }));
+    await saveResponseTrace({ path, params, status: "OK", httpStatus: response.status, headers, rawBody });
     await trackRequest(path, params, performance.now() - startedAt, "OK", undefined, quota);
     return body;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    await saveResponseTrace({ path, params, status: "FAILED", error: message });
     await trackRequest(path, params, performance.now() - startedAt, "FAILED", message);
     return { success: false, events: [], error: { code: 500, message } };
   }
@@ -137,17 +230,16 @@ function firstHeader(headers: Headers, names: string[]) {
 }
 
 export async function getSportsApiQuota(): Promise<SportsApiQuota> {
-  const day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: env.APP_TIMEZONE || "Asia/Tehran",
-    year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-  const start = new Date(`${day}T00:00:00+03:30`);
+  const day = new Date().toISOString().slice(0, 10);
+  const { start, end } = providerDayBounds();
   const db = await getDb();
   const used = await db.collection<any>("sportsApiRequests").countDocuments({
-    timestamp: { $gte: start, $lt: new Date(start.getTime() + 86_400_000) },
+    timestamp: { $gte: start, $lt: end },
+    status: "OK",
+    keyFingerprint: requestKeyFingerprint(),
   });
   const latest = await db.collection<any>("sportsApiRequests").findOne(
-    { timestamp: { $gte: start } },
+    { timestamp: { $gte: start }, keyFingerprint: requestKeyFingerprint() },
     { sort: { timestamp: -1 }, projection: { quotaRemaining: 1, quotaLimit: 1 } },
   );
   const limit = latest?.quotaLimit ?? env.SPORTSAPI_DAILY_LIMIT ?? null;
@@ -164,11 +256,9 @@ const dailyFixturesCache = new Map<
 /**
  * Fetches one calendar day's fixtures through the provider REST API.
  *
- * The scheduled sync deliberately uses one `/schedule/{date}` request per
- * date. The WebSocket remains responsible for realtime deltas; REST is the
- * authoritative daily snapshot/discovery path. Keeping this function to one
- * request per date makes the normal yesterday/today/tomorrow sync three
- * provider calls at most.
+ * Fetch every reported `/schedule/{date}` page and merge by provider event ID.
+ * The WebSocket remains responsible for realtime deltas; REST is the
+ * authoritative daily snapshot/discovery path.
  */
 export async function getSportsApiDailyFixtures(
   dateString: string,
@@ -176,6 +266,7 @@ export async function getSportsApiDailyFixtures(
   const now = Date.now();
   const cached = dailyFixturesCache.get(dateString);
   if (cached && cached.expiresAt > now) {
+    console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_cache_hit", date: dateString, source: "memory" }));
     return cached.data;
   }
 
@@ -187,12 +278,14 @@ export async function getSportsApiDailyFixtures(
     if (
       persisted?.expiresAt &&
       new Date(persisted.expiresAt).getTime() > now &&
-      persisted.data
+      persisted.data &&
+      persisted.data.success !== false
     ) {
       dailyFixturesCache.set(dateString, {
         data: persisted.data,
         expiresAt: new Date(persisted.expiresAt).getTime(),
       });
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_cache_hit", date: dateString, source: "mongo" }));
       return persisted.data;
     }
   } catch (err) {
@@ -205,26 +298,39 @@ export async function getSportsApiDailyFixtures(
     events: [],
   };
 
-  // One request per requested date. Do not add a second /today request here:
-  // the daily window is deliberately capped at three REST calls.
+  // The provider paginates /schedule. A single successful page is not a
+  // complete daily snapshot. Fetch every advertised page before caching.
   try {
-    const res = await fetchSportsApi<any>(`/schedule/${dateString}`);
-    if (res.success === false || res.error) {
-      return {
-        success: false,
-        events: [],
-        error: res.error ?? { code: 502, message: "SportsAPI returned an unsuccessful response" },
-      };
-    }
-    const events = res.events || res.data || (Array.isArray(res) ? res : null);
-    if (Array.isArray(events)) {
-      for (const ev of events) {
-        const id = ev.id || ev.eventId;
-        if (id && !eventsMap.has(id)) {
-          eventsMap.set(id, ev);
-        }
+    let totalPages = 1;
+    for (let page = 1; page <= totalPages; page += 1) {
+      if (page > 20) throw new Error("SportsAPI schedule exceeded the 20-page safety limit");
+      const params: Record<string, string> = page === 1 ? {} : { page: String(page) };
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_started", date: dateString, page }));
+      const res = await fetchSportsApi<any>(`/schedule/${dateString}`, params);
+      if (res.success === false || res.error) {
+        result = { success: false, events: [], error: res.error ?? { code: 502, message: "SportsAPI returned an unsuccessful response" } };
+        break;
       }
+      if (res.page != null && Number(res.page) !== page)
+        throw new Error(`SportsAPI schedule page mismatch: expected ${page}, received ${res.page}`);
+      const reportedPages = Number(res.totalPages ?? 1);
+      if (!Number.isInteger(reportedPages) || reportedPages < 1 || reportedPages > 20)
+        throw new Error(`Invalid SportsAPI schedule totalPages: ${res.totalPages}`);
+      if (page > 1 && reportedPages !== totalPages)
+        throw new Error(`SportsAPI schedule pagination changed from ${totalPages} to ${reportedPages}`);
+      totalPages = reportedPages;
+      const events = res.events ??
+        (Array.isArray(res.data) ? res.data : (res.data as any)?.events);
+      if (!Array.isArray(events))
+        throw new Error(`SportsAPI schedule page ${page} has no events array`);
+      for (const ev of events) {
+        const id = ev.id ?? ev.eventId;
+        if (id != null && !eventsMap.has(String(id))) eventsMap.set(String(id), ev);
+      }
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_page_finished", date: dateString, page, totalPages, providerEvents: events.length, uniqueEvents: eventsMap.size }));
     }
+    if (result.success !== false)
+      console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_request_finished", date: dateString, ok: true, totalPages, providerEvents: eventsMap.size }));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[SportsAPI] /schedule/${dateString} failed:`, message);
@@ -233,24 +339,33 @@ export async function getSportsApiDailyFixtures(
 
   if (result.success !== false)
     result = { success: true, events: Array.from(eventsMap.values()) };
-  dailyFixturesCache.set(dateString, {
-    data: result,
-    expiresAt: now + DISCOVERY_CACHE_TTL_MS,
-  });
+  // Never cache an unsuccessful provider response. Caching a transient
+  // malformed/empty HTTP-200 response makes every retry during the cache
+  // window fail without contacting the provider again.
+  if (result.success !== false) {
+    dailyFixturesCache.set(dateString, {
+      data: result,
+      expiresAt: now + DISCOVERY_CACHE_TTL_MS,
+    });
+  } else {
+    dailyFixturesCache.delete(dateString);
+  }
   try {
     const db = await getDb();
-    await db.collection("sportsApiDailyFixtures").updateOne(
-      { dateString },
-      {
-        $set: {
-          dateString,
-          data: result,
-          expiresAt: new Date(now + DISCOVERY_CACHE_TTL_MS),
-          updatedAt: new Date(),
+    if (result.success !== false) {
+      await db.collection("sportsApiDailyFixtures").updateOne(
+        { dateString },
+        {
+          $set: {
+            dateString,
+            data: result,
+            expiresAt: new Date(now + DISCOVERY_CACHE_TTL_MS),
+            updatedAt: new Date(),
+          },
         },
-      },
-      { upsert: true },
-    );
+        { upsert: true },
+      );
+    }
   } catch (err) {
     console.warn("[SportsAPI] Failed to persist discovery cache:", err);
   }

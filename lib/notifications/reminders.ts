@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { teamName } from "@/lib/football/team-names";
 import { readableFa } from "@/lib/text";
 import { isGlobalCompetition } from "@/lib/football/leagues";
+import { telegramApi, telegramEnabled } from "@/lib/telegram/client";
 
 type Provider = "TELEGRAM" | "BALE";
 const preferenceField = (provider: Provider) =>
@@ -106,7 +107,7 @@ export async function processMatchReminder(matchId: string) {
   let sent = 0;
   for (const identity of identities) {
     const provider = String(identity.provider) as Provider;
-    if (provider === "TELEGRAM" ? !env.TELEGRAM_BOT_TOKEN : !env.BALE_BOT_TOKEN)
+    if (provider === "TELEGRAM" ? !telegramEnabled() : !env.BALE_BOT_TOKEN)
       continue;
     const preferences = identity.preferences?.[0];
     if (preferences?.[preferenceField(provider)] === false) continue;
@@ -248,6 +249,8 @@ async function sendPlatform(
             ],
           ],
         };
+  if (provider === "TELEGRAM" && env.TELEGRAM_RELAY_URL)
+    return telegramApi("sendMessage", { chat_id: chatId, text, reply_markup: markup });
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },

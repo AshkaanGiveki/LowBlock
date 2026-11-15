@@ -47,7 +47,7 @@ function formatKickoff(dateValue: string, language: "fa" | "en") {
 
 function teamDetails(team: any, language: "fa" | "en") {
   const name = teamName(language, Number(team?.id ?? 0), team?.name ?? "Team", undefined, team?.faName);
-  const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
+  const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-logo/${team.id}` : null);
   return { name: language === "en" ? String(name ?? "Team").toUpperCase() : name ?? "Team", logo };
 }
 

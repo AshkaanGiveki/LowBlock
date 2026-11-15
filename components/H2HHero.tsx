@@ -48,7 +48,7 @@ export default function H2HHero({ slateCount, activeSlate, progressSlate }: H2HH
             const slate = index + 1;
             const active = slate === raceSlate;
             const complete = slate < raceSlate;
-            return <div key={slate} className="relative z-10 flex min-w-0 flex-1 justify-center"><motion.div initial={{ scale: .7, opacity: 0 }} animate={{ scale: active ? 1.08 : 1, opacity: 1 }} transition={{ delay: index * .05 }} className={`grid h-7 w-7 place-items-center rounded-full border text-[10px] font-black transition ${active ? "border-brand bg-brand text-[#06120c] shadow-[0_0_18px_rgba(32,184,121,.65)]" : complete ? "border-brand/50 bg-[#13231a] text-brand" : "border-white/15 bg-[#101914] text-white/40"}`}>{slate}</motion.div></div>;
+            return <div key={slate} className="relative z-10 flex min-w-0 flex-1 justify-center"><motion.div initial={{ scale: .7, opacity: 0 }} animate={{ scale: active ? 1.04 : 1, opacity: 1 }} transition={{ delay: index * .05 }} className={`grid h-6 w-6 place-items-center rounded-full border text-[9px] font-black transition ${active ? "border-brand bg-brand text-[#06120c] shadow-[0_0_14px_rgba(32,184,121,.55)]" : complete ? "border-brand/50 bg-[#13231a] text-brand" : "border-white/15 bg-[#101914] text-white/40"}`}>{slate}</motion.div></div>;
           })}
         </div>
       </div>

@@ -51,11 +51,24 @@ export class SportsApiFootballProvider implements FootballDataProvider {
     if (!matches.length) return 0;
 
     const centralIds = new Map<string, string>();
-    await Promise.all(matches.flatMap((match) => [match.homeTeam, match.awayTeam]).map(async (team) => {
+    const teamsByProviderId = new Map<string, CanonicalMatch["homeTeam"]>();
+    const nationalProviderIds = new Set<string>();
+    for (const match of matches) {
+      const raw = (match as any).rawApiResponse?.event ?? (match as any).rawApiResponse;
+      for (const side of ["home", "away"] as const) {
+        const team = side === "home" ? match.homeTeam : match.awayTeam;
+        teamsByProviderId.set(String(team.id), team);
+        if (raw?.[side + "Team"]?.national === true) nationalProviderIds.add(String(team.id));
+      }
+    }
+    // Resolve each provider team once and in order. Concurrent calls for the
+    // same new team raced on the unique providerIds index and could abort the
+    // entire match import with E11000.
+    for (const team of teamsByProviderId.values()) {
       const providerTeamId = String(team.id);
-      const centralId = await ensureCentralTeam({ provider: "sportsapi", providerTeamId, sourceName: team.name, logoUrl: team.logoUrl });
+      const centralId = await ensureCentralTeam({ provider: "sportsapi", providerTeamId, sourceName: team.name, logoUrl: team.logoUrl, isNational: nationalProviderIds.has(providerTeamId) });
       centralIds.set(providerTeamId, centralId);
-    }));
+    }
 
     const ops = matches.map((match) => {
       const { createdAt, _id, ...matchData } = match as any;
@@ -104,7 +117,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
               provider: this.name,
               providerTeamId: String(team.id),
               sourceName: team.name,
-              crestUrl: team.logoUrl || (team as any).logo || (team.id ? `/api/team-image/${team.id}` : null),
+              crestUrl: team.id ? `/api/team-logo/${team.id}` : null,
               currentLeagueCodes: [team.leagueCode],
               updatedAt: new Date(),
             },
@@ -133,9 +146,13 @@ export class SportsApiFootballProvider implements FootballDataProvider {
 
     for (const date of dates) {
       try {
+        // One provider response is authoritative for this cycle. Retrying
+        // here multiplied quota usage and could exhaust the allowance when a
+        // failed daily run was reclaimed by the worker.
         const response = await getSportsApiDailyFixtures(date);
         if (response.success === false || response.error) {
           failedDates.push(date);
+          console.warn(JSON.stringify({ type: "lowblock.sportsapi.daily_date_failed", date, error: response.error ?? null }));
           continue;
         }
         const resAny = response as any;
@@ -145,17 +162,20 @@ export class SportsApiFootballProvider implements FootballDataProvider {
           (Array.isArray(response) ? response : null) ||
           [];
 
+        let normalizedCount = 0;
         if (Array.isArray(rawList)) {
           for (const item of rawList) {
             const normalized = normalizeSportsApiMatch(item);
             if (normalized) {
               matchesMap.set(normalized.providerMatchId, normalized);
+              normalizedCount++;
             }
           }
         }
+        console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_date_finished", date, providerEvents: Array.isArray(rawList) ? rawList.length : 0, normalized: normalizedCount }));
       } catch (err) {
         failedDates.push(date);
-        console.error(`[SportsAPI] Failed to fetch fixtures for ${date}:`, err);
+        console.error("lowblock.sportsapi.daily_date_exception", { date, error: err instanceof Error ? err.message : String(err) });
       }
     }
 

@@ -14,12 +14,23 @@ async function cycle() {
 }
 
 async function main() {
+  console.info(JSON.stringify({
+    type: "lowblock.worker.started",
+    pid: process.pid,
+    once,
+    intervalMs,
+    timezone: process.env.APP_TIMEZONE || "Asia/Tehran",
+    provider: process.env.FOOTBALL_DATA_PROVIDER || "unset",
+  }));
   await ensureIndexes();
   await ensureH2HIndexes();
+  console.info(JSON.stringify({ type: "lowblock.worker.ready", pid: process.pid }));
   await cycle();
   if (once) return;
   const timer = setInterval(cycle, intervalMs);
-  timer.unref?.();
+  // Keep the worker process alive across the overnight schedule window.
+  // An unresolved Promise does not keep Node alive when the interval is
+  // unref'ed, so the old code could silently exit between cycles.
   await new Promise<void>(() => undefined);
 }
 

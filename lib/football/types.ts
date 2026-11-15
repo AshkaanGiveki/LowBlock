@@ -132,6 +132,7 @@ export type CanonicalMatch = {
   sportsApiId?: number;
   apiSportsId?: number;
   leagueCode: string;
+  featuredNationalFixture?: boolean;
   matchday: number;
   seasonStartYear: number;
   roundId: string;

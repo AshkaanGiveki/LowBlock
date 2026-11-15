@@ -8,6 +8,7 @@ import type {
   CanonicalScore,
   CanonicalIncidentType,
 } from "../types";
+import { teamLogoUrl } from "../teamLogos";
 
 function normalizeStatus(status?: { code?: number; type?: string; description?: string }): CanonicalStatus {
   if (!status) return "SCHEDULED";
@@ -57,7 +58,7 @@ function resolveTeamLogo(team: any): string | null {
   const teamId = team.id || team.eventId;
   // 1. All teams with an ID: Cached secure proxy (30 days cache)
   if (teamId) {
-    return `/api/team-image/${teamId}`;
+    return teamLogoUrl(teamId);
   }
 
   // 2. Fallback to country flag if no team ID is present
@@ -81,22 +82,25 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
     rawEvent.tournament ||
     (rawEvent.uniqueTournament ? { uniqueTournament: rawEvent.uniqueTournament } : null);
 
-  const leagueCode = getLeagueCodeFromSportsApi(rawTournament);
-
-  // If we can't map the league, we drop it (Competition filtering is strictly preserved)
-  if (!leagueCode) return null;
-
-  // Keep the API-Football eligibility rule: for national-team international
-  // competitions, at least one side must be an important national team.
-  // Club competitions such as UCL remain unrestricted.
-  const league = getLeague(leagueCode);
   const homeName = String(rawEvent.homeTeam?.name ?? "");
   const awayName = String(rawEvent.awayTeam?.name ?? "");
-  if (
-    league?.kind === "INTERNATIONAL" &&
-    !isFeaturedFixture(leagueCode, homeName, awayName)
-  )
-    return null;
+  const isNationalMatch = rawEvent.homeTeam?.national === true && rawEvent.awayTeam?.national === true;
+  const importantNationalFixture = isFeaturedFixture(
+    "",
+    homeName,
+    awayName,
+  );
+  const mappedLeagueCode = getLeagueCodeFromSportsApi(rawTournament);
+  // Keep all Nations League fixtures. In other international competitions,
+  // include only fixtures featuring at least one important national team.
+  const leagueCode = mappedLeagueCode ??
+    (isNationalMatch && importantNationalFixture ? "INTL_OTHER" : null);
+  if (!leagueCode) return null;
+  const league = getLeague(leagueCode);
+  const isFeaturedCompetition = leagueCode === "NATIONS";
+  if (league?.kind === "INTERNATIONAL" &&
+      !isFeaturedCompetition &&
+      !importantNationalFixture) return null;
 
   const rawId = rawEvent.id || rawEvent.eventId;
   if (!rawId) return null;
@@ -191,6 +195,7 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   const awayLogo = awayCanonical.logoUrl || resolveTeamLogo(rawEvent.awayTeam);
 
   return {
+    featuredNationalFixture: importantNationalFixture || isFeaturedCompetition,
     provider: "sportsapi",
     providerMatchId: String(rawId),
     sportsApiId: Number(rawId),

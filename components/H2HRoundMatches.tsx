@@ -25,7 +25,7 @@ function scoreCircle(points: number, highlighted: boolean, finished: boolean) {
 
 function MatchTeam({ team, side, language }: { team: any; side: "home" | "away"; language: "fa" | "en" }) {
   const name = teamName(language, Number(team?.id ?? 0), team?.name ?? "Team", undefined, team?.faName);
-  const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-image/${team.id}` : null);
+  const logo = team?.logoUrl || team?.logo || (team?.id ? `/api/team-logo/${team.id}` : null);
   const crest = <TeamCrest name={name ?? "Team"} logo={logo} className="h-5 w-5 rounded-lg" />;
   return <div className={`flex min-w-0 items-center gap-2 ${side === "home" ? "justify-end" : "justify-start"}`}>{side === "home" ? <><span className="truncate whitespace-nowrap text-[10px] font-bold text-white/75">{name}</span>{crest}</> : <>{crest}<span className="truncate whitespace-nowrap text-[10px] font-bold text-white/75">{name}</span></>}</div>;
 }

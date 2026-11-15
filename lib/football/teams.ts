@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db/mongo";
 import { NAMES_FA, repairPersianText, teamName } from "./team-names";
+import { nationalTeamCrestUrl } from "./teamLogos";
 
 export type CanonicalTeamRecord = {
   _id?: unknown;
@@ -105,28 +106,15 @@ export function getCanonicalTeamSync(params: {
       id: Number(params.providerTeamId),
       name: team.name,
       faName: team.faName,
-      logoUrl: team.logoUrl,
+      logoUrl: params.isNational ? nationalTeamCrestUrl(params.name) : team.logoUrl,
     };
   }
 
   // 2. Fallback to NAMES_FA static dictionary
   const faName = resolvePersianName(params.name, params.provider, params.providerTeamId);
 
-  let logoUrl: string | null = null;
-  const alpha2 = params.country?.alpha2?.toLowerCase();
   const isNational = Boolean(params.isNational);
-
-  if (
-    isNational ||
-    params.name.toLowerCase().includes("england") ||
-    params.name.toLowerCase().includes("scotland") ||
-    params.name.toLowerCase().includes("wales")
-  ) {
-    if (params.name.toLowerCase().includes("england")) logoUrl = "https://flagcdn.com/w160/gb-eng.png";
-    else if (params.name.toLowerCase().includes("scotland")) logoUrl = "https://flagcdn.com/w160/gb-sct.png";
-    else if (params.name.toLowerCase().includes("wales")) logoUrl = "https://flagcdn.com/w160/gb-wls.png";
-    else if (alpha2) logoUrl = `https://flagcdn.com/w160/${alpha2}.png`;
-  }
+  const logoUrl: string | null = isNational ? nationalTeamCrestUrl(params.name) : null;
 
   return {
     id: Number(params.providerTeamId),
@@ -191,28 +179,15 @@ export async function resolveCanonicalTeam(params: {
       id: Number(params.providerTeamId),
       name: team.name,
       faName: team.faName,
-      logoUrl: team.logoUrl,
+      logoUrl: params.isNational ? nationalTeamCrestUrl(params.name) : team.logoUrl,
     };
   }
 
   // 4. If not found in central registry, determine Persian name and logo locally
   const faName = resolvePersianName(params.name, params.provider, params.providerTeamId);
 
-  let logoUrl: string | null = null;
-  const alpha2 = params.country?.alpha2?.toLowerCase();
   const isNational = Boolean(params.isNational);
-
-  if (
-    isNational ||
-    params.name.toLowerCase().includes("england") ||
-    params.name.toLowerCase().includes("scotland") ||
-    params.name.toLowerCase().includes("wales")
-  ) {
-    if (params.name.toLowerCase().includes("england")) logoUrl = "https://flagcdn.com/w160/gb-eng.png";
-    else if (params.name.toLowerCase().includes("scotland")) logoUrl = "https://flagcdn.com/w160/gb-sct.png";
-    else if (params.name.toLowerCase().includes("wales")) logoUrl = "https://flagcdn.com/w160/gb-wls.png";
-    else if (alpha2) logoUrl = `https://flagcdn.com/w160/${alpha2}.png`;
-  }
+  const logoUrl: string | null = isNational ? nationalTeamCrestUrl(params.name) : null;
 
   // Create new canonical team in registry
   const newTeam: CanonicalTeamRecord = {

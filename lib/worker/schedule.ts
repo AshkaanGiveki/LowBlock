@@ -21,5 +21,8 @@ export function localWorkerClock(
 
 export function isDailyWorkerWindow(date = new Date(), timeZone?: string) {
   const clock = localWorkerClock(date, timeZone);
+  // SportsAPI's daily quota resets at 00:00 UTC (03:30 Asia/Tehran).
+  // Start at the agreed 03:30 Asia/Tehran window after the provider quota
+  // reset. The recovery workflow itself runs at 03:40 as an extra buffer.
   return clock.hour > 3 || (clock.hour === 3 && clock.minute >= 30);
 }
