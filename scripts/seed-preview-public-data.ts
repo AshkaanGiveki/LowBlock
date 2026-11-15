@@ -28,6 +28,7 @@ async function main() {
     const matchProjection = {
       _id: 0, provider: 1, providerMatchId: 1,
       leagueCode: 1, roundId: 1, matchday: 1, seasonStartYear: 1,
+      featuredNationalFixture: 1,
       kickoffAt: 1, status: 1, elapsed: 1,
       homeGoals: 1, awayGoals: 1,
       homePenaltyGoals: 1, awayPenaltyGoals: 1,
@@ -49,7 +50,21 @@ async function main() {
     const unique = new Map<string, any>();
     for (const match of [...recent, ...upcoming]) {
       const key = String(match.provider) + ":" + String(match.providerMatchId);
-      if (match.providerMatchId && match.homeTeam?.name && match.awayTeam?.name) unique.set(key, match);
+      if (match.providerMatchId && match.homeTeam?.name && match.awayTeam?.name) {
+        // getMatchesPage/getMatch require a verified source marker. Preserve
+        // the provider-derived canonical fixture metadata, never raw odds or
+        // other heavyweight upstream payloads in the staging copy.
+        unique.set(key, {
+          ...match,
+          rawApiResponse: {
+            teams: {
+              home: { name: match.homeTeam.name },
+              away: { name: match.awayTeam.name },
+            },
+            previewPublicFixture: true,
+          },
+        });
+      }
     }
     const matches = [...unique.values()];
     if (!matches.length) throw new Error("No public fixture data available: refusing empty preview seed");
