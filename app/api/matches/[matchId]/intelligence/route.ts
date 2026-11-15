@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/mongo";
 
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
  * Missing data stays unavailable rather than being fabricated.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ matchId: string }> },
 ) {
   const { matchId } = await params;
@@ -54,8 +55,22 @@ export async function GET(
         standings: Boolean(insights?.standings),
       },
     };
-    return NextResponse.json(payload, {
-      headers: { "Cache-Control": "private, max-age=0, must-revalidate" },
+    // Conditional responses reduce bandwidth when the worker has not changed
+    // a snapshot. No provider requests or per-viewer upstream subscriptions.
+    const body = JSON.stringify(payload);
+    const etag = `"${createHash("sha256").update(body).digest("hex")}"`;
+    const headers = {
+      "Cache-Control": "private, max-age=0, must-revalidate",
+      ETag: etag,
+      Vary: "Accept-Encoding",
+    };
+    const previous = request.headers.get("if-none-match");
+    if (previous?.split(",").some((tag) => tag.trim() === etag)) {
+      return new Response(null, { status: 304, headers });
+    }
+    return new Response(body, {
+      status: 200,
+      headers: { ...headers, "Content-Type": "application/json; charset=utf-8" },
     });
   } catch (error) {
     console.error("[MatchIntelligence] Read failed:", error);
