@@ -114,6 +114,56 @@ async function trackRequest(
 }
 
 /**
+ * Atomically reserves one or several SportsAPI REST attempts in the same
+ * Mongo quota document. Hosted GitHub jobs must reserve their maximum possible
+ * attempts before calling the provider, including failed attempts.
+ *
+ * This is deliberately fail-closed: an unavailable Mongo connection must
+ * never authorize unaccounted requests.
+ */
+export async function reserveSportsApiQuotaBatch(
+  attempts: number,
+  source = "lowblock-rest",
+): Promise<{ allowed: boolean; unavailable: boolean; used: number | null; limit: number; day: string }> {
+  const hardLimit = Math.min(60, Math.max(0, Number(env.SPORTSAPI_DAILY_REQUEST_BUDGET) || 0));
+  if (!Number.isInteger(attempts) || attempts < 1 || attempts > 60) {
+    throw new RangeError("SportsAPI reservation must cover 1-60 attempts");
+  }
+  const { start: dayStart, end: dayEnd } = providerDayBounds();
+  const day = dayStart.toISOString().slice(0, 10);
+  if (hardLimit < attempts) return { allowed: false, unavailable: false, used: null, limit: hardLimit, day };
+  try {
+    const db = await getDb();
+    const keyFingerprint = requestKeyFingerprint();
+    const _id = `${day}:${keyFingerprint}`;
+    const priorAttempts = await db.collection("sportsApiRequests").countDocuments({
+      timestamp: { $gte: dayStart, $lt: dayEnd },
+      keyFingerprint,
+    });
+    const quota = db.collection<any>("sportsApiQuotaReservations");
+    await quota.updateOne(
+      { _id },
+      {
+        $setOnInsert: { day, keyFingerprint, createdAt: new Date() },
+        $max: { used: priorAttempts },
+      },
+      { upsert: true },
+    );
+    // Use <= (limit - attempts), rather than a read-then-write, so even 100
+    // simultaneous callers cannot overshoot the shared daily hard cap.
+    const booked = await quota.findOneAndUpdate(
+      { _id, used: { $lte: hardLimit - attempts } },
+      { $inc: { used: attempts }, $set: { updatedAt: new Date(), lastSource: source } },
+      { returnDocument: "after" },
+    );
+    return { allowed: Boolean(booked), unavailable: false, used: booked?.used ?? null, limit: hardLimit, day };
+  } catch (error) {
+    console.error("[SportsAPI] Could not atomically reserve REST quota:", error);
+    return { allowed: false, unavailable: true, used: null, limit: hardLimit, day };
+  }
+}
+
+/**
  * REST is the source for discovery and on-demand resources. The provider's
  * documented WebSocket surface is a realtime stream, not a REST proxy.
  */
@@ -125,46 +175,19 @@ export async function fetchSportsApi<T>(
   const url = new URL(`${env.SPORTSAPI_BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
-  // Reserve quota atomically BEFORE every outbound attempt. Failed requests,
-  // timeouts and retries consume a reservation too. The shared Mongo counter
-  // prevents multiple workers from racing past the daily cap.
-  try {
-    const db = await getDb();
-    const { start: dayStart, end: dayEnd } = providerDayBounds();
-    const day = dayStart.toISOString().slice(0, 10);
-    const keyFingerprint = requestKeyFingerprint();
-    const hardLimit = Math.min(60, Math.max(0, Number(env.SPORTSAPI_DAILY_REQUEST_BUDGET) || 0));
-    const _id = `${day}:${keyFingerprint}`;
-    const priorAttempts = await db.collection("sportsApiRequests").countDocuments({
-      timestamp: { $gte: dayStart, $lt: dayEnd },
-      keyFingerprint,
-    });
-    await db.collection<any>("sportsApiQuotaReservations").updateOne(
-      { _id },
-      {
-        $setOnInsert: { day, keyFingerprint, createdAt: new Date() },
-        $max: { used: priorAttempts },
-      },
-      { upsert: true },
-    );
-    const reservation = await db.collection<any>("sportsApiQuotaReservations").findOneAndUpdate(
-      { _id, used: { $lt: hardLimit } },
-      { $inc: { used: 1 }, $set: { updatedAt: new Date() } },
-      { returnDocument: "after" },
-    );
-    if (!reservation) {
-      return {
-        success: false,
-        events: [],
-        error: { code: 429, message: `SportsAPI hard daily REST cap reached (max ${hardLimit}, reserve 40 of 100)` },
-      };
-    }
-  } catch (error) {
-    console.error("[SportsAPI] Could not atomically reserve REST quota:", error);
+  // Every caller, including external hosted-sync reservations, uses the same
+  // database counter before a provider request. Never make an unreserved call.
+  const reservation = await reserveSportsApiQuotaBatch(1, "lowblock-rest");
+  if (!reservation.allowed) {
     return {
       success: false,
       events: [],
-      error: { code: 503, message: "SportsAPI shared REST quota unavailable" },
+      error: {
+        code: reservation.unavailable ? 503 : 429,
+        message: reservation.unavailable
+          ? "SportsAPI shared REST quota unavailable"
+          : `SportsAPI hard daily REST cap reached (max ${reservation.limit}, reserve 40 of 100)`,
+      },
     };
   }
 
