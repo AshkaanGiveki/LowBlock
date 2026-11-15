@@ -13,6 +13,7 @@ type Row = {
   userId: string;
   points: number;
   predictions: number;
+  submittedPredictions?: number;
   exact: number;
   username: string;
   avatarUrl: string | null;
@@ -135,8 +136,7 @@ export function LeaderboardView({
                           {row.username}
                         </h3>
                         <p className="text-[10px] text-[var(--muted)]">
-                          {number(row.predictions)}{" "}
-                          {t("پیش‌بینی امتیازدهی‌شده", "scored predictions")} · {number(row.exact)}{" "}
+                          {number(row.submittedPredictions ?? row.predictions)} {t("ثبت‌شده", "submitted")} · {number(row.predictions)} {t("امتیازدهی‌شده", "scored")} · {number(row.exact)}{" "}
                           {t("دقیق", "exact")}
                         </p>
                       </div>
@@ -270,7 +270,7 @@ function PodiumCard({
       </div>
       <p className="truncate text-sm font-black text-white">{row.username}</p>
       <p className="mt-1 text-[10px] text-white/50">
-        {number(row.predictions, language)} {t("پیش‌بینی امتیازدهی‌شده", "scored picks")} ·{" "}
+        {number(row.submittedPredictions ?? row.predictions, language)} {t("ثبت‌شده", "submitted")} · {number(row.predictions, language)} {t("امتیازدهی‌شده", "scored")} ·{" "}
         {number(row.exact, language)} {t("دقیق", "exact")}
       </p>
       <div className="mt-4 flex items-center justify-center gap-1.5 text-xl font-black text-brand">
