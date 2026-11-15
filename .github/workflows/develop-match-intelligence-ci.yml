@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 20
     env:
       SPORTSAPI_WS_ENABLED: "false"
-      SPORTSAPI_DAILY_REQUEST_BUDGET: "0"
+      SPORTSAPI_DAILY_REQUEST_BUDGET: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
