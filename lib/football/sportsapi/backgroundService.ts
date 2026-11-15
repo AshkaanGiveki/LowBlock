@@ -130,3 +130,19 @@ export function ensureSportsApiBackgroundService(): void {
     startSportsApiBackgroundService();
   }
 }
+
+/**
+ * Disconnect immediately on lease loss; keep listeners so the same worker
+ * can safely reconnect if it later regains ownership.
+ */
+export function stopSportsApiBackgroundService(): void {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = null;
+  const ws = getSportsApiWsManager();
+  for (const channel of managedChannels) ws.unsubscribeFromChannel(channel);
+  managedChannels.clear();
+  ws.unsubscribeFromChannel("live-scores");
+  ws.unsubscribeFromChannel("live-scores:football");
+  ws.disconnect();
+  isStarted = false;
+}
