@@ -26,3 +26,5 @@ jobs:
         run: pnpm lint
       - name: Unit and regression tests (no live provider calls)
         run: pnpm test
+      - name: Production build validation (develop only)
+        run: pnpm build
