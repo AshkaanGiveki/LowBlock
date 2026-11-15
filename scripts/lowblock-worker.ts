@@ -24,6 +24,15 @@ async function main() {
   }));
   await ensureIndexes();
   await ensureH2HIndexes();
+  if (!once && process.env.FOOTBALL_DATA_PROVIDER === "sportsapi" && process.env.VERCEL !== "1") {
+    process.env.LOWBLOCK_LIVE_INGESTION_WORKER = "true";
+    const [{ getMatchMonitorService }, { startSportsApiBackgroundService }] = await Promise.all([
+      import("../lib/football/sportsapi/matchMonitor"),
+      import("../lib/football/sportsapi/backgroundService"),
+    ]);
+    getMatchMonitorService().startIngestion();
+    startSportsApiBackgroundService();
+  }
   console.info(JSON.stringify({ type: "lowblock.worker.ready", pid: process.pid }));
   await cycle();
   if (once) return;
