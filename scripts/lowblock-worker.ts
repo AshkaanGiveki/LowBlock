@@ -34,6 +34,23 @@ async function main() {
     startSportsApiBackgroundService();
   }
   console.info(JSON.stringify({ type: "lowblock.worker.ready", pid: process.pid }));
+  // Historical intelligence is materialized by the worker, not computed for viewers.
+  const refreshIntelligence = async () => {
+    try {
+      const { getDb } = await import("../lib/db/mongo");
+      const { refreshLocalMatchIntelligence } = await import("../lib/football/intelligence/history");
+      const results = await refreshLocalMatchIntelligence(await getDb());
+      console.info(JSON.stringify({ type: "lowblock.intelligence.refreshed", ...results }));
+    } catch (error) {
+      console.error("lowblock_intelligence_refresh_failed", error);
+    }
+  };
+  if (!once) {
+    await refreshIntelligence();
+    // Every hour; historic snapshots remain in MongoDB between worker cycles.
+    const historicalTimer = setInterval(refreshIntelligence, 60 * 60_000);
+    historicalTimer.unref?.();
+  }
   await cycle();
   if (once) return;
   const timer = setInterval(cycle, intervalMs);
