@@ -189,6 +189,9 @@ export async function ensureIndexes() {
       .collection("predictions")
       .createIndex({ userId: 1, matchId: 1 }, { unique: true }),
     db.collection("predictions").createIndex({ matchId: 1 }),
+    db.collection("matches").createIndex({ provider: 1, status: 1, "homeTeam.id": 1, kickoffAt: -1 }, { name: "intelligence_home_history" }),
+    db.collection("matches").createIndex({ provider: 1, status: 1, "awayTeam.id": 1, kickoffAt: -1 }, { name: "intelligence_away_history" }),
+    db.collection("matches").createIndex({ provider: 1, kickoffAt: 1 }, { name: "intelligence_window" }),
     db
       .collection("predictionLockSnapshots")
       .createIndex({ predictionId: 1 }, { unique: true }),
