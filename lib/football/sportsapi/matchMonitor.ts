@@ -767,12 +767,8 @@ class MatchMonitorService {
       // 3. Trigger score engine if match is newly finished
       if (snapshot.score.status === "FINISHED" && !this.scoredFinishedMatches.has(matchId)) {
         this.scoredFinishedMatches.add(matchId);
-        try {
-          const { runScoreEngine } = await import("@/lib/scoring/scoreEngine");
-          await runScoreEngine();
-        } catch (scoreErr) {
-          console.error("[MatchMonitor] Error running scoreEngine on match finish:", scoreErr);
-        }
+        const { queueFinishedMatchScoring } = await import("./scoringBatch");
+        queueFinishedMatchScoring();
       }
     } catch (err) {
       console.error("[MatchMonitor] Failed to persist state to MongoDB:", err);
