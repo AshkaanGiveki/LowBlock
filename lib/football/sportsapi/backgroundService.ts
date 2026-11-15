@@ -5,7 +5,7 @@ let isStarted = false;
 let refreshTimer: NodeJS.Timeout | null = null;
 let syncInFlight: Promise<void> | null = null;
 const managedChannels = new Set<string>();
-const MAX_TRACKED_MATCHES = 80;
+const MAX_TRACKED_MATCHES = 32;
 const LIVE_WINDOW_BEFORE_MS = 3 * 60 * 60_000;
 const LIVE_WINDOW_AFTER_MS = 5 * 60 * 60_000;
 
@@ -20,6 +20,7 @@ export function isSportsApiBackgroundServiceRunning(): boolean {
  * Exclusively uses WebSocket streaming channels. ZERO REST quota is used.
  */
 async function performActiveMatchSubscriptionSync(): Promise<void> {
+  if (!isSportsApiRealtimeEnabled()) return;
   try {
     const db = await getDb();
     const now = Date.now();
@@ -38,6 +39,7 @@ async function performActiveMatchSubscriptionSync(): Promise<void> {
       .limit(MAX_TRACKED_MATCHES)
       .toArray();
 
+    if (!isSportsApiRealtimeEnabled()) return;
     const ws = getSportsApiWsManager();
 
     // Ensure connection is active
