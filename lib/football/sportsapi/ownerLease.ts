@@ -61,6 +61,8 @@ export async function checkLiveIngestionOwnership(): Promise<boolean> {
 }
 
 export async function startLiveIngestionOwnership(): Promise<void> {
+  // A worker without its provider credentials/config must never claim ownership.
+  if (process.env.SPORTSAPI_WS_ENABLED === "false" || !process.env.SPORTSAPI_API_KEY) return;
   if (renewal) return;
   await checkLiveIngestionOwnership();
   renewal = setInterval(() => { void checkLiveIngestionOwnership(); }, RENEW_MS);
