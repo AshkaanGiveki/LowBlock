@@ -172,8 +172,10 @@ export class SportsApiWebSocketManager {
  */
 export function isSportsApiRealtimeEnabled(): boolean {
   if (env.SPORTSAPI_WS_ENABLED === false) return false;
+  // Only the dedicated ingestion worker may own an upstream connection.
+  // Application/serverless/browser requests are always cache-only.
   if (process.env.NODE_ENV === "test") return true;
-  return process.env.VERCEL !== "1" || process.env.SPORTSAPI_REALTIME_ENABLED === "true";
+  return process.env.LOWBLOCK_LIVE_INGESTION_WORKER === "true";
 }
 
 // Global singleton for server/client contexts
