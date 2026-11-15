@@ -169,6 +169,7 @@ describe("sportsapi match monitor and background handlers", () => {
   it("updates score and status from live-scores message", async () => {
     const monitor = getMatchMonitorService();
     const matchId = "99004";
+    monitor.subscribeMatchChannels(matchId);
 
     monitor.handleWsMessage("live-scores", {
       event: {
@@ -189,6 +190,7 @@ describe("sportsapi match monitor and background handlers", () => {
   it("keeps regulation score separate from penalty shootout score", () => {
     const monitor = getMatchMonitorService();
     const matchId = "99008";
+    monitor.subscribeMatchChannels(matchId);
 
     monitor.handleWsMessage("live-scores", {
       event: {
@@ -215,6 +217,7 @@ describe("sportsapi match monitor and background handlers", () => {
 
   it("reconciles SportsAPI flattened live-score deltas", () => {
     const monitor = getMatchMonitorService();
+    monitor.subscribeMatchChannels("99005");
 
     monitor.handleWsMessage("live-scores", {
       type: "update",
@@ -239,6 +242,7 @@ describe("sportsapi match monitor and background handlers", () => {
 
   it("accepts nested live-score event batches and keeps a visible live clock", () => {
     const monitor = getMatchMonitorService();
+    monitor.subscribeMatchChannels("99006");
 
     monitor.handleWsMessage("live-scores:football", {
       data: {
@@ -259,4 +263,17 @@ describe("sportsapi match monitor and background handlers", () => {
     expect(snap.score.away).toBe(0);
     expect(snap.score.elapsed).toBe(1);
   });
+  it("ignores global score updates for matches outside bounded subscriptions", () => {
+    const monitor = getMatchMonitorService();
+    const allowed = "99124";
+    const ignored = "99125";
+    monitor.subscribeMatchChannels(allowed);
+    monitor.handleWsMessage("live-scores", { events: [
+      { id: allowed, status: { type: "inprogress" }, homeScore: { current: 1 }, awayScore: { current: 0 } },
+      { id: ignored, status: { type: "inprogress" }, homeScore: { current: 9 }, awayScore: { current: 9 } },
+    ] });
+    expect(monitor.getSnapshot(allowed).score.home).toBe(1);
+    expect(monitor.getSnapshot(ignored).score.home).toBeNull();
+  });
+
 });
