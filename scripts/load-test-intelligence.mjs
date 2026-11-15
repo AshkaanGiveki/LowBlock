@@ -88,4 +88,9 @@ const summary = {
   providerCallsFromBrowser: 0,
 };
 console.log(JSON.stringify(summary, null, 2));
+const maxP95Ms = Number(process.env.INTELLIGENCE_MAX_P95_MS || 0);
+if (maxP95Ms > 0 && summary.p95Ms > maxP95Ms) {
+  console.error(`Staging p95 latency ${summary.p95Ms}ms exceeded ${maxP95Ms}ms`);
+  process.exitCode = 1;
+}
 if (failed > 0) process.exitCode = 1;
