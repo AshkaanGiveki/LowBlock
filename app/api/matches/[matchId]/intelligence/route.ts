@@ -27,13 +27,13 @@ export async function GET(
         { projection: { _id: 0, provider: 1, providerMatchId: 1, leagueCode: 1, kickoffAt: 1, status: 1, homeTeam: 1, awayTeam: 1, homeGoals: 1, awayGoals: 1 } },
       ),
       db.collection<any>("matchInsights").findOne({ matchId }, { projection: { _id: 0 } }),
-      db.collection<any>("matchDetails").findOne({ matchId }, { projection: { _id: 0, snapshot: 1, updatedAt: 1 } }),
+      db.collection<any>("matchDetails").findOne({ matchId }, { projection: { _id: 0, score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 } }),
     ]);
     if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
 
     // Provider IDs are not interchangeable. SportsAPI snapshots must never be
     // attached to an API-Football fixture with a coincidentally equal ID.
-    const snapshot = match.provider === "sportsapi" ? details?.snapshot ?? null : null;
+    const snapshot = match.provider === "sportsapi" ? details ?? null : null;
     const payload = {
       match,
       live: snapshot ? {
