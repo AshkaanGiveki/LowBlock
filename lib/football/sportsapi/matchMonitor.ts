@@ -607,14 +607,22 @@ class MatchMonitorService {
             ? data.updates
             : [data.event || data.data?.event || data];
 
+    // The global channel can carry fixtures outside LowBlock's tracked
+    // competitions. Persisting all of them creates unbounded Mongo writes,
+    // Redis calls and in-memory snapshots. Ingest only explicitly subscribed
+    // match IDs from the bounded active-match worker.
+    const trackedIds = new Set(
+      getSportsApiWsManager().getStatus().activeSubscriptions
+        .filter((channel) => /^match:\d+$/.test(channel))
+        .map((channel) => channel.slice("match:".length)),
+    );
     for (const item of list) {
       if (!item) continue;
       const ev = expandProviderDelta(item.event || item);
       const matchId = providerEventId(ev);
-      if (!matchId || matchId === "undefined") continue;
+      if (!matchId || !trackedIds.has(matchId)) continue;
 
-      const snapshot = this.snapshots.get(matchId);
-      if (snapshot || matchId) {
+      {
         const snap = this.getSnapshot(matchId);
         snap.rawProviderPayload ||= {};
         snap.rawProviderPayload.liveScores = item;
