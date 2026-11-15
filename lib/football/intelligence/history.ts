@@ -120,7 +120,7 @@ export async function refreshLocalMatchIntelligence(db: Db, now = new Date()) {
   const keys = [...new Set(matches.filter((match) => match.leagueCode && match.seasonStartYear)
     .map((match) => match.provider + ":" + match.leagueCode + ":" + match.seasonStartYear))];
   const standings = keys.length ? await db.collection<any>("leagueStandings")
-    .find({ _id: { $in: keys }, verified: true })
+    .find({ _id: { $in: keys }, verified: true, updatedAt: { $gte: new Date(now.getTime() - 48 * 60 * 60_000) } })
     .project({ _id: 1, rows: 1, updatedAt: 1 }).toArray() : [];
   const tableByKey = new Map(standings.map((row) => [row._id, row]));
   // Four at a time bounds the database load even on a busy matchday.
