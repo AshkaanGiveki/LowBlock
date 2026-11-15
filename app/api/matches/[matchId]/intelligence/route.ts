@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/mongo";
+import { readCachedLiveMatch } from "@/lib/football/intelligence/liveCache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,15 +23,23 @@ export async function GET(
 
   try {
     const db = await getDb();
-    const [match, insights, details] = await Promise.all([
+    const [match, insights, cachedLive] = await Promise.all([
       db.collection<any>("matches").findOne(
         { provider: { $in: ["sportsapi", "football-api"] }, providerMatchId: matchId },
         { projection: { _id: 0, provider: 1, providerMatchId: 1, leagueCode: 1, kickoffAt: 1, status: 1, homeTeam: 1, awayTeam: 1, homeGoals: 1, awayGoals: 1 } },
       ),
       db.collection<any>("matchInsights").findOne({ matchId }, { projection: { _id: 0 } }),
-      db.collection<any>("matchDetails").findOne({ matchId }, { projection: { _id: 0, provider: 1, score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 } }),
+      readCachedLiveMatch(matchId),
     ]);
     if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    const details = match.provider === "sportsapi" && cachedLive
+      ? cachedLive
+      : match.provider === "sportsapi"
+        ? await db.collection<any>("matchDetails").findOne(
+            { matchId, provider: "sportsapi" },
+            { projection: { _id: 0, provider: 1, score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 } },
+          )
+        : null;
 
     // Provider IDs are not interchangeable. SportsAPI snapshots must never be
     // attached to an API-Football fixture with a coincidentally equal ID.
