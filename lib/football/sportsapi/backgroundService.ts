@@ -4,6 +4,10 @@ import { getDb } from "@/lib/db/mongo";
 let isStarted = false;
 let refreshTimer: NodeJS.Timeout | null = null;
 let syncInFlight: Promise<void> | null = null;
+const managedChannels = new Set<string>();
+const MAX_TRACKED_MATCHES = 80;
+const LIVE_WINDOW_BEFORE_MS = 3 * 60 * 60_000;
+const LIVE_WINDOW_AFTER_MS = 5 * 60 * 60_000;
 
 export function isSportsApiBackgroundServiceRunning(): boolean {
   return isStarted;
@@ -19,19 +23,19 @@ async function performActiveMatchSubscriptionSync(): Promise<void> {
   try {
     const db = await getDb();
     const now = Date.now();
-    const fromTime = new Date(now - 24 * 60 * 60 * 1000); // 24 hours ago
-    const toTime = new Date(now + 48 * 60 * 60 * 1000); // 48 hours ahead
+    const fromTime = new Date(now - LIVE_WINDOW_AFTER_MS);
+    const toTime = new Date(now + LIVE_WINDOW_BEFORE_MS);
 
     const matches = await db
       .collection<any>("matches")
       .find({
         provider: "sportsapi",
-        $or: [
-          { kickoffAt: { $gte: fromTime, $lte: toTime } },
-          { status: { $in: ["LIVE", "IN_PLAY", "PAUSED", "SUSPENDED", "SCHEDULED"] } },
-        ],
+        kickoffAt: { $gte: fromTime, $lte: toTime },
+        status: { $in: ["LIVE", "IN_PLAY", "PAUSED", "SUSPENDED", "SCHEDULED"] },
       })
-      .project({ providerMatchId: 1, status: 1, homeTeam: 1, awayTeam: 1, kickoffAt: 1 })
+      .project({ providerMatchId: 1, status: 1, kickoffAt: 1 })
+      .sort({ kickoffAt: 1 })
+      .limit(MAX_TRACKED_MATCHES)
       .toArray();
 
     const ws = getSportsApiWsManager();
@@ -41,18 +45,29 @@ async function performActiveMatchSubscriptionSync(): Promise<void> {
     ws.subscribeToChannel("live-scores");
     ws.subscribeToChannel("live-scores:football");
 
+    const desired = new Set<string>();
     for (const m of matches) {
-      const matchId = String(m.providerMatchId);
+      const matchId = String(m.providerMatchId ?? "");
       if (!matchId) continue;
-
-      // Subscribe to real-time WebSocket channels for this match
-      ws.subscribeToChannel(`match:${matchId}`);
-      ws.subscribeToChannel(`match:${matchId}:incidents`);
-      ws.subscribeToChannel(`match:${matchId}:stats`);
-      ws.subscribeToChannel(`match:${matchId}:lineups`);
-      ws.subscribeToChannel(`match:${matchId}:odds`);
-
+      desired.add(`match:${matchId}`);
+      desired.add(`match:${matchId}:incidents`);
+      desired.add(`match:${matchId}:stats`);
+      desired.add(`match:${matchId}:lineups`);
+      // No odds channels. LowBlock is a points-based prediction game.
     }
+    for (const channel of managedChannels) {
+      if (!desired.has(channel)) {
+        ws.unsubscribeFromChannel(channel);
+        managedChannels.delete(channel);
+      }
+    }
+    for (const channel of desired) {
+      if (!managedChannels.has(channel)) {
+        ws.subscribeToChannel(channel);
+        managedChannels.add(channel);
+      }
+    }
+
   } catch (err) {
     console.error("[SportsApiBackground] Failed to sync match subscriptions from DB:", err);
   }
