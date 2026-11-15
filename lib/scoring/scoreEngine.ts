@@ -295,6 +295,7 @@ export async function runScoreEngine(
       scopes.push("GLOBAL");
     if (
       snapshot?.clubIdAtLock &&
+      match.leagueCode !== "ACLE" &&
       (
         clubCompetitionCodes.get(snapshot.clubIdAtLock) ??
         DEFAULT_CLUB_LEAGUE_CODES
@@ -459,6 +460,7 @@ async function rebuildLeaderboardStatsForUsers(
     const clubId = score.clubIdAtLock ? String(score.clubIdAtLock) : null;
     if (
       clubId &&
+      leagueCode !== "ACLE" &&
       (
         clubCompetitionCodes.get(clubId) ?? DEFAULT_CLUB_LEAGUE_CODES
       ).includes(leagueCode)
