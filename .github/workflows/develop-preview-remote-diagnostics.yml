@@ -1,0 +1,30 @@
+name: Diagnose public isolated LowBlock develop preview
+
+on:
+  push:
+    branches: [develop]
+    paths: [.github/workflows/develop-preview-remote-diagnostics.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare preview API and page network responses without provider calls
+        shell: bash
+        run: |
+          set -u
+          base=https://lowblock-preview.45.11.186.199.sslip.io
+          for path in '/api/matches?limit=1' '/api/matches?limit=30' '/matches' '/preview'; do
+            echo "=== $path ==="
+            curl --silent --show-error --location --max-time 18 \
+              -w 'status=%{http_code} bytes=%{size_download} first_byte=%{time_starttransfer}s total=%{time_total}s\\n' \
+              "$base$path" -o /tmp/lowblock-diagnostic-response || true
+            head -c 100 /tmp/lowblock-diagnostic-response | tr '\n' ' ' || true
+            echo
+          done
+          echo "Diagnostic complete; no SportsAPI endpoints contacted."
