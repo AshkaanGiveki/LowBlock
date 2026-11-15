@@ -180,7 +180,11 @@ export function InfiniteLeaderboard({
             <span className="min-w-0 flex-1">
               <b className="block truncate">{row.username}</b>
               <small className="text-[10px] text-[var(--muted)]">
-                {n(row.exact)} {t("دقیق", "exact")} · {n(row.submittedPredictions ?? row.predictions)} {t("ثبت‌شده", "submitted")} · {n(row.predictions)} {t("امتیازدهی‌شده", "scored")}
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="rounded-md bg-white/[.07] px-1.5 py-0.5 font-semibold text-white/80" title={t("کل پیش‌بینی‌های ثبت‌شده", "All submitted predictions")}>{n(row.submittedPredictions ?? row.predictions)} <span className="opacity-60">{t("کل", "all")}</span></span>
+                  <span className="rounded-md bg-brand/10 px-1.5 py-0.5 font-semibold text-brand" title={t("پیش‌بینی‌های امتیازدهی‌شده در این جدول", "Scored predictions in this leaderboard")}>{n(row.predictions)} <span className="opacity-70">{t("معتبر", "scored")}</span></span>
+                  <span className="text-white/40">{n(row.exact)} {t("دقیق", "exact")}</span>
+                </span>
               </small>
             </span>
             <span className="flex items-center gap-2 text-sm font-black text-brand">
@@ -247,8 +251,11 @@ function PodiumCard({
       </div>
       <p className="truncate text-sm font-black text-white">{row.username}</p>
       <p className="mt-1 text-[10px] text-white/50">
-        {n(row.submittedPredictions ?? row.predictions, language)} {t("ثبت‌شده", "submitted")} · {n(row.predictions, language)} {t("امتیازدهی‌شده", "scored")} ·{" "}
-        {n(row.exact, language)} {t("دقیق", "exact")}
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-white/80" title={t("کل پیش‌بینی‌های ثبت‌شده", "All submitted predictions")}>{n(row.submittedPredictions ?? row.predictions, language)} {t("کل", "all")}</span>
+          <span className="rounded-md bg-brand/15 px-1.5 py-0.5 text-brand" title={t("پیش‌بینی‌های امتیازدهی‌شده در این جدول", "Scored predictions in this leaderboard")}>{n(row.predictions, language)} {t("معتبر", "scored")}</span>
+          <span>{n(row.exact, language)} {t("دقیق", "exact")}</span>
+        </span>
       </p>
       <div className="mt-4 flex items-center justify-center gap-1.5 text-xl font-black text-brand">
         <Sparkles size={15} />
