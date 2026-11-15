@@ -90,13 +90,11 @@ export function startSportsApiBackgroundService(): void {
   // Vercel functions are short-lived and may be instantiated concurrently.
   // A process-local interval/WebSocket here creates one DB subscription scan
   // per warm instance and amplifies Mongo pressure during live matches.
-  // Match-specific SSE handlers still subscribe to the required channels.
+  // Browsers never subscribe to SportsAPI. Only this dedicated worker does.
   if (!isSportsApiRealtimeEnabled()) {
     return;
   }
-  if (process.env.VERCEL === "1" && process.env.SPORTSAPI_BACKGROUND_ENABLED !== "true") {
-    return;
-  }
+  if (process.env.VERCEL === "1") return;
   if (isStarted) return;
   isStarted = true;
 
