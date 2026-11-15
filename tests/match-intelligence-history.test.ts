@@ -43,7 +43,7 @@ describe("local Match Intelligence without provider requests", () => {
     const toArray = vi.fn(async () => rows);
     const limit = vi.fn(() => ({ toArray }));
     const sort = vi.fn(() => ({ limit }));
-    const find = vi.fn(() => ({ sort }));
+    const find = vi.fn((_query: unknown) => ({ sort }));
     const db = { collection: vi.fn(() => ({ find })) } as unknown as Db;
     const match = {
       ...fixture("upcoming", 1, 2, null, null),
