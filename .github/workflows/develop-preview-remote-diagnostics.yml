@@ -12,49 +12,34 @@ permissions:
 jobs:
   public-preview:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - name: Compare preview API and page network responses without provider calls
+      - name: Compare preview and production public transport without provider access
         shell: bash
         run: |
           set -u
-          base=https://lowblock-preview.45.11.186.199.sslip.io
-          for path in '/api/matches?limit=1' '/api/matches?limit=30' '/matches' '/preview' '/login' '/help' '/this-page-is-missing'; do
-            echo "=== $path ==="
-            curl --silent --show-error --location --max-time 12 \
-              -w 'status=%{http_code} bytes=%{size_download} first_byte=%{time_starttransfer}s total=%{time_total}s\\n' \
-              "$base$path" -o /tmp/lowblock-diagnostic-response || true
-            head -c 100 /tmp/lowblock-diagnostic-response | tr '\n' ' ' || true
-            echo
-            echo 'Last 160 response bytes:'
-            tail -c 160 /tmp/lowblock-diagnostic-response | tr '\n' ' ' || true
-            echo
+          preview=lowblock-preview.45.11.186.199.sslip.io
+          echo '=== Independent public transport checks, no SportsAPI calls ==='
+          # One small safe request per host to avoid synthetic request storms
+          # and to separate destination-wide network issues from preview code.
+          for target in \
+            "https://$preview/api/matches?limit=1" \
+            'https://lowblock.ir/api/matches?limit=1' \
+            "https://$preview/preview"; do
+            echo "=== $target ==="
+            if curl --http1.1 --compressed --silent --show-error --location \
+              --connect-timeout 5 --max-time 16 \
+              -D /tmp/lowblock-diagnostic-headers \
+              -o /tmp/lowblock-diagnostic-body \
+              -w 'status=%{http_code} remote=%{remote_ip} lookup=%{time_namelookup}s connect=%{time_connect}s tls=%{time_appconnect}s first_byte=%{time_starttransfer}s total=%{time_total}s size=%{size_download}\n' \
+              "$target"; then
+              echo 'complete=true'
+              head -c 100 /tmp/lowblock-diagnostic-body | tr '\n' ' ' || true
+              echo
+            else
+              echo 'complete=false'
+            fi
+            grep -Ei '^(server|content-type|content-encoding|content-length|transfer-encoding|x-robots-tag):' \
+              /tmp/lowblock-diagnostic-headers | tail -8 || true
           done
-          echo '=== Protocol and response-header comparison ==='
-          for protocol in --http1.1 --http2; do
-            for path in '/api/matches?limit=30' '/matches'; do
-              echo "$protocol $path"
-              curl "$protocol" --silent --show-error --max-time 15 --location \
-                -D /tmp/preview-protocol-headers \
-                -w 'status=%{http_code} http_version=%{http_version} bytes=%{size_download} total=%{time_total}s\\n' \
-                "$base$path" -o /tmp/preview-protocol-response || true
-              grep -Ei '^(server|content-length|transfer-encoding|content-type|content-encoding):' /tmp/preview-protocol-headers | tail -6 || true
-            done
-          done
-          echo '=== Compressed public HTTPS response completeness ==='
-          for protocol in --http1.1 --http2; do
-            for path in '/api/matches?limit=30' '/matches' '/preview'; do
-              echo "$protocol compressed $path"
-              if curl "$protocol" --compressed --silent --show-error --location --max-time 18 \
-                -D /tmp/preview-compressed-headers \
-                -w 'status=%{http_code} http_version=%{http_version} bytes=%{size_download} total=%{time_total}s\n' \
-                "$base$path" -o /tmp/preview-compressed-response; then
-                echo 'complete=true'
-              else
-                echo 'complete=false'
-              fi
-              grep -Ei '^(content-length|transfer-encoding|content-encoding|content-type):' \
-                /tmp/preview-compressed-headers | tail -6 || true
-            done
-          done
-          echo "Diagnostic complete; no SportsAPI endpoints contacted."
+          echo 'Diagnostic completed without invoking a football data provider.'
