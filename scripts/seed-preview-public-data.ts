@@ -121,7 +121,7 @@ async function main() {
     }
 
     const teamIds = [...new Set(matches.flatMap((m) => [m.homeTeam?.centralTeamId, m.awayTeam?.centralTeamId]).filter(Boolean))];
-    const teams = teamIds.length ? await from.collection("centralTeams")
+    const teams = !incremental && teamIds.length ? await from.collection("centralTeams")
       .find({ centralTeamId: { $in: teamIds } }, {
         projection: { _id: 0, centralTeamId: 1, numericTeamId: 1, names: 1, aliases: 1, logoUrl: 1, providerIds: 1 },
       }).limit(1000).toArray() : [];
@@ -135,7 +135,7 @@ async function main() {
 
     // Existing league metadata is public; do not import standings as a
     // "verified" table without proving fixture/season completeness.
-    const leagues = await from.collection("leagues").find({}, {
+    const leagues = incremental ? [] : await from.collection("leagues").find({}, {
       projection: { _id: 0, code: 1, kind: 1, enName: 1, faName: 1, seasonStartYear: 1, provider: 1 },
     }).limit(100).toArray();
     if (leagues.length) await to.collection("leagues").bulkWrite(leagues.filter((l) => l.code).map((l) => ({
