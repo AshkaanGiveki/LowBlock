@@ -50,6 +50,7 @@ export async function GET(
       ? insights.find((item) => item.provider === match.provider) ?? null
       : null;
     const local = historical?.local ?? null;
+    const providerHistory = match.provider === "sportsapi" ? historical?.providerHistory ?? null : null;
     const payload = {
       match,
       live: snapshot ? {
@@ -60,13 +61,22 @@ export async function GET(
         updatedAt: details?.updatedAt ?? null,
       } : null,
       historical,
+      source: {
+        form: providerHistory?.form?.home?.fixtures?.length || providerHistory?.form?.away?.fixtures?.length ||
+          providerHistory?.form?.home?.results?.length || providerHistory?.form?.away?.results?.length
+          ? "sportsapi" : local?.form?.home?.length || local?.form?.away?.length ? "lowblock-partial" : "unavailable",
+        h2h: providerHistory?.duel ? "sportsapi" : local?.h2h?.length ? "lowblock-partial" : "unavailable",
+        live: snapshot ? "sportsapi-cached" : "unavailable",
+      },
       availability: {
         live: Boolean(snapshot),
         incidents: Boolean(snapshot?.incidents?.length),
         stats: Boolean(snapshot?.stats?.length),
         lineups: Boolean(snapshot?.lineups?.home?.players?.length || snapshot?.lineups?.away?.players?.length),
-        h2h: Boolean(local?.h2h?.length || historical?.h2h?.length),
-        form: Boolean(local?.form?.home?.length || local?.form?.away?.length),
+        h2h: Boolean(providerHistory?.duel || local?.h2h?.length || historical?.h2h?.length),
+        form: Boolean(providerHistory?.form?.home?.fixtures?.length || providerHistory?.form?.away?.fixtures?.length ||
+          providerHistory?.form?.home?.results?.length || providerHistory?.form?.away?.results?.length ||
+          local?.form?.home?.length || local?.form?.away?.length),
         standings: Boolean(historical?.standingsVerified === true && historical?.standings?.length),
       },
     };
