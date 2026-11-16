@@ -23,8 +23,11 @@ async function main() {
     const to = target.db();
     if (from.databaseName === to.databaseName) throw new Error("Preview cannot share production database");
     const now = Date.now();
-    const cutoff = new Date(now - 120 * 86_400_000);
-    const future = new Date(now + 30 * 86_400_000);
+    // Scheduled mirror keeps CURRENT fixtures fresh with small, indexed reads.
+    // A full seed is reserved for deployment, not every five-minute sync.
+    const incremental = process.env.PREVIEW_SEED_LIVE_ONLY === "true";
+    const cutoff = new Date(now - (incremental ? 2 : 120) * 86_400_000);
+    const future = new Date(now + (incremental ? 5 : 30) * 86_400_000);
     const matchProjection = {
       _id: 0, provider: 1, providerMatchId: 1,
       leagueCode: 1, roundId: 1, matchday: 1, seasonStartYear: 1,
@@ -41,11 +44,11 @@ async function main() {
       from.collection("matches").find(
         { kickoffAt: { $gte: cutoff, $lt: new Date(now) }, provider: { $in: ["sportsapi", "football-api"] } },
         { projection: matchProjection },
-      ).sort({ kickoffAt: -1 }).limit(1200).toArray(),
+      ).sort({ kickoffAt: -1 }).limit(incremental ? 180 : 1200).toArray(),
       from.collection("matches").find(
         { kickoffAt: { $gte: new Date(now), $lte: future }, provider: { $in: ["sportsapi", "football-api"] } },
         { projection: matchProjection },
-      ).sort({ kickoffAt: 1 }).limit(400).toArray(),
+      ).sort({ kickoffAt: 1 }).limit(incremental ? 180 : 400).toArray(),
     ]);
     const unique = new Map<string, any>();
     for (const match of [...recent, ...upcoming]) {
@@ -89,7 +92,7 @@ async function main() {
     const details = sportsIds.length ? await from.collection("matchDetails")
       .find({ matchId: { $in: sportsIds }, provider: "sportsapi" }, {
         projection: { _id: 0, matchId: 1, provider: 1, score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 },
-      }).limit(450).toArray() : [];
+      }).limit(incremental ? 260 : 450).toArray() : [];
     if (details.length) await to.collection("matchDetails").bulkWrite(details.map((detail) => ({
       updateOne: {
         filter: { matchId: detail.matchId, provider: "sportsapi" },
@@ -97,6 +100,25 @@ async function main() {
         upsert: true,
       },
     })), { ordered: false });
+
+    // Mirror PUBLIC provider-sourced form and H2H only. Exclude accounts,
+    // predictions, user analytics, request traces and all raw credentials.
+    // Keep local history untouched; provider history supplements it.
+    const insightsIds = matches.filter((m) => m.provider === "sportsapi")
+      .map((m) => "sportsapi:" + String(m.providerMatchId));
+    const providerInsights = insightsIds.length ? await from.collection("footballMatchIntelligence")
+      .find({ _id: { $in: insightsIds }, provider: "sportsapi", providerHistory: { $exists: true } },
+        { projection: { _id: 1, matchId: 1, provider: 1, providerHistory: 1 } })
+      .limit(incremental ? 350 : 1600).toArray() : [];
+    if (providerInsights.length) {
+      await to.collection("footballMatchIntelligence").bulkWrite(providerInsights.map((row) => ({
+        updateOne: {
+          filter: { _id: row._id },
+          update: { $set: { provider: "sportsapi", matchId: row.matchId, providerHistory: row.providerHistory } },
+          upsert: true,
+        },
+      })), { ordered: false });
+    }
 
     const teamIds = [...new Set(matches.flatMap((m) => [m.homeTeam?.centralTeamId, m.awayTeam?.centralTeamId]).filter(Boolean))];
     const teams = teamIds.length ? await from.collection("centralTeams")
@@ -119,9 +141,9 @@ async function main() {
     if (leagues.length) await to.collection("leagues").bulkWrite(leagues.filter((l) => l.code).map((l) => ({
       updateOne: { filter: { code: l.code }, update: { $set: l }, upsert: true },
     })), { ordered: false });
-    const history = await refreshLocalMatchIntelligence(to);
+    const history = incremental ? { updated: 0 } : await refreshLocalMatchIntelligence(to);
     console.info(JSON.stringify({
-      previewSeed: "ok", publicMatches: matches.length, publicDetails: details.length,
+      previewSeed: "ok", incremental, publicMatches: matches.length, publicDetails: details.length, providerHistory: providerInsights.length,
       publicTeams: teams.length, historyMaterialized: history.updated,
       sourceDb: from.databaseName, targetDb: to.databaseName,
       personalDataCopied: false, sportsApiRequests: 0,
