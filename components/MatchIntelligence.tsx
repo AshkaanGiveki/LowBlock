@@ -23,10 +23,16 @@ type MatchIntel = {
       coverage?: string;
     };
     h2h?: Array<any>;
+    providerHistory?: {
+      source: "sportsapi"; updatedAt?: string;
+      form?: { home?: { fixtures?: Array<any>; results?: Array<"W" | "D" | "L">; position?: number | null }; away?: { fixtures?: Array<any>; results?: Array<"W" | "D" | "L">; position?: number | null } };
+      duel?: { homeWins: number; draws: number; awayWins: number };
+    };
     standings?: Array<any>;
     standingsVerified?: boolean;
   } | null;
   availability: Record<string, boolean>;
+  source?: { form?: string; h2h?: string; live?: string };
 };
 const SECTIONS: Array<{ id: Section; en: string; fa: string }> = [
   { id: "overview", en: "Overview", fa: "خلاصه" },
@@ -66,6 +72,24 @@ function FormStrip({ fixtures, name, t }: { fixtures: Array<any>; name: string; 
         <span className="tabular-nums text-white/80">{row.goalsFor} : {row.goalsAgainst}</span>
         <span className={"grid h-7 w-7 place-items-center rounded-lg font-black " + (row.result === "W" ? "bg-emerald-500/15 text-emerald-300" : row.result === "D" ? "bg-white/10 text-white/65" : "bg-rose-500/15 text-rose-300")}>{row.result}</span>
       </div>)}</div>}
+  </div>;
+}
+function FormPanel({ fixtures, results, name, source, t }: {
+  fixtures: Array<any>; results?: Array<"W" | "D" | "L">;
+  name: string; source: string; t: (fa: string, en: string) => string;
+}) {
+  return <div className="space-y-2">
+    {fixtures.length > 0 ? <FormStrip fixtures={fixtures} name={name} t={t} /> :
+      results?.length ? <div className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+        <h4 className="mb-3 text-sm font-black text-white">{name}</h4>
+        <div className="flex flex-wrap gap-2">{results.map((result, i) => <span key={i}
+          title={result === "W" ? "Win" : result === "D" ? "Draw" : "Loss"}
+          className={"grid h-9 w-9 place-items-center rounded-lg text-xs font-black " + (result === "W" ? "bg-emerald-500/20 text-emerald-300" : result === "D" ? "bg-white/10 text-white/70" : "bg-rose-500/20 text-rose-300")}>{result}</span>)}</div>
+      </div> : <FormStrip fixtures={[]} name={name} t={t} />}
+    {((fixtures.length > 0 || results?.length) && source) &&
+      <p className="px-1 text-[10px] text-white/45">{source === "sportsapi"
+        ? t("منبع: SportsAPI Pro", "Source: SportsAPI Pro")
+        : t("منبع: آرشیو ناقص LowBlock", "Source: partial LowBlock archive")}</p>}
   </div>;
 }
 export function MatchIntelligence({ matchId, initialMatch }: { matchId: string; initialMatch?: any }) {
@@ -117,6 +141,15 @@ export function MatchIntelligence({ matchId, initialMatch }: { matchId: string; 
   const match = info?.match || initialMatch;
   const live = info?.live;
   const local = info?.historical?.local;
+  const provider = info?.historical?.providerHistory;
+  const formSide = (side: "home" | "away") => {
+    const value = provider?.form?.[side];
+    if (value?.fixtures?.length) return { fixtures: value.fixtures, results: value.results, source: "sportsapi" };
+    if (value?.results?.length) return { fixtures: [] as Array<any>, results: value.results, source: "sportsapi" };
+    return { fixtures: local?.form?.[side] ?? [], results: undefined, source: "lowblock-partial" };
+  };
+  const homeForm = formSide("home");
+  const awayForm = formSide("away");
   const home = language === "fa" ? match?.homeTeam?.faName || match?.homeTeam?.name : match?.homeTeam?.name;
   const away = language === "fa" ? match?.awayTeam?.faName || match?.awayTeam?.name : match?.awayTeam?.name;
   const scoreHome = live?.score?.home ?? match?.homeGoals;
@@ -167,10 +200,10 @@ export function MatchIntelligence({ matchId, initialMatch }: { matchId: string; 
         </div>
         <h3 className="text-sm font-black">{t("فرم اخیر تیم‌ها", "Recent team form")}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormStrip fixtures={local?.form?.home ?? []} name={home} t={t} />
-          <FormStrip fixtures={local?.form?.away ?? []} name={away} t={t} />
+          <FormPanel {...homeForm} name={home} t={t} />
+          <FormPanel {...awayForm} name={away} t={t} />
         </div>
-        <p className="text-[11px] leading-5 text-white/45">{t("نتایج تاریخی فقط از مسابقات واردشده به LowBlock محاسبه شده‌اند؛ ممکن است کامل نباشند.", "Historical results use only fixtures imported into LowBlock and may be incomplete.")}</p>
+        <p className="text-[11px] leading-5 text-white/45">{info?.source?.form === "sportsapi" ? t("داده‌های فرم از SportsAPI Pro به‌صورت ذخیره‌شده ارائه شده‌اند.", "Form is cached from SportsAPI Pro.") : t("آرشیو LowBlock هنوز ناقص است و ممکن است نتایج پیشین را دربر نگیرد.", "LowBlock’s imported archive is incomplete and may omit previous fixtures.")}</p>
       </div> :
       selected === "stats" ? (stats.some(group => group?.items?.length) ? <div className="space-y-5">{stats.map((group, index) =>
         <div key={index}><h3 className="mb-3 flex items-center gap-2 text-xs font-black text-white/60"><BarChart3 size={15} className="text-brand" /> {group.groupName}</h3>
@@ -187,12 +220,29 @@ export function MatchIntelligence({ matchId, initialMatch }: { matchId: string; 
           <span className="text-white/40">{item.isHome === true ? home : item.isHome === false ? away : ""}</span>
         </div>)}</div> : <Empty title={t("رویدادی ثبت نشده", "No verified events yet")} description={t("گل‌ها، کارت‌ها و تعویض‌ها پس از دریافت اطلاعات ثبت می‌شوند.", "Goals, cards and substitutions appear once ingested.")} />) :
       selected === "lineups" ? <PitchLineup lineups={live?.lineups ?? null} match={match} language={language} t={t} incidents={incidents} /> :
-      selected === "form" ? <><div className="grid gap-3 sm:grid-cols-2"><FormStrip fixtures={local?.form?.home ?? []} name={home} t={t} /><FormStrip fixtures={local?.form?.away ?? []} name={away} t={t} /></div><p className="mt-4 text-xs leading-5 text-white/45">{t("پوشش محدود به نتایج ذخیره‌شده است.", "Coverage is limited to matches stored in LowBlock.")}</p></> :
-      selected === "h2h" ? meetings.length ? <div className="space-y-2">{meetings.slice(0, 10).map((meeting: any) => <div key={meeting.fixtureId} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3 text-xs">
-        <span className="text-white/45">{new Date(meeting.date).toLocaleDateString(language === "fa" ? "fa-IR" : "en-GB")}</span>
-        <span className="min-w-0 flex-1 truncate text-center">{meeting.homeTeam?.name} <b className="mx-2 text-brand">{meeting.homeGoals} : {meeting.awayGoals}</b> {meeting.awayTeam?.name}</span>
-      </div>)}</div> : <Empty title={t("سابقه تقابل موجود نیست", "No historical meetings found")} description={t("فقط دیدارهای موجود در داده‌های ثبت‌شده نمایش داده می‌شوند.", "Only verified meetings in imported match history are included.")} /> :
-      verifiedStandings.length ? <div className="space-y-2">{verifiedStandings.map((entry: any, i: number) =>
+      selected === "form" ? <><div className="grid gap-3 sm:grid-cols-2"><FormPanel {...homeForm} name={home} t={t} /><FormPanel {...awayForm} name={away} t={t} /></div><p className="mt-4 text-xs leading-5 text-white/45">{info?.source?.form === "sportsapi" ? t("داده‌های فرم از ارائه‌دهنده دریافت و ذخیره شده‌اند؛ پوشش با مسابقه و تیم متفاوت است.", "Cached provider form; coverage depends on match and team.") : t("پوشش محلی ناقص است؛ داده‌های تأییدشده ارائه‌دهنده هنگام دریافت جایگزین می‌شوند.", "Local history is partial; verified provider data takes priority once cached.")}</p></> :
+      selected === "h2h" ? <div className="space-y-4">
+        {provider?.duel && <section className="rounded-2xl border border-brand/20 bg-brand/[.045] p-4">
+          <div className="mb-3 flex items-center justify-between text-xs font-black">
+            <span>{t("آمار تقابل‌های مستقیم", "Head-to-head record")}</span>
+            <span className="text-[10px] font-semibold text-brand">{t("منبع: SportsAPI Pro", "Source: SportsAPI Pro")}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div><p className="text-2xl font-black">{digits(provider.duel.homeWins)}</p><p className="mt-1 text-[10px] text-white/50">{t("برد میزبان", "Home wins")}</p></div>
+            <div><p className="text-2xl font-black">{digits(provider.duel.draws)}</p><p className="mt-1 text-[10px] text-white/50">{t("مساوی", "Draws")}</p></div>
+            <div><p className="text-2xl font-black">{digits(provider.duel.awayWins)}</p><p className="mt-1 text-[10px] text-white/50">{t("برد مهمان", "Away wins")}</p></div>
+          </div>
+        </section>}
+        {meetings.length ? <div className="space-y-2">
+          <p className="text-[11px] text-white/45">{t("دیدارهای ثبت‌شده در آرشیو LowBlock (ممکن است ناقص باشد)", "Meetings in LowBlock's partial archive")}</p>
+          {meetings.slice(0, 10).map((meeting: any) => <div key={meeting.fixtureId} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3 text-xs">
+            <span className="text-white/45">{new Date(meeting.date).toLocaleDateString(language === "fa" ? "fa-IR" : "en-GB")}</span>
+            <span className="min-w-0 flex-1 truncate text-center">{meeting.homeTeam?.name} <b className="mx-2 text-brand">{meeting.homeGoals} : {meeting.awayGoals}</b> {meeting.awayTeam?.name}</span>
+          </div>)}
+        </div> : !provider?.duel ? <Empty title={t("سابقه تقابل موجود نیست", "No historical meetings found")} description={t("داده ارائه‌دهنده هنگام ذخیره نمایش داده می‌شود؛ آرشیو LowBlock هنوز ناقص است.", "Provider data will appear once cached; LowBlock's history is currently incomplete.")} /> :
+          <p className="text-xs text-white/45">{t("آمار تقابل موجود است، اما فهرست دقیق دیدارها در آرشیو ناقص LowBlock موجود نیست.", "The provider H2H totals are available, but individual meetings have not been imported into LowBlock.")}</p>}
+      </div> :
+            verifiedStandings.length ? <div className="space-y-2">{verifiedStandings.map((entry: any, i: number) =>
         <div key={entry.team?.id ?? i} className="grid grid-cols-[2rem_1fr_3rem_3rem] items-center gap-2 border-b border-white/10 py-2 text-xs">
           <span className="text-white/45">{entry.rank}</span><span className="truncate">{entry.team?.name}</span>
           <span className="text-center text-white/55">{entry.played ?? "–"}</span><span className="text-center font-black text-brand">{entry.points ?? "–"}</span>
