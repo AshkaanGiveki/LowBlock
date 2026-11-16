@@ -106,7 +106,7 @@ async function main() {
     // Keep local history untouched; provider history supplements it.
     const insightsIds = matches.filter((m) => m.provider === "sportsapi")
       .map((m) => "sportsapi:" + String(m.providerMatchId));
-    const providerInsights = insightsIds.length ? await from.collection("footballMatchIntelligence")
+    const providerInsights = insightsIds.length ? await from.collection<any>("footballMatchIntelligence")
       .find({ _id: { $in: insightsIds }, provider: "sportsapi", providerHistory: { $exists: true } },
         { projection: { _id: 1, matchId: 1, provider: 1, providerHistory: 1 } })
       .limit(incremental ? 350 : 1600).toArray() : [];
