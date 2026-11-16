@@ -44,7 +44,7 @@ describe("SportsAPI provider-first history parser", () => {
       event(1, 5, 7, 2, 1),
       event(2, 8, 5, 1, 1),
       event(3, 8, 9, 3, 0),
-      event(4, 5, 1, 2, 2, 1794830400),
+      event(4, 5, 1, 2, 2, Date.parse("2026-11-17T16:00:00.000Z") / 1000),
       { ...event(5, 5, 6, 1, 0), status: { type: "inprogress" } },
       { ...event(6, 5, 6, 1, 0), homeScore: {} },
     ] } };
