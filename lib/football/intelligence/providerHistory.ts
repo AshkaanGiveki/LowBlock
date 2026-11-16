@@ -148,29 +148,6 @@ export async function syncSportsApiProviderHistory(db: Db, now = new Date()) {
     let duel = old?.duel;
     let touched = false;
 
-    // Each team's historical results are cached once and reused across fixtures.
-    for (const side of ["home", "away"] as const) {
-      const teamId = Number(match[side + "Team"].id);
-      const cacheKey = "sportsapi:" + teamId;
-      let saved = await teamCache.findOne({ _id: cacheKey });
-      if (!saved || new Date(saved.expiresAt ?? 0) <= now) {
-        const response = await request("/api/teams/" + teamId + "/events/last/0");
-        if (response) {
-          // Share a current team cache across fixtures, then apply each
-          // fixture's own kickoff cutoff before displaying results.
-          const fixtures = parseSportsApiTeamLast(response, teamId, new Date(now.getTime() + 60_000));
-          await teamCache.updateOne({ _id: cacheKey }, {
-            $set: { fixtures, expiresAt: new Date(now.getTime() + (fixtures.length ? 24 : 6) * 60 * 60_000), updatedAt: now },
-          }, { upsert: true });
-          saved = { fixtures };
-        }
-      }
-      if (saved?.fixtures?.length) {
-        // Cached list can contain games after THIS fixture, so cutoff again.
-        const safe = (saved.fixtures as FormFixture[]).filter((f) => new Date(f.date) < kickoff).slice(0, 5);
-        if (safe.length) { form[side].fixtures = safe; touched = true; }
-      }
-    }
     if (beforeKickoff && !old?.form?.home?.results?.length &&
       retryAllowed(attemptsRecorded?.providerHistoryAttempts?.pregameFormAt, 12)) {
       const prior = attempts;
@@ -196,6 +173,34 @@ export async function syncSportsApiProviderHistory(db: Db, now = new Date()) {
       }, { upsert: true });
       const parsed = parseSportsApiDuel(response);
       if (parsed) { duel = parsed; touched = true; }
+    }
+    // Save the scarce provider budget for pregame form and H2H across all
+    // eligible fixtures first. Detailed last-five scorecards can be filled
+    // on subsequent cycles or once the fixture has started.
+    if (!beforeKickoff || (old?.duel && old?.form?.home?.results?.length)) {
+    // Each team's historical results are cached once and reused across fixtures.
+    for (const side of ["home", "away"] as const) {
+      const teamId = Number(match[side + "Team"].id);
+      const cacheKey = "sportsapi:" + teamId;
+      let saved = await teamCache.findOne({ _id: cacheKey });
+      if (!saved || new Date(saved.expiresAt ?? 0) <= now) {
+        const response = await request("/api/teams/" + teamId + "/events/last/0");
+        if (response) {
+          // Share a current team cache across fixtures, then apply each
+          // fixture's own kickoff cutoff before displaying results.
+          const fixtures = parseSportsApiTeamLast(response, teamId, new Date(now.getTime() + 60_000));
+          await teamCache.updateOne({ _id: cacheKey }, {
+            $set: { fixtures, expiresAt: new Date(now.getTime() + (fixtures.length ? 24 : 6) * 60 * 60_000), updatedAt: now },
+          }, { upsert: true });
+          saved = { fixtures };
+        }
+      }
+      if (saved?.fixtures?.length) {
+        // Cached list can contain games after THIS fixture, so cutoff again.
+        const safe = (saved.fixtures as FormFixture[]).filter((f) => new Date(f.date) < kickoff).slice(0, 5);
+        if (safe.length) { form[side].fixtures = safe; touched = true; }
+      }
+    }
     }
     if (touched) {
       const providerHistory: ProviderHistory = {
