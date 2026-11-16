@@ -1,0 +1,45 @@
+name: Diagnose public isolated LowBlock develop preview
+
+on:
+  push:
+    branches: [develop]
+    paths: [.github/workflows/develop-preview-remote-diagnostics.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Compare preview and production public transport without provider access
+        shell: bash
+        run: |
+          set -u
+          preview=lowblock-preview.45.11.186.199.sslip.io
+          echo '=== Independent public transport checks, no SportsAPI calls ==='
+          # One small safe request per host to avoid synthetic request storms
+          # and to separate destination-wide network issues from preview code.
+          for target in \
+            "https://$preview/api/matches?limit=1" \
+            'https://lowblock.ir/api/matches?limit=1' \
+            "https://$preview/preview"; do
+            echo "=== $target ==="
+            if curl --http1.1 --compressed --silent --show-error --location \
+              --connect-timeout 5 --max-time 16 \
+              -D /tmp/lowblock-diagnostic-headers \
+              -o /tmp/lowblock-diagnostic-body \
+              -w 'status=%{http_code} remote=%{remote_ip} lookup=%{time_namelookup}s connect=%{time_connect}s tls=%{time_appconnect}s first_byte=%{time_starttransfer}s total=%{time_total}s size=%{size_download}\n' \
+              "$target"; then
+              echo 'complete=true'
+              head -c 100 /tmp/lowblock-diagnostic-body | tr '\n' ' ' || true
+              echo
+            else
+              echo 'complete=false'
+            fi
+            grep -Ei '^(server|content-type|content-encoding|content-length|transfer-encoding|x-robots-tag):' \
+              /tmp/lowblock-diagnostic-headers | tail -8 || true
+          done
+          echo 'Diagnostic completed without invoking a football data provider.'

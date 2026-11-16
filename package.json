@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "test": "vitest run",
+    "test:intelligence:load": "node scripts/load-test-intelligence.mjs",
     "sync:season": "tsx scripts/sync-season.ts",
     "seed": "tsx scripts/sync-season.ts",
     "data:check": "tsx scripts/data-check.ts",

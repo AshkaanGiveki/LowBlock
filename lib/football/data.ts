@@ -76,20 +76,8 @@ const getCachedMatches = unstable_cache(
       )
       .slice(0, limit);
 
-    if (rows.length === 0 && activeProvider === "sportsapi") {
-      try {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        await getFootballProvider().syncDate(todayStr);
-        rows = await db
-          .collection<MatchRecord>("matches")
-          .find(query)
-          .sort({ kickoffAt: 1 })
-          .limit(limit)
-          .toArray();
-      } catch (err) {
-        console.error("[SportsAPI] Discovery on empty cached matches failed:", err);
-      }
-    }
+    // Cache-only request path: an empty match feed must not trigger SportsAPI
+    // discovery from a page view. Only scheduled workers may use REST quota.
 
     return rows;
   },

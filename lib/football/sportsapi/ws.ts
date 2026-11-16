@@ -22,6 +22,7 @@ export class SportsApiWebSocketManager {
   }
 
   public subscribeToChannel(channel: string) {
+    if (this.activeSubscriptions.has(channel)) return;
     this.activeSubscriptions.add(channel);
     if (this.ws !== null && this.ws.readyState === 1) {
       this.ws.send(JSON.stringify({ action: "subscribe", channel }));
@@ -29,6 +30,7 @@ export class SportsApiWebSocketManager {
   }
 
   public unsubscribeFromChannel(channel: string) {
+    if (!this.activeSubscriptions.has(channel)) return;
     this.activeSubscriptions.delete(channel);
     if (this.ws !== null && this.ws.readyState === 1) {
       this.ws.send(JSON.stringify({ action: "unsubscribe", channel }));
@@ -157,9 +159,13 @@ export class SportsApiWebSocketManager {
 
     this.reconnectAttempts++;
 
+    // Jitter prevents multiple reconnecting processes from synchronizing.
+    const jitteredDelay = Math.min(env.SPORTSAPI_RECONNECT_MAX_DELAY_MS, delay + Math.floor(Math.random() * delay * 0.2));
     setTimeout(() => {
+      // A lease may have been lost after this reconnect was scheduled.
+      if (this.manualDisconnect || !isSportsApiRealtimeEnabled()) return;
       this.connect();
-    }, delay);
+    }, jitteredDelay);
   }
 }
 
@@ -170,8 +176,10 @@ export class SportsApiWebSocketManager {
  */
 export function isSportsApiRealtimeEnabled(): boolean {
   if (env.SPORTSAPI_WS_ENABLED === false) return false;
+  // Only the dedicated ingestion worker may own an upstream connection.
+  // Application/serverless/browser requests are always cache-only.
   if (process.env.NODE_ENV === "test") return true;
-  return process.env.VERCEL !== "1" || process.env.SPORTSAPI_REALTIME_ENABLED === "true";
+  return process.env.LOWBLOCK_LIVE_INGESTION_WORKER === "true";
 }
 
 // Global singleton for server/client contexts

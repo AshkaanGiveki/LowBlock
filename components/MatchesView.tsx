@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { Check, Globe2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { isFeaturedFixture, LEAGUES } from "@/lib/football/leagues";
+import { matchDisplayState } from "@/lib/football/matchDisplayState";
 import { MatchAnalyticsCard } from "@/components/MatchAnalyticsCard";
 import { useLanguage, T } from "@/components/LanguageProvider";
 
@@ -25,18 +26,6 @@ type MatchPage = {
   hasMore: boolean;
 };
 
-function stateOf(match: Match, now: number) {
-  const kickoff = new Date(match.kickoffAt).getTime();
-  const finished =
-    match.status === "FINISHED" ||
-    (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED");
-  const started =
-    finished ||
-    match.status === "LIVE" ||
-    match.status === "SUSPENDED" ||
-    (match.status === "SCHEDULED" && now >= kickoff);
-  return { finished, live: false, started };
-}
 function encodeCursor(cursor: Exclude<Cursor, null>) {
   return btoa(JSON.stringify(cursor));
 }
@@ -105,8 +94,8 @@ export function MatchesView({
               match.awayTeam.name,
             )) &&
           (tab === "open"
-            ? !stateOf(match, now).started
-            : stateOf(match, now).started),
+            ? !matchDisplayState(match, now).started
+            : matchDisplayState(match, now).started),
       )
       .sort(
         (a, b) =>

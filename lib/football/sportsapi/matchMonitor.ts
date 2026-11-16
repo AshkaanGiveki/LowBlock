@@ -1,5 +1,6 @@
-import { getSportsApiWsManager } from "./ws";
+import { getSportsApiWsManager, isSportsApiRealtimeEnabled } from "./ws";
 import { getDb } from "@/lib/db/mongo";
+import { writeCachedLiveMatch } from "@/lib/football/intelligence/liveCache";
 
 export type LiveMatchScore = {
   home: number | null;
@@ -228,6 +229,7 @@ class MatchMonitorService {
 
   private ensureInitialized() {
     if (this.initialized) return;
+    if (!isSportsApiRealtimeEnabled()) return;
     this.initialized = true;
 
     const ws = getSportsApiWsManager();
@@ -236,6 +238,10 @@ class MatchMonitorService {
     ws.addListener((channel: string, payload: any) => {
       this.handleWsMessage(channel, payload);
     });
+  }
+
+  public startIngestion(): void {
+    this.ensureInitialized();
   }
 
   public getSnapshot(matchId: string): LiveMatchSnapshot {
@@ -258,9 +264,39 @@ class MatchMonitorService {
         lastUpdateAt: Date.now(),
       };
       this.snapshots.set(matchId, snapshot);
-      this.subscribeMatchChannels(matchId);
+      this.pruneOldSnapshots();
+      // The background worker alone manages bounded subscriptions.
+      // Receiving a global score event must not add subscriptions forever.
     }
     return snapshot;
+  }
+
+  /**
+   * The global worker is long-lived. Evict dormant cached snapshots rather
+   * than retaining every historical fixture and its raw WS payload forever.
+   * Never evict a subscribed match or a write waiting to be persisted.
+   */
+  private pruneOldSnapshots() {
+    if (this.snapshots.size <= 256) return;
+    const active = new Set(getSportsApiWsManager().getStatus().activeSubscriptions);
+    for (const [id] of this.snapshots) {
+      if (this.snapshots.size <= 192) break;
+      if (active.has(`match:${id}`) || this.listeners.has(id) ||
+          this.persistInFlight.has(id) || this.persistTimers.has(id)) continue;
+      this.snapshots.delete(id);
+      this.lastDbSync.delete(id);
+      this.scoredFinishedMatches.delete(id);
+    }
+  }
+
+  /** Bounded worker-health counters; no personal data or raw match payloads. */
+  public getMetrics() {
+    return {
+      trackedSnapshots: this.snapshots.size,
+      activeListeners: [...this.listeners.values()].reduce((total, set) => total + set.size, 0),
+      pendingWrites: this.persistTimers.size,
+      inFlightWrites: this.persistInFlight.size,
+    };
   }
 
   public updateFromSnapshot(snapshot: LiveMatchSnapshot): void {
@@ -381,12 +417,12 @@ class MatchMonitorService {
   }
 
   public subscribeMatchChannels(matchId: string) {
+    if (!isSportsApiRealtimeEnabled()) return;
     const ws = getSportsApiWsManager();
     ws.subscribeToChannel(`match:${matchId}`);
     ws.subscribeToChannel(`match:${matchId}:incidents`);
     ws.subscribeToChannel(`match:${matchId}:stats`);
     ws.subscribeToChannel(`match:${matchId}:lineups`);
-    ws.subscribeToChannel(`match:${matchId}:odds`);
   }
 
   public handleWsMessage(channel: string, payload: any) {
@@ -600,14 +636,22 @@ class MatchMonitorService {
             ? data.updates
             : [data.event || data.data?.event || data];
 
+    // The global channel can carry fixtures outside LowBlock's tracked
+    // competitions. Persisting all of them creates unbounded Mongo writes,
+    // Redis calls and in-memory snapshots. Ingest only explicitly subscribed
+    // match IDs from the bounded active-match worker.
+    const trackedIds = new Set(
+      getSportsApiWsManager().getStatus().activeSubscriptions
+        .filter((channel) => /^match:\d+$/.test(channel))
+        .map((channel) => channel.slice("match:".length)),
+    );
     for (const item of list) {
       if (!item) continue;
       const ev = expandProviderDelta(item.event || item);
       const matchId = providerEventId(ev);
-      if (!matchId || matchId === "undefined") continue;
+      if (!matchId || !trackedIds.has(matchId)) continue;
 
-      const snapshot = this.snapshots.get(matchId);
-      if (snapshot || matchId) {
+      {
         const snap = this.getSnapshot(matchId);
         snap.rawProviderPayload ||= {};
         snap.rawProviderPayload.liveScores = item;
@@ -683,18 +727,36 @@ class MatchMonitorService {
 
   private lastDbSync = new Map<string, number>();
   private persistInFlight = new Map<string, Promise<void>>();
+  private persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private scoredFinishedMatches = new Set<string>();
 
+  private scheduleTrailingPersist(matchId: string, snapshot: LiveMatchSnapshot, delayMs: number) {
+    if (this.persistTimers.has(matchId)) return;
+    const timer = setTimeout(() => {
+      this.persistTimers.delete(matchId);
+      // Read the latest mutable snapshot. Persisting the first delta would
+      // otherwise overwrite later score, lineup or final-whistle updates.
+      void this.persistMatchState(matchId, this.snapshots.get(matchId) ?? snapshot);
+    }, Math.max(1, delayMs));
+    timer.unref?.();
+    this.persistTimers.set(matchId, timer);
+  }
+
   private async persistMatchState(matchId: string, snapshot: LiveMatchSnapshot) {
+    // A second update arriving during an active write must eventually flush.
+    // A bare 5-second early return can permanently lose the final whistle
+    // when no further WebSocket message arrives.
+    if (this.persistInFlight.has(matchId)) {
+      this.scheduleTrailingPersist(matchId, snapshot, 1_000);
+      return;
+    }
     const now = Date.now();
     const last = this.lastDbSync.get(matchId) || 0;
-    if (now - last < 5_000) return; // Debounce 5s
+    if (now - last < 5_000) {
+      this.scheduleTrailingPersist(matchId, snapshot, 5_000 - (now - last));
+      return;
+    }
     this.lastDbSync.set(matchId, now);
-
-    // WebSocket deltas can arrive concurrently. Never let several Mongo
-    // persistence jobs for the same match pile up behind one another.
-    if (this.persistInFlight.has(matchId)) return;
-
     const persistJob = this.persistMatchStateInternal(matchId, snapshot).finally(() => {
       this.persistInFlight.delete(matchId);
     });
@@ -764,18 +826,27 @@ class MatchMonitorService {
         { upsert: true },
       );
 
+      // Redis holds the latest lightweight live state; Mongo remains durable.
+      await writeCachedLiveMatch(matchId, {
+        score: snapshot.score,
+        incidents: snapshot.incidents,
+        stats: snapshot.stats,
+        lineups: snapshot.lineups,
+      });
+
       // 3. Trigger score engine if match is newly finished
       if (snapshot.score.status === "FINISHED" && !this.scoredFinishedMatches.has(matchId)) {
         this.scoredFinishedMatches.add(matchId);
-        try {
-          const { runScoreEngine } = await import("@/lib/scoring/scoreEngine");
-          await runScoreEngine();
-        } catch (scoreErr) {
-          console.error("[MatchMonitor] Error running scoreEngine on match finish:", scoreErr);
-        }
+        const { queueFinishedMatchScoring } = await import("./scoringBatch");
+        queueFinishedMatchScoring();
       }
     } catch (err) {
       console.error("[MatchMonitor] Failed to persist state to MongoDB:", err);
+      // Preserve live updates through transient Mongo outages. Never retry
+      // from unit tests or browser processes, only the ingestion worker.
+      if (process.env.LOWBLOCK_LIVE_INGESTION_WORKER === "true") {
+        this.scheduleTrailingPersist(matchId, snapshot, 30_000);
+      }
     }
   }
 }

@@ -1,0 +1,44 @@
+name: Match Intelligence isolated preview load test
+
+on:
+  workflow_dispatch:
+    inputs:
+      viewers:
+        description: Concurrent staging viewers (1-500)
+        required: true
+        default: "50"
+      requests:
+        description: Total read-only requests (viewers to 5000)
+        required: true
+        default: "200"
+
+permissions:
+  contents: read
+
+jobs:
+  match-intelligence-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PREVIEW_BASE: https://lowblock-preview.45.11.186.199.sslip.io
+      INTELLIGENCE_MAX_P95_MS: "4000"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+      - name: Select an imported public fixture in isolated preview
+        id: match
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          curl --fail --silent --show-error --max-time 20 \
+            "$PREVIEW_BASE/api/matches?limit=20" -o /tmp/staging-matches.json
+          id=$(node -e 'const body=require("/tmp/staging-matches.json");const match=body.matches?.find(x=>x.providerMatchId);if(!match)process.exit(2);process.stdout.write(encodeURIComponent(String(match.providerMatchId)))')
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+      - name: Concurrent cached intelligence reads (no SportsAPI calls)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/load-test-intelligence.mjs \
+            "$PREVIEW_BASE/api/matches/${{ steps.match.outputs.id }}/intelligence" \
+            "${{ inputs.viewers }}" "${{ inputs.requests }}"

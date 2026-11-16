@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { appDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
+import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
 import ratingsData from "@/data/h2h-team-ratings-review.json";
 
 export const H2H_TOURNAMENT_WEIGHTS: Record<string, number> = {
@@ -297,10 +298,17 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
     if (existingPrimary?.status === "INACTIVE") continue;
     const primary = existingPrimary ?? await createH2HLeague(db, clubId, week);
     if (primary && dailySlate) {
-      const slates = [...(primary.slates ?? []).filter((slate: H2HSlate) => slate.sourceDate !== sourceDate), dailySlate]
-        .sort((a, b) => a.matchday - b.matchday);
-      await db.collection("h2hLeagues").updateOne({ _id: primary._id }, { $set: { slates, updatedAt: new Date() } });
-      primary.slates = slates;
+      // An advertised slate is permanent. Normal sync commands only publish
+      // missing matchdays and must never invalidate predictions or gold picks.
+      const publication = await publishH2HSlateOnce(db, primary, dailySlate);
+      primary.slates = publication.league.slates;
+      if (publication.action === "ALREADY_PUBLISHED") {
+        console.info(JSON.stringify({
+          type: "lowblock.h2h.slate_locked",
+          weekKey: week.key, sourceDate, matchday: dailySlate.matchday,
+          leagueId: String(primary._id),
+        }));
+      }
     }
     if (primary) await materializeH2HLeague(db, primary);
     if (primary) created++;

@@ -4,8 +4,6 @@ import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { isPredictionLocked } from "@/lib/domain/predictionLock";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
-import { getMatchMonitorService } from "@/lib/football/sportsapi/matchMonitor";
-import { ensureSportsApiBackgroundService } from "@/lib/football/sportsapi/backgroundService";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
 
 export const dynamic = "force-dynamic";
@@ -75,20 +73,27 @@ export async function GET(
       );
   }
 
-  // SportsAPI match details are keyed by SportsAPI event ids. API-Football
-  // fixtures can have the same numeric id, but those ids refer to a different
-  // event namespace; fetching them from SportsAPI returns unrelated scores
-  // (for example 69-79 for a 1-0 football fixture). The match row is the
-  // canonical result for API-Football fixtures.
-  let liveDetails = null;
-  if (match.provider === "sportsapi") {
-    // Return the in-process WebSocket snapshot immediately. The SSE stream
-    // hydrates it from Mongo asynchronously after the drawer is visible.
-    ensureSportsApiBackgroundService();
-    const monitor = getMatchMonitorService();
-    monitor.subscribeMatchChannels(matchId);
-    liveDetails = monitor.getSnapshot(matchId);
-  }
+  // This request is strictly read-only. Never connect or subscribe to the
+  // upstream provider when someone opens the match drawer.
+  const persistedDetails = match.provider === "sportsapi"
+    ? await db.collection<any>("matchDetails").findOne(
+        { matchId, provider: "sportsapi" },
+        { projection: { score: 1, incidents: 1, stats: 1, lineups: 1, updatedAt: 1 } },
+      )
+    : null;
+  const liveDetails = persistedDetails ? {
+    matchId,
+    score: persistedDetails.score ?? {
+      home: match.homeGoals ?? null,
+      away: match.awayGoals ?? null,
+      status: match.status,
+      elapsed: match.elapsed ?? null,
+    },
+    incidents: persistedDetails.incidents ?? [],
+    stats: persistedDetails.stats ?? [],
+    lineups: persistedDetails.lineups ?? null,
+    lastUpdateAt: persistedDetails.updatedAt ? new Date(persistedDetails.updatedAt).getTime() : 0,
+  } : null;
 
   const started =
     ["LIVE", "FINISHED", "SUSPENDED"].includes(String(match.status)) ||

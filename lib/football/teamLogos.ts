@@ -48,7 +48,16 @@ export function nationalTeamCrestSlug(name: string): string | null {
   return exceptions[nameKey] ?? `${nameKey}-national-team`;
 }
 
+const federationCrests: Record<string, string> = {
+  turkey: "https://assets.footylogos.com/logos/turkish-football-federation-logo-footylogos.svg",
+  turkiye: "https://assets.footylogos.com/logos/turkish-football-federation-logo-footylogos.svg",
+  switzerland: "https://assets.footylogos.com/logos/swiss-football-association-logo-footylogos.svg",
+  swiss: "https://assets.footylogos.com/logos/swiss-football-association-logo-footylogos.svg",
+};
+
 export function nationalTeamCrestUrl(name: string): string | null {
+  const normalized = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+  if (federationCrests[normalized]) return federationCrests[normalized];
   const slug = nationalTeamCrestSlug(name);
   return slug ? `/api/team-logo/national-${slug}` : null;
 }

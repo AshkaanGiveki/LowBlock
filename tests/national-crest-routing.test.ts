@@ -8,6 +8,9 @@ describe("football association crests and provider-specific clubs", () => {
     expect(nationalTeamCrestUrl("Netherlands")).toBe("/api/team-logo/national-netherlands-national-team-dutch");
     expect(nationalTeamCrestSlug("Côte d'Ivoire")).toBe("cote-d-ivoire-national-team");
     expect(nationalTeamCrestSlug("Türkiye")).toBe("turkey-national-team");
+    expect(nationalTeamCrestUrl("Türkiye")).toContain("turkish-football-federation-logo");
+    expect(nationalTeamCrestUrl("Turkey")).toContain("turkish-football-federation-logo");
+    expect(nationalTeamCrestUrl("Switzerland")).toContain("swiss-football-association-logo");
     expect(nationalTeamCrestUrl("Cook Islands")).toBeNull();
   });
   it("never uses an existing flag URL for a national team", () => {

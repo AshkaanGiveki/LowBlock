@@ -71,9 +71,26 @@ export async function runWorkerCycle() {
   console.info(JSON.stringify({ type: "lowblock.worker.cycle_started", cycleId, clock, timezone: process.env.APP_TIMEZONE || "Asia/Tehran", dailyWindow: isDailyWorkerWindow(cycleStartedAt) }));
   try {
     const heartbeatDb = await getDb();
+    const rssBytes = process.memoryUsage().rss;
+    const liveOwner = process.env.LOWBLOCK_LIVE_INGESTION_WORKER === "true";
+    let liveHealth: Record<string, unknown> = { owner: liveOwner, rssBytes };
+    if (liveOwner) {
+      const [{ getSportsApiWsManager }, { getMatchMonitorService }] = await Promise.all([
+        import("@/lib/football/sportsapi/ws"),
+        import("@/lib/football/sportsapi/matchMonitor"),
+      ]);
+      const socket = getSportsApiWsManager().getStatus();
+      liveHealth = {
+        ...liveHealth,
+        connected: socket.connected,
+        activeChannels: socket.activeSubscriptions.length,
+        reconnectAttempts: socket.reconnectAttempts,
+        ...getMatchMonitorService().getMetrics(),
+      };
+    }
     await heartbeatDb.collection("workerHeartbeats").updateOne(
       { worker: "lowblock" },
-      { $set: { worker: "lowblock", cycleId, pid: process.pid, at: cycleStartedAt, clock, updatedAt: cycleStartedAt } },
+      { $set: { worker: "lowblock", cycleId, pid: process.pid, at: cycleStartedAt, clock, liveHealth, updatedAt: cycleStartedAt } },
       { upsert: true },
     );
   } catch (error) {

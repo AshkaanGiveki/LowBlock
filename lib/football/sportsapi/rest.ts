@@ -114,6 +114,56 @@ async function trackRequest(
 }
 
 /**
+ * Atomically reserves one or several SportsAPI REST attempts in the same
+ * Mongo quota document. Hosted GitHub jobs must reserve their maximum possible
+ * attempts before calling the provider, including failed attempts.
+ *
+ * This is deliberately fail-closed: an unavailable Mongo connection must
+ * never authorize unaccounted requests.
+ */
+export async function reserveSportsApiQuotaBatch(
+  attempts: number,
+  source = "lowblock-rest",
+): Promise<{ allowed: boolean; unavailable: boolean; used: number | null; limit: number; day: string }> {
+  const hardLimit = Math.min(60, Math.max(0, Number(env.SPORTSAPI_DAILY_REQUEST_BUDGET) || 0));
+  if (!Number.isInteger(attempts) || attempts < 1 || attempts > 60) {
+    throw new RangeError("SportsAPI reservation must cover 1-60 attempts");
+  }
+  const { start: dayStart, end: dayEnd } = providerDayBounds();
+  const day = dayStart.toISOString().slice(0, 10);
+  if (hardLimit < attempts) return { allowed: false, unavailable: false, used: null, limit: hardLimit, day };
+  try {
+    const db = await getDb();
+    const keyFingerprint = requestKeyFingerprint();
+    const _id = `${day}:${keyFingerprint}`;
+    const priorAttempts = await db.collection("sportsApiRequests").countDocuments({
+      timestamp: { $gte: dayStart, $lt: dayEnd },
+      keyFingerprint,
+    });
+    const quota = db.collection<any>("sportsApiQuotaReservations");
+    await quota.updateOne(
+      { _id },
+      {
+        $setOnInsert: { day, keyFingerprint, createdAt: new Date() },
+        $max: { used: priorAttempts },
+      },
+      { upsert: true },
+    );
+    // Use <= (limit - attempts), rather than a read-then-write, so even 100
+    // simultaneous callers cannot overshoot the shared daily hard cap.
+    const booked = await quota.findOneAndUpdate(
+      { _id, used: { $lte: hardLimit - attempts } },
+      { $inc: { used: attempts }, $set: { updatedAt: new Date(), lastSource: source } },
+      { returnDocument: "after" },
+    );
+    return { allowed: Boolean(booked), unavailable: false, used: booked?.used ?? null, limit: hardLimit, day };
+  } catch (error) {
+    console.error("[SportsAPI] Could not atomically reserve REST quota:", error);
+    return { allowed: false, unavailable: true, used: null, limit: hardLimit, day };
+  }
+}
+
+/**
  * REST is the source for discovery and on-demand resources. The provider's
  * documented WebSocket surface is a realtime stream, not a REST proxy.
  */
@@ -125,39 +175,19 @@ export async function fetchSportsApi<T>(
   const url = new URL(`${env.SPORTSAPI_BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
-  // Fail closed before making a provider request once the configured daily
-  // budget is exhausted. This counts all attempted REST calls, including
-  // failed calls, and prevents optional paths from consuming the free quota.
-  try {
-    const db = await getDb();
-    // SportsAPI resets quota at 00:00 UTC. Using Tehran midnight here
-    // incorrectly carried pre-reset usage into the new provider day.
-    // Count only successful provider responses for this guard. A connection
-    // timeout never gives us a provider quota response and must not consume
-    // the entire local budget, otherwise one production-network incident
-    // prevents every later recovery attempt until the next UTC day.
-    const { start } = providerDayBounds();
-    const used = await db.collection("sportsApiRequests").countDocuments({
-      timestamp: { $gte: start },
-      status: "OK",
-      keyFingerprint: requestKeyFingerprint(),
-    });
-    if (used >= env.SPORTSAPI_DAILY_REQUEST_BUDGET) {
-      return {
-        success: false,
-        events: [],
-        error: {
-          code: 429,
-          message: `SportsAPI local daily request budget exhausted (${used}/${env.SPORTSAPI_DAILY_REQUEST_BUDGET})`,
-        },
-      };
-    }
-  } catch (error) {
-    console.error("[SportsAPI] Could not verify local request budget:", error);
+  // Every caller, including external hosted-sync reservations, uses the same
+  // database counter before a provider request. Never make an unreserved call.
+  const reservation = await reserveSportsApiQuotaBatch(1, "lowblock-rest");
+  if (!reservation.allowed) {
     return {
       success: false,
       events: [],
-      error: { code: 503, message: "SportsAPI local request budget unavailable" },
+      error: {
+        code: reservation.unavailable ? 503 : 429,
+        message: reservation.unavailable
+          ? "SportsAPI shared REST quota unavailable"
+          : `SportsAPI hard daily REST cap reached (max ${reservation.limit}, reserve 40 of 100)`,
+      },
     };
   }
 
@@ -233,18 +263,21 @@ export async function getSportsApiQuota(): Promise<SportsApiQuota> {
   const day = new Date().toISOString().slice(0, 10);
   const { start, end } = providerDayBounds();
   const db = await getDb();
-  const used = await db.collection<any>("sportsApiRequests").countDocuments({
+  const reservation = await db.collection<any>("sportsApiQuotaReservations").findOne({
+    _id: `${start.toISOString().slice(0, 10)}:${requestKeyFingerprint()}`,
+  });
+  const loggedAttempts = await db.collection<any>("sportsApiRequests").countDocuments({
     timestamp: { $gte: start, $lt: end },
-    status: "OK",
     keyFingerprint: requestKeyFingerprint(),
   });
+  const used = Math.max(Number(reservation?.used ?? 0), loggedAttempts);
   const latest = await db.collection<any>("sportsApiRequests").findOne(
     { timestamp: { $gte: start }, keyFingerprint: requestKeyFingerprint() },
     { sort: { timestamp: -1 }, projection: { quotaRemaining: 1, quotaLimit: 1 } },
   );
-  const limit = latest?.quotaLimit ?? env.SPORTSAPI_DAILY_LIMIT ?? null;
-  const remaining = latest?.quotaRemaining ?? (limit == null ? null : Math.max(0, limit - used));
-  return { used, limit, remaining, source: latest?.quotaRemaining != null ? "provider-header" : limit == null ? "usage-only" : "configured-limit", day };
+  const limit = Math.min(60, Math.max(0, Number(env.SPORTSAPI_DAILY_REQUEST_BUDGET) || 0));
+  const remaining = Math.max(0, limit - used);
+  return { used, limit, remaining, source: "configured-limit", day };
 }
 
 // In-memory cache for daily discovery to support all execution environments
@@ -408,7 +441,9 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
     let finalManifest: SportsApiDiscoveryManifest | null = null;
     let selectedEvents: any[] = [];
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      const schedule = await fetchSportsApi<any>(`/schedule/${dateString}`);
+      // Reuse the fully paginated, cross-worker cached schedule reader.
+      // A direct first-page fetch silently omits Nations League fixtures.
+      const schedule = await getSportsApiDailyFixtures(dateString);
       const scheduleEvents = eventList(schedule);
       const todayAttempted = dateString === todayStr;
       const today = todayAttempted ? await fetchSportsApi<any>("/today") : null;

@@ -11,7 +11,7 @@ import { BrandSwitcher } from "@/components/BrandSwitcher";
 import { isH2HEnabled } from "@/lib/domain/h2h";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://lowblock.ir"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://lowblock.ir"),
   title: {
     default: "LowBlock | Football Predictions",
     template: "%s | LowBlock",
@@ -34,11 +34,11 @@ export const metadata: Metadata = {
   creator: "LowBlock",
   publisher: "LowBlock",
   robots: {
-    index: true,
-    follow: true,
+    index: process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW !== "true",
+    follow: process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW !== "true",
     googleBot: {
-      index: true,
-      follow: true,
+      index: process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW !== "true",
+      follow: process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW !== "true",
       "max-image-preview": "large",
       "max-snippet": -1,
       "max-video-preview": -1,
@@ -91,6 +91,11 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl">
       <body>
+        {process.env.NEXT_PUBLIC_LOWBLOCK_PREVIEW === "true" && (
+          <a href="/preview" className="fixed bottom-20 left-3 z-[120] rounded-xl border border-amber-500/50 bg-[#111d16]/95 px-3 py-2 text-[11px] font-black text-amber-200 shadow-lg transition hover:bg-amber-500/20" dir="ltr">
+            DEVELOP PREVIEW · EXPLORE MATCHES ↗
+          </a>
+        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organization) }}
