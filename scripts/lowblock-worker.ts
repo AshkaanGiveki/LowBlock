@@ -38,6 +38,12 @@ async function main() {
       const db = await getDb();
       const officialTables = await syncVerifiedSportsApiStandings(db);
       const results = await refreshLocalMatchIntelligence(db);
+      // Provider-first history is optional and strictly bounded to 18 extra
+      // REST attempts/day within the shared 60/100 provider quota. Never
+      // fetch history from viewer requests or the isolated preview.
+      const { syncSportsApiProviderHistory } = await import("../lib/football/intelligence/providerHistory");
+      const providerHistory = await syncSportsApiProviderHistory(db);
+      console.info(JSON.stringify({ type: "lowblock.intelligence.provider_history", ...providerHistory }));
       console.info(JSON.stringify({ type: "lowblock.intelligence.official_standings", ...officialTables }));
       console.info(JSON.stringify({ type: "lowblock.intelligence.refreshed", ...results }));
     } catch (error) {
