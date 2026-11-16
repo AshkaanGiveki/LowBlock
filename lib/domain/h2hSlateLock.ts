@@ -23,7 +23,7 @@ export async function publishH2HSlateOnce<TSlate extends { sourceDate: string; m
   );
   if (existing) return { league, action: "ALREADY_PUBLISHED" };
 
-  const collection = db.collection<any>("h2hLeagues");
+  const collection = db.collection<{ _id: any; status: string; slates: TSlate[]; updatedAt?: Date }>("h2hLeagues");
   const published = await collection.findOneAndUpdate(
     {
       _id: league._id,
