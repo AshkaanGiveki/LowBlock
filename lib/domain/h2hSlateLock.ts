@@ -10,7 +10,7 @@ import type { Db } from "mongodb";
  */
 export async function publishH2HSlateOnce<TSlate extends { sourceDate: string; matchday: number }>(
   db: Db,
-  league: { _id: unknown; slates?: TSlate[] },
+  league: { _id: any; slates?: TSlate[] },
   candidate: TSlate,
 ): Promise<{ league: typeof league; action: "PUBLISHED" | "ALREADY_PUBLISHED" }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate.sourceDate) ||
