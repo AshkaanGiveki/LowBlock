@@ -41,4 +41,20 @@ jobs:
               grep -Ei '^(server|content-length|transfer-encoding|content-type|content-encoding):' /tmp/preview-protocol-headers | tail -6 || true
             done
           done
+          echo '=== Compressed public HTTPS response completeness ==='
+          for protocol in --http1.1 --http2; do
+            for path in '/api/matches?limit=30' '/matches' '/preview'; do
+              echo "$protocol compressed $path"
+              if curl "$protocol" --compressed --silent --show-error --location --max-time 18 \
+                -D /tmp/preview-compressed-headers \
+                -w 'status=%{http_code} http_version=%{http_version} bytes=%{size_download} total=%{time_total}s\n' \
+                "$base$path" -o /tmp/preview-compressed-response; then
+                echo 'complete=true'
+              else
+                echo 'complete=false'
+              fi
+              grep -Ei '^(content-length|transfer-encoding|content-encoding|content-type):' \
+                /tmp/preview-compressed-headers | tail -6 || true
+            done
+          done
           echo "Diagnostic complete; no SportsAPI endpoints contacted."
