@@ -135,6 +135,12 @@ export async function syncSportsApiProviderHistory(db: Db, now = new Date()) {
     const insights = db.collection<any>("footballMatchIntelligence");
     const existing = await insights.findOne({ _id: key }, { projection: { providerHistory: 1 } });
     const old = existing?.providerHistory as ProviderHistory | undefined;
+    const attemptsRecorded = await insights.findOne(
+      { _id: key }, { projection: { providerHistoryAttempts: 1 } },
+    );
+    const retryAllowed = (date: unknown, hours: number) =>
+      !date || !Number.isFinite(new Date(date as string).getTime()) ||
+      now.getTime() - new Date(date as string).getTime() >= hours * 60 * 60_000;
     const form = old?.form ?? {
       home: { fixtures: [], results: [], position: null },
       away: { fixtures: [], results: [], position: null },
@@ -150,9 +156,11 @@ export async function syncSportsApiProviderHistory(db: Db, now = new Date()) {
       if (!saved || new Date(saved.expiresAt ?? 0) <= now) {
         const response = await request("/api/teams/" + teamId + "/events/last/0");
         if (response) {
-          const fixtures = parseSportsApiTeamLast(response, teamId, kickoff);
+          // Share a current team cache across fixtures, then apply each
+          // fixture's own kickoff cutoff before displaying results.
+          const fixtures = parseSportsApiTeamLast(response, teamId, new Date(now.getTime() + 60_000));
           await teamCache.updateOne({ _id: cacheKey }, {
-            $set: { fixtures, expiresAt: new Date(now.getTime() + 24 * 60 * 60_000), updatedAt: now },
+            $set: { fixtures, expiresAt: new Date(now.getTime() + (fixtures.length ? 24 : 6) * 60 * 60_000), updatedAt: now },
           }, { upsert: true });
           saved = { fixtures };
         }
@@ -163,8 +171,13 @@ export async function syncSportsApiProviderHistory(db: Db, now = new Date()) {
         if (safe.length) { form[side].fixtures = safe; touched = true; }
       }
     }
-    if (beforeKickoff && !old?.form?.home?.results?.length) {
+    if (beforeKickoff && !old?.form?.home?.results?.length &&
+      retryAllowed(attemptsRecorded?.providerHistoryAttempts?.pregameFormAt, 12)) {
+      const prior = attempts;
       const response = await request("/api/match/" + matchId + "/pregame-form");
+      if (attempts > prior) await insights.updateOne({ _id: key }, {
+        $set: { "providerHistoryAttempts.pregameFormAt": now },
+      }, { upsert: true });
       const parsed = parseSportsApiPregameForm(response);
       if (parsed) {
         form.home.results = parsed.home.results;
@@ -174,8 +187,13 @@ export async function syncSportsApiProviderHistory(db: Db, now = new Date()) {
         touched = true;
       }
     }
-    if (beforeKickoff && !duel) {
+    if (beforeKickoff && !duel &&
+      retryAllowed(attemptsRecorded?.providerHistoryAttempts?.duelAt, 12)) {
+      const prior = attempts;
       const response = await request("/api/match/" + matchId + "/h2h");
+      if (attempts > prior) await insights.updateOne({ _id: key }, {
+        $set: { "providerHistoryAttempts.duelAt": now },
+      }, { upsert: true });
       const parsed = parseSportsApiDuel(response);
       if (parsed) { duel = parsed; touched = true; }
     }
