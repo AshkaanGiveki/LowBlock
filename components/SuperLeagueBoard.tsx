@@ -12,6 +12,12 @@ function Skeleton() {
   return <div className="mt-6 animate-pulse space-y-5" aria-label="Loading SuperLeague details"><div className="h-20 rounded-[1.35rem] border border-white/[.06] bg-white/[.04]" /><div className="h-72 max-w-5xl rounded-[1.5rem] border border-white/[.06] bg-white/[.04]" /><div className="h-80 max-w-2xl rounded-2xl border border-white/[.06] bg-white/[.04]" /></div>;
 }
 
+function preferredRoundIndex(slates: any[] = []) {
+  const upcoming = slates.find((item) => new Date(item.firstKickoffAt).getTime() > Date.now());
+  if (upcoming) return Math.max(0, Number(upcoming.matchday) - 1);
+  return slates.length ? Math.max(0, Number(slates[slates.length - 1].matchday) - 1) : 0;
+}
+
 function Standings({ rows, viewerId }: { rows: any[]; viewerId: string }) {
   return <section className="mt-8 max-w-3xl overflow-hidden rounded-2xl border border-white/[.08] bg-[#101512]"><div className="flex items-center gap-2 border-b border-white/[.07] px-3 py-3 text-brand sm:px-4"><Crown size={14} /><h2 className="text-sm font-black"><T fa="جدول رتبه‌بندی" en="Standings" /></h2></div><div className="grid grid-cols-[22px_minmax(0,1fr)_32px_32px_32px_48px_48px] items-center gap-2 border-b border-white/[.06] px-3 py-2 text-[8px] font-black uppercase tracking-[.12em] text-white/30 sm:grid-cols-[26px_minmax(0,1fr)_38px_38px_38px_58px_58px] sm:px-4"><span>#</span><span><T fa="بازیکن" en="Player" /></span><span className="text-center">W</span><span className="text-center">D</span><span className="text-center">L</span><span className="text-center">PTS</span><span className="text-center">PRD</span></div><div className="divide-y divide-white/[.05]">{rows.map((row: any) => <div key={row.userId} className={`grid grid-cols-[22px_minmax(0,1fr)_32px_32px_32px_48px_48px] items-center gap-2 px-3 py-2 sm:grid-cols-[26px_minmax(0,1fr)_38px_38px_38px_58px_58px] sm:px-4 ${row.userId === viewerId ? "bg-brand/[.07]" : ""}`}><span className="text-xs font-black text-brand">{row.rank}</span><div className="flex min-w-0 items-center gap-2"><UserAvatar name={row.username} avatarUrl={row.avatarUrl} className="h-7 w-7 shrink-0 text-[8px]" /><span className="truncate text-[10px] font-bold text-white/80 sm:text-[11px]">{row.username}</span></div><span className="text-center text-[10px] font-bold text-white/70">{row.wins ?? 0}</span><span className="text-center text-[10px] font-bold text-white/50">{row.draws ?? 0}</span><span className="text-center text-[10px] font-bold text-white/50">{row.losses ?? 0}</span><span className="justify-self-center rounded-lg bg-brand/15 px-2 py-1 text-[11px] font-black text-brand">{row.h2hPoints ?? 0}</span><span className="justify-self-center rounded-lg bg-white/[.06] px-2 py-1 text-[11px] font-black text-white/75">{row.predictionPoints ?? 0}</span></div>)}</div></section>;
 }
@@ -24,7 +30,24 @@ export default function SuperLeagueBoard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const cache = useRef(new Map<string, any>());
-  const loadDetail = (weekKey: string) => { const cached = cache.current.get(weekKey); if (cached) { setDetail(cached); return; } setLoading(true); fetch(`/api/superleague/week/${encodeURIComponent(weekKey)}`, { cache: "no-store" }).then((r) => r.json()).then((next) => { cache.current.set(weekKey, next); setDetail(next); }).catch(() => setError("Could not load SuperLeague details")).finally(() => setLoading(false)); };
+  const loadDetail = (weekKey: string) => {
+    const cached = cache.current.get(weekKey);
+    if (cached) {
+      setDetail(cached);
+      setRoundIndex(preferredRoundIndex(cached.league?.slates ?? []));
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/superleague/week/${encodeURIComponent(weekKey)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((next) => {
+        cache.current.set(weekKey, next);
+        setDetail(next);
+        setRoundIndex(preferredRoundIndex(next.league?.slates ?? []));
+      })
+      .catch(() => setError("Could not load SuperLeague details"))
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { fetch("/api/h2h/current", { cache: "no-store" }).then((r) => r.json()).then((next) => { setData(next); const currentIndex = next.availableWeeks?.indexOf(next.weekKey) ?? 0; setWeekIndex(Math.max(0, currentIndex)); if (next.league?.weekKey) loadDetail(next.league.weekKey); }).catch(() => setError("Could not load SuperLeague")); }, []);
   if (!data) return <main className="min-h-screen bg-[#080b0a] px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><Skeleton /></div></main>;
   if (!data.enabled) return null;
