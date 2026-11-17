@@ -4,7 +4,7 @@ import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore
 import { getCanonicalLeaderboard, getLeaderboardSummary } from "@/lib/domain/leaderboards";
 import { currentUserId } from "@/lib/auth/session";
 import { env } from "@/lib/env";
-import { appDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
+import { appDateKey, appScheduleDateKey, appLocalDateTimeToUtc, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
 import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
@@ -84,28 +84,16 @@ export function isH2HFixtureResolved(match: any): boolean {
 }
 
 export function getH2HWeek(now = new Date(), offset = 0): H2HWeek {
-  const zone = (() => { try { new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE }).format(now); return env.APP_TIMEZONE; } catch { return "UTC"; } })();
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
-  const local = new Date(Date.UTC(values.year, values.month - 1, values.day + offset * 7));
+  const local = new Date(`${appScheduleDateKey(now)}T00:00:00.000Z`);
+  local.setUTCDate(local.getUTCDate() + offset * 7);
   const daysSinceFriday = (local.getUTCDay() + 2) % 7;
   local.setUTCDate(local.getUTCDate() - daysSinceFriday);
-  const toUtc = (date: Date) => {
-    const rough = new Date(date);
-    const offsetParts = new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(rough);
-    const p = Object.fromEntries(offsetParts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
-    const zoneAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-    const offsetMs = zoneAsUtc - rough.getTime();
-    return new Date(date.getTime() - offsetMs);
-  };
-  const start = toUtc(local);
-  const end = new Date(start.getTime() + 7 * 86400000);
-  return { key: local.toISOString().slice(0, 10), start, end };
-}
-
-function dayKey(value: Date) { return value.toISOString().slice(0, 10); }
-function dayIndex(value: Date, start: Date) {
-  return Math.max(0, Math.min(6, Math.floor((value.getTime() - start.getTime()) / 86400000)));
+  const key = local.toISOString().slice(0, 10);
+  const nextWeekDate = new Date(local);
+  nextWeekDate.setUTCDate(nextWeekDate.getUTCDate() + 7);
+  const start = appLocalDateTimeToUtc(key, 12);
+  const end = appLocalDateTimeToUtc(nextWeekDate.toISOString().slice(0, 10), 12);
+  return { key, start, end };
 }
 function kickoff(value: unknown) {
   const date = new Date(String(value));
@@ -145,13 +133,17 @@ export function buildH2HSlates(matches: any[], week: H2HWeek, ratingMap: Map<str
     }))
     .filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index)
     .sort((a, b) => a.date.getTime() - b.date.getTime() || b.score - a.score || a.id.localeCompare(b.id));
+  const sourceDates = providerWeekDateKeys(week.start);
   const byDay = Array.from({ length: 7 }, () => [] as typeof candidates);
-  for (const row of candidates) byDay[dayIndex(row.date, week.start)].push(row);
+  for (const row of candidates) {
+    const index = sourceDates.indexOf(appScheduleDateKey(row.date));
+    if (index >= 0) byDay[index].push(row);
+  }
   const slates: H2HSlate[] = [];
   for (let matchday = 1; matchday <= 7; matchday++) {
     const dayCandidates = byDay[matchday - 1];
     if (dayCandidates.length < 4) return [];
-    const sourceDay = dayKey(dayCandidates[0].date);
+    const sourceDay = sourceDates[matchday - 1];
     const chosen = [...dayCandidates]
       .sort((a, b) => b.score - a.score || a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id))
       .slice(0, 5);
@@ -349,7 +341,7 @@ export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: st
   if (matchday < 1) return null;
   const candidates = matches
     .filter((match) => selectable(match, week, ratingMap))
-    .filter((match) => appDateKey(kickoff(match.kickoffAt)!) === sourceDate)
+    .filter((match) => appScheduleDateKey(kickoff(match.kickoffAt)!) === sourceDate)
     .map((match) => ({ match, date: kickoff(match.kickoffAt)!, score: scoreH2HFixture(match, ratingMap)!, id: String(match.providerMatchId) }))
     .filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index)
     .sort((a, b) => b.score - a.score || a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
@@ -477,11 +469,10 @@ export async function getViewerH2HTodayMatch(db: Db, userId: string, now = new D
   const league = await db.collection<any>("h2hLeagues").findOne({ weekKey: week.key, players: userId, status: "ACTIVE" }, { projection: { _id: 1, players: 1, slates: 1 } });
   if (!league) return null;
 
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-  const slate = (league.slates ?? []).find((item: any) => {
-    const kickoff = new Date(item.firstKickoffAt);
-    return new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(kickoff) === today;
-  });
+  const today = appScheduleDateKey(now);
+  const slate = (league.slates ?? []).find((item: any) =>
+    appScheduleDateKey(new Date(item.firstKickoffAt)) === today,
+  );
   if (!slate) return null;
 
   const pairing = buildH2HPairings((league.players ?? []).map(String), Number(slate.matchday) - 1).find((item) => item.playerA === String(userId) || item.playerB === String(userId));
@@ -566,6 +557,6 @@ export async function publicH2HLeague(db: Db, league: any, viewerId: string) {
     players: league.players.map((id: string) => ({ userId: id, username: userById.get(id)?.username ?? "LowBlock Player", avatarUrl: userById.get(id)?.avatarUrl ?? null })),
     standings: standings.map(({ slateScores: _slateScores, ...row }: any) => ({ ...row, username: userById.get(row.userId)?.username ?? "LowBlock Player", avatarUrl: userById.get(row.userId)?.avatarUrl ?? null })),
     h2hMatches,
-    slates: league.slates.map((slate: H2HSlate) => ({ ...slate, fixtures: slate.fixtures.map((fixture) => { const homeLogo = centralLogos.get(fixture.homeTeam?.centralTeamId) || fixture.homeTeam?.logoUrl || null; const awayLogo = centralLogos.get(fixture.awayTeam?.centralTeamId) || fixture.awayTeam?.logoUrl || null; return { ...fixture, homeTeam: { ...canonicalTeam(fixture.homeTeam), logo: homeLogo, logoUrl: homeLogo }, awayTeam: { ...canonicalTeam(fixture.awayTeam), logo: awayLogo, logoUrl: awayLogo }, kickoffAt: fixture.kickoffAt, prediction: predictions.find((p) => String(p.matchId) === fixture.matchId) ?? null, opponentPredictions: new Date() >= new Date(fixture.kickoffAt) ? revealed.filter((p) => String(p.matchId) === fixture.matchId && String(p.userId) !== viewerId) : [], isGold: goldBySlate.get(slate.matchday) === fixture.matchId }; }) })),
+    slates: league.slates.map((slate: H2HSlate) => ({ ...slate, sourceDate: appScheduleDateKey(new Date(slate.firstKickoffAt)), fixtures: slate.fixtures.map((fixture) => { const homeLogo = centralLogos.get(fixture.homeTeam?.centralTeamId) || fixture.homeTeam?.logoUrl || null; const awayLogo = centralLogos.get(fixture.awayTeam?.centralTeamId) || fixture.awayTeam?.logoUrl || null; return { ...fixture, homeTeam: { ...canonicalTeam(fixture.homeTeam), logo: homeLogo, logoUrl: homeLogo }, awayTeam: { ...canonicalTeam(fixture.awayTeam), logo: awayLogo, logoUrl: awayLogo }, kickoffAt: fixture.kickoffAt, prediction: predictions.find((p) => String(p.matchId) === fixture.matchId) ?? null, opponentPredictions: new Date() >= new Date(fixture.kickoffAt) ? revealed.filter((p) => String(p.matchId) === fixture.matchId && String(p.userId) !== viewerId) : [], isGold: goldBySlate.get(slate.matchday) === fixture.matchId }; }) })),
   };
 }
