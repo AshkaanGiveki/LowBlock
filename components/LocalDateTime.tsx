@@ -35,6 +35,17 @@ export function LocalDate(props: Props) {
   );
 }
 
+export function LocalScheduleDate(props: Props) {
+  const value = new Date(new Date(props.value).getTime() - 12 * 60 * 60 * 1000);
+  return (
+    <LocalFormat
+      {...props}
+      value={value}
+      options={{ weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Tehran" }}
+    />
+  );
+}
+
 export function LocalTime(props: Props) {
   return <LocalFormat {...props} options={{ hour: "2-digit", minute: "2-digit" }} />;
 }
