@@ -18,6 +18,7 @@ export type MatchRecord = {
   _id?: unknown;
   provider: ProviderName;
   providerMatchId: string;
+  duplicateOf?: string;
   leagueCode: string;
   featuredNationalFixture?: boolean;
   matchday: number;
@@ -44,6 +45,9 @@ const getCachedMatches = unstable_cache(
     const activeProvider = getFootballProvider().name;
     const query = {
       provider: activeProvider,
+      // Retained provider duplicates stay in storage for audit/prediction history,
+      // but are excluded from public schedule and match detail surfaces.
+      duplicateOf: { $exists: false },
       // Only expose records written from a verified Football API response.
       rawApiResponse: { $exists: true },
       // 207 is Switzerland's Super League, not Turkey's Super Cup (551).
@@ -143,6 +147,7 @@ export async function getMatchesPage(
   const bounds = todayBounds();
   const query: any = {
     provider: getFootballProvider().name,
+    duplicateOf: { $exists: false },
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
@@ -306,6 +311,7 @@ export async function getMatch(providerMatchId: string) {
   const match = await db.collection<MatchRecord>("matches").findOne({
     provider: getFootballProvider().name,
     providerMatchId,
+    duplicateOf: { $exists: false },
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED"] },
