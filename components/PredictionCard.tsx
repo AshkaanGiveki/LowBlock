@@ -16,7 +16,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { LocalDate, LocalTime } from "@/components/LocalDateTime";
+import { LocalScheduleDate, LocalTime } from "@/components/LocalDateTime";
 import { teamName } from "@/lib/football/team-names";
 import { formatNumber } from "@/lib/text";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -384,7 +384,7 @@ export function PredictionCard({
             />
           </div>
           <div className="mt-4 text-center text-[10px] font-bold text-white/65">
-            <LocalDate
+            <LocalScheduleDate
               value={match.kickoffAt}
               locale={language === "fa" ? "fa-IR" : "en-GB"}
             />{" "}
