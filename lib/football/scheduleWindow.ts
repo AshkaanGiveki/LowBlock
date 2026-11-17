@@ -9,6 +9,24 @@ export function appDateKey(value = new Date()): string {
   }).format(value);
 }
 
+/** Operational schedule days run from 12:00 to 12:00 in the app timezone. */
+export function appScheduleDateKey(value = new Date()): string {
+  return appDateKey(new Date(value.getTime() - 12 * 60 * 60 * 1000));
+}
+
+export function appLocalDateTimeToUtc(dateKey: string, hour = 0, minute = 0): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const rough = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: env.APP_TIMEZONE || "Asia/Tehran",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(rough);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
+  const zoneAsUtc = Date.UTC(values.year, values.month - 1, values.day, values.hour, values.minute, values.second);
+  return new Date(rough.getTime() - (zoneAsUtc - rough.getTime()));
+}
+
 function addDays(dateKey: string, days: number) {
   const value = new Date(`${dateKey}T00:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + days);
@@ -30,9 +48,12 @@ export function providerWeekDateKeys(value = new Date()): string[] {
 }
 
 export function appDayBounds(value = new Date()) {
-  const today = appDateKey(value);
-  const start = new Date(`${today}T00:00:00+03:30`);
-  return { start, end: new Date(start.getTime() + DAY_MS) };
+  const scheduleDate = appScheduleDateKey(value);
+  const endDate = addDays(scheduleDate, 1);
+  return {
+    start: appLocalDateTimeToUtc(scheduleDate, 12),
+    end: appLocalDateTimeToUtc(endDate, 12),
+  };
 }
 
 /** SportsAPI quota days reset at 00:00 UTC, not at the Tehran calendar day. */
