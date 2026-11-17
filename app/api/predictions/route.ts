@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     .findOne({
       provider: { $in: ["football-api", "sportsapi"] },
       providerMatchId: parsed.data.matchId,
+      duplicateOf: { $exists: false },
       rawApiResponse: { $exists: true },
     });
   if (!match)
