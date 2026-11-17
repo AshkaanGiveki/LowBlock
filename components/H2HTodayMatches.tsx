@@ -34,9 +34,10 @@ function countdownParts(milliseconds: number, language: "fa" | "en") {
 
 function formatKickoff(dateValue: string, language: "fa" | "en") {
   const date = new Date(dateValue);
+  const scheduleDate = new Date(date.getTime() - 12 * 60 * 60 * 1000);
   const locale = language === "fa" ? "fa-IR" : "en-GB";
   return {
-    date: new Intl.DateTimeFormat(locale, { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Asia/Tehran" }).format(date),
+    date: new Intl.DateTimeFormat(locale, { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Asia/Tehran" }).format(scheduleDate),
     time: new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tehran" }).format(date),
   };
 }
