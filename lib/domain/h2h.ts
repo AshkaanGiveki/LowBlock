@@ -136,7 +136,7 @@ function selectable(match: any, week: H2HWeek, ratingMap: Map<string, number>) {
 
 export function buildH2HSlates(matches: any[], week: H2HWeek, ratingMap: Map<string, number> = ratings): H2HSlate[] {
   const candidates = matches
-    .filter((match) => selectable(match, week, ratingMap))
+    .filter((match) => !match.duplicateOf && selectable(match, week, ratingMap))
     .map((match) => ({
       match,
       date: kickoff(match.kickoffAt)!,
