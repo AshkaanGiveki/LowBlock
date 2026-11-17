@@ -4,7 +4,7 @@ import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore
 import { getCanonicalLeaderboard, getLeaderboardSummary } from "@/lib/domain/leaderboards";
 import { currentUserId } from "@/lib/auth/session";
 import { env } from "@/lib/env";
-import { appDateKey, appScheduleDateKey, appLocalDateTimeToUtc, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
+import { appScheduleDateKey, appLocalDateTimeToUtc, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
 import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
