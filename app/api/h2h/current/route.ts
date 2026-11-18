@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
-import { getH2HWeek, isH2HEnabled } from "@/lib/domain/h2h";
+import { getH2HWeek, isH2HEnabled, publicH2HLeague } from "@/lib/domain/h2h";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export async function GET() {
   if (!membership) return NextResponse.json({ enabled: true, league: null, weekKey: week.key, reason: "NO_CLUB" });
   const [clubMemberCount, league, clubWeeks] = await Promise.all([
     db.collection<any>("clubMemberships").countDocuments({ clubId: membership.clubId, leftAt: null }),
-    db.collection<any>("h2hLeagues").findOne({ clubId: membership.clubId, weekKey: week.key, groupNumber: 1 }, { projection: { _id: 1, weekKey: 1, status: 1, players: 1 } }),
+    db.collection<any>("h2hLeagues").findOne({ clubId: membership.clubId, weekKey: week.key, groupNumber: 1 }, { projection: { _id: 1, weekKey: 1, status: 1, players: 1, slates: 1, clubId: 1, startsAt: 1, endsAt: 1 } }),
     db.collection<any>("h2hLeagues").find({ clubId: membership.clubId, groupNumber: 1 }, { projection: { weekKey: 1, slates: 1 } }).sort({ weekKey: -1 }).limit(12).toArray(),
   ]);
   const validClubWeeks = clubWeeks.filter((item) => Array.isArray(item.slates) && item.slates.length === 7 && item.slates.every((slate: any) => Array.isArray(slate.fixtures) && slate.fixtures.length >= 4));
@@ -26,5 +26,6 @@ export async function GET() {
   if (league.status !== "ACTIVE") {
     return NextResponse.json({ enabled: true, league: null, weekKey: week.key, reason: "NEXT_WEEK", clubMemberCount, availableWeeks });
   }
-  return NextResponse.json({ enabled: true, weekKey: week.key, league: { id: String(league._id), weekKey: league.weekKey }, viewerIncluded: league.players.map(String).includes(String(userId)), clubMemberCount, availableWeeks });
+  const detail = await publicH2HLeague(db, league, userId);
+  return NextResponse.json({ enabled: true, weekKey: week.key, league: { id: String(league._id), weekKey: league.weekKey }, detail, viewerIncluded: league.players.map(String).includes(String(userId)), clubMemberCount, availableWeeks });
 }

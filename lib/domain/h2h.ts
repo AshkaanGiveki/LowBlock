@@ -426,10 +426,32 @@ export async function calculateH2HStandings(db: Db, league: any) {
   const globalRankByUser = new Map<string, number>(ids.map((id: string) => [id, Number.MAX_SAFE_INTEGER]));
   const matchesCollection = db.collection<any>("matches");
   if (typeof matchesCollection.findOne === "function") {
-    const latestSeason = await matchesCollection.findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } });
+    const [latestSeason, seasonRows] = await Promise.all([
+      matchesCollection.findOne({}, { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } }),
+      db.collection<any>("leaderboardStats")
+        .find({ scope: /^SEASON:/ }, { projection: { scope: 1 } })
+        .toArray(),
+    ]);
     const seasonStartYear = Number(latestSeason?.seasonStartYear ?? new Date().getUTCFullYear());
-    const globalSummaries = await Promise.all(ids.map((id: string) => getLeaderboardSummary(db, id, { seasonStartYear })));
-    ids.forEach((id: string, index: number) => globalRankByUser.set(id, Number(globalSummaries[index]?.rank ?? Number.MAX_SAFE_INTEGER)));
+    const scope = `SEASON:${seasonStartYear}`;
+    const rankedScopeExists = seasonRows.some((row) => row.scope === scope);
+    const ordered = rankedScopeExists
+      ? await db.collection<any>("leaderboardStats")
+          .find({ scope }, { projection: { userId: 1, points: 1, exact: 1, correctOutcome: 1, globalPoints: 1, earliestPredictionAt: 1, predictions: 1 } })
+          .sort({ points: -1, exact: -1, correctOutcome: -1, globalPoints: -1, earliestPredictionAt: 1, predictions: -1, userId: 1 })
+          .toArray()
+      : [];
+    const rankedUsers = new Set<string>();
+    ordered.forEach((row, index) => {
+      const id = String(row.userId);
+      globalRankByUser.set(id, index + 1);
+      rankedUsers.add(id);
+    });
+    const missing = ids.filter((id) => !rankedUsers.has(id));
+    if (missing.length) {
+      const fallbacks = await Promise.all(missing.map((id) => getLeaderboardSummary(db, id, { seasonStartYear })));
+      fallbacks.forEach((row, index) => { if (row) globalRankByUser.set(missing[index], Number(row.rank)); });
+    }
   }
   for (const slate of league.slates as H2HSlate[]) {
     const slateMatches = slate.fixtureIds.map((matchId) => byMatch.get(matchId)).filter(Boolean);
