@@ -113,7 +113,7 @@ export const LEAGUES = [
     enName: "FIFA U-17 World Cup",
     short: "U-17 World Cup",
     globalLeaderboard: false,
-    h2h: false,
+    h2h: true,
     defaultClubLeaderboard: false,
     kind: "TOURNAMENT",
   },
