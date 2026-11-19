@@ -68,6 +68,14 @@ export const COMPETITION_MAPPINGS: readonly CompetitionMappingEntry[] = [
     aliases: ["FIFA World Cup", "World Cup"],
   },
   {
+    code: "WC_U17",
+    apiSportsId: 415,
+    sportsApiUniqueTournamentId: 279,
+    expectedCategories: ["World", "world"],
+    slugs: ["u17-world-championship", "world-cup-u17", "u17-world-cup"],
+    aliases: ["FIFA U-17 World Cup", "World Cup - U17", "U17 World Championship"],
+  },
+  {
     code: "EURO",
     apiSportsId: 4,
     sportsApiUniqueTournamentId: 1,

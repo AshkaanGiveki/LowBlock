@@ -11,7 +11,7 @@ import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
 import ratingsData from "@/data/h2h-team-ratings-review.json";
 
 export const H2H_TOURNAMENT_WEIGHTS: Record<string, number> = {
-  UCL: 1.20, GB1: 1.18, ES1: 1.16, IT1: 1.14, L1: 1.12, UEL: 1.12,
+  UCL: 1.20, GB1: 1.18, ES1: 1.16, IT1: 1.14, L1: 1.12, UEL: 1.12, WC_U17: 1.08,
   FR1: 1.10, SA1: 1.08, ACLE: 1.08, TR1: 1.07, NATIONS: 1.07,
   GB2: 1.05, IR1: 1.04, FRIENDLY: 1.00,
 };
@@ -100,12 +100,25 @@ function kickoff(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function h2hTeamRating(
+  match: any,
+  side: "home" | "away",
+  ratingMap: Map<string, number>,
+): number {
+  const team = match[side + "Team"];
+  const id = String(team?.centralTeamId ?? team?.teamId ?? "");
+  const rating = id ? ratingMap.get(id) : undefined;
+  if (rating !== undefined && Number.isFinite(rating) && rating > 0) return rating;
+  // Youth national sides have little comparable club-form data. A restrained
+  // baseline keeps U-17 World Cup fixtures eligible without outranking elite
+  // senior competitions by default.
+  return String(match.leagueCode ?? "") === "WC_U17" ? 45 : 0;
+}
+
 export function scoreH2HFixture(match: any, ratingMap: Map<string, number> = ratings): number | null {
   const code = String(match.leagueCode ?? "");
-  const homeId = String(match.homeTeam?.centralTeamId ?? "");
-  const awayId = String(match.awayTeam?.centralTeamId ?? "");
-  const home = ratingMap.get(homeId) ?? 0;
-  const away = ratingMap.get(awayId) ?? 0;
+  const home = h2hTeamRating(match, "home", ratingMap);
+  const away = h2hTeamRating(match, "away", ratingMap);
   const weight = H2H_TOURNAMENT_WEIGHTS[code] ?? 1;
   const score = (home + away) * weight;
   return score > 0 ? score : null;
@@ -160,8 +173,8 @@ export function buildH2HSlates(matches: any[], week: H2HWeek, ratingMap: Map<str
         leagueCode: String(row.match.leagueCode),
         homeTeam: row.match.homeTeam,
         awayTeam: row.match.awayTeam,
-        homeRating: ratingMap.get(String(row.match.homeTeam?.centralTeamId ?? row.match.homeTeam?.teamId)) ?? 0,
-        awayRating: ratingMap.get(String(row.match.awayTeam?.centralTeamId ?? row.match.awayTeam?.teamId)) ?? 0,
+        homeRating: h2hTeamRating(row.match, "home", ratingMap),
+        awayRating: h2hTeamRating(row.match, "away", ratingMap),
         tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(row.match.leagueCode)],
         ratingVersion: "h2h-team-ratings-review",
       selectionReason: "highest-score-with-four-to-five-daily-target",
