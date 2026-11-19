@@ -25,7 +25,12 @@ export function teamLogoFile(id: unknown): string | null {
 }
 
 export function nationalTeamCrestSlug(name: string): string | null {
-  const nameKey = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+  // Youth national-team fixtures reuse the senior federation crest.
+  const federationName = name.trim().replace(
+    /\\s+(?:u[\\s-]?17|under[\\s-]?17)(?:\\s+(?:national\\s+)?team)?$/i,
+    "",
+  ).trim();
+  const nameKey = federationName.normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
     .toLowerCase().replace(/&/g, " and ").replace(/['’]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const exceptions: Record<string, string> = {
