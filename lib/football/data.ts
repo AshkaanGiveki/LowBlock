@@ -12,7 +12,7 @@ import {
   IMPORTANT_NATIONAL_TEAM_NAMES,
   isFeaturedFixture,
 } from "@/lib/football/leagues";
-import { appCalendarDayBounds } from "./scheduleWindow";
+import { appMatchesPageBounds } from "./scheduleWindow";
 
 export type MatchRecord = {
   _id?: unknown;
@@ -136,7 +136,7 @@ export type MatchPageCursor = {
 };
 
 function todayBounds() {
-  return appCalendarDayBounds();
+  return appMatchesPageBounds();
 }
 
 export async function getMatchesPage(

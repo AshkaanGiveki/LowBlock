@@ -47,12 +47,13 @@ export function providerWeekDateKeys(value = new Date()): string[] {
   return Array.from({ length: 7 }, (_, index) => addDays(local.toISOString().slice(0, 10), index));
 }
 
-/** Returns the local calendar day, for date-based surfaces such as Matches. */
-export function appCalendarDayBounds(value = new Date()) {
+/** Matches page window: all of today plus tomorrow before local noon. */
+export function appMatchesPageBounds(value = new Date()) {
   const date = appDateKey(value);
+  const tomorrow = addDays(date, 1);
   return {
     start: appLocalDateTimeToUtc(date),
-    end: appLocalDateTimeToUtc(addDays(date, 1)),
+    end: appLocalDateTimeToUtc(tomorrow, 12),
   };
 }
 
