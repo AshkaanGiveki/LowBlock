@@ -47,6 +47,15 @@ export function providerWeekDateKeys(value = new Date()): string[] {
   return Array.from({ length: 7 }, (_, index) => addDays(local.toISOString().slice(0, 10), index));
 }
 
+/** Returns the local calendar day, for date-based surfaces such as Matches. */
+export function appCalendarDayBounds(value = new Date()) {
+  const date = appDateKey(value);
+  return {
+    start: appLocalDateTimeToUtc(date),
+    end: appLocalDateTimeToUtc(addDays(date, 1)),
+  };
+}
+
 export function appDayBounds(value = new Date()) {
   const scheduleDate = appScheduleDateKey(value);
   const endDate = addDays(scheduleDate, 1);
