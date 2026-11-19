@@ -366,8 +366,8 @@ export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: st
     fixtures: chosen.map((row) => ({
       matchId: row.id, kickoffAt: row.date, score: row.score, leagueCode: String(row.match.leagueCode),
       homeTeam: row.match.homeTeam, awayTeam: row.match.awayTeam,
-      homeRating: ratingMap.get(String(row.match.homeTeam?.centralTeamId ?? row.match.homeTeam?.teamId)) ?? 0,
-      awayRating: ratingMap.get(String(row.match.awayTeam?.centralTeamId ?? row.match.awayTeam?.teamId)) ?? 0,
+      homeRating: h2hTeamRating(row.match, "home", ratingMap),
+      awayRating: h2hTeamRating(row.match, "away", ratingMap),
       tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(row.match.leagueCode)] ?? 1,
       ratingVersion: "h2h-team-ratings-review", selectionReason: "top-five-rated-matches-for-fetched-date",
     })),
