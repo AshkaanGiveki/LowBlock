@@ -399,6 +399,22 @@ export async function refreshH2HLeagueResults(db: Db, league: any) {
   const byMatch = new Map(matches.map((match) => [String(match.providerMatchId), match]));
   const completedSlates = (league.slates as H2HSlate[]).filter((slate) => slate.fixtureIds.every((matchId) => isH2HFixtureResolved(byMatch.get(matchId))));
   const now = new Date();
+  const validPlayerIds = [...new Set((league.players ?? []).map((id: any) => String(id)).filter((id: string) => id && id !== "undefined" && id !== "null"))];
+  const completedMatchdays = completedSlates.map((slate) => Number(slate.matchday));
+  const expectedPairKeys = completedSlates.flatMap((slate) =>
+    buildH2HPairings(validPlayerIds, Number(slate.matchday) - 1).map((pairing) => `${pairing.playerA}:${pairing.playerB}`),
+  );
+  // Result rows are derived data. Remove stale weeks and malformed pairings
+  // before rebuilding, so old undefined participant rows cannot survive.
+  await db.collection("h2hMatchResults").deleteMany({
+    leagueId: league._id,
+    $or: [
+      { matchday: { $nin: completedMatchdays } },
+      { playerPair: { $nin: expectedPairKeys } },
+      { playerA: { $nin: validPlayerIds } },
+      { playerB: { $nin: validPlayerIds } },
+    ],
+  });
   await db.collection("h2hStandings").deleteMany({ leagueId: league._id });
   if (standings.length) {
     const played = completedSlates.length;
@@ -407,9 +423,10 @@ export async function refreshH2HLeagueResults(db: Db, league: any) {
     for (const slate of completedSlates) for (const pairing of buildH2HPairings(league.players.map(String), slate.matchday - 1)) {
       const a = standings.find((row: any) => row.userId === pairing.playerA);
       const b = standings.find((row: any) => row.userId === pairing.playerB);
-      const as = a?.slateScores?.[String(slate.matchday)] ?? 0;
-      const bs = b?.slateScores?.[String(slate.matchday)] ?? 0;
-      operations.push({ updateOne: { filter: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}` }, update: { $set: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a?.userId}:${b?.userId}`, playerA: a?.userId, playerB: b?.userId, scoreA: as, scoreB: bs, winnerUserId: as === bs ? null : as > bs ? a?.userId : b?.userId, status: "FINAL", updatedAt: now }, $setOnInsert: { createdAt: now } }, upsert: true } });
+      if (!a || !b || !validPlayerIds.includes(String(a.userId)) || !validPlayerIds.includes(String(b.userId))) continue;
+      const as = a.slateScores?.[String(slate.matchday)] ?? 0;
+      const bs = b.slateScores?.[String(slate.matchday)] ?? 0;
+      operations.push({ updateOne: { filter: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a.userId}:${b.userId}` }, update: { $set: { leagueId: league._id, matchday: slate.matchday, playerPair: `${a.userId}:${b.userId}`, playerA: a.userId, playerB: b.userId, scoreA: as, scoreB: bs, winnerUserId: as === bs ? null : as > bs ? a.userId : b.userId, status: "FINAL", updatedAt: now }, $setOnInsert: { createdAt: now } }, upsert: true } });
     }
     if (operations.length) await db.collection("h2hMatchResults").bulkWrite(operations);
   }
