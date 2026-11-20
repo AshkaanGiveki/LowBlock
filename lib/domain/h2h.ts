@@ -352,8 +352,10 @@ export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: nu
 export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: string, ratingMap: Map<string, number> = ratings): H2HSlate | null {
   const matchday = providerWeekDateKeys(week.start).indexOf(sourceDate) + 1;
   if (matchday < 1) return null;
+  const minimumLeadTime = Date.now() + 45 * 60 * 1000;
   const candidates = matches
     .filter((match) => selectable(match, week, ratingMap))
+    .filter((match) => kickoff(match.kickoffAt)!.getTime() >= minimumLeadTime)
     .filter((match) => appScheduleDateKey(kickoff(match.kickoffAt)!) === sourceDate)
     .map((match) => ({ match, date: kickoff(match.kickoffAt)!, score: scoreH2HFixture(match, ratingMap)!, id: String(match.providerMatchId) }))
     .filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index)
