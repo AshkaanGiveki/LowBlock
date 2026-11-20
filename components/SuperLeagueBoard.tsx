@@ -30,7 +30,11 @@ function Unavailable({ onRetry }: { onRetry: () => void }) {
 }
 
 function preferredRoundIndex(slates: any[] = []) {
-  const upcoming = slates.find((item) => new Date(item.firstKickoffAt).getTime() > Date.now());
+  const upcoming = slates.find((item) => {
+    const kickoffs = (item.fixtures ?? []).map((fixture: any) => new Date(fixture.kickoffAt).getTime()).filter(Number.isFinite);
+    const latestKickoff = kickoffs.length ? Math.max(...kickoffs) : new Date(item.firstKickoffAt).getTime();
+    return latestKickoff > Date.now();
+  });
   if (upcoming) return Math.max(0, Number(upcoming.matchday) - 1);
   return slates.length ? Math.max(0, Number(slates[slates.length - 1].matchday) - 1) : 0;
 }
