@@ -52,7 +52,7 @@ const getCachedMatches = unstable_cache(
       rawApiResponse: { $exists: true },
       // 207 is Switzerland's Super League, not Turkey's Super Cup (551).
       $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
-      status: { $nin: ["VOID", "CANCELLED"] },
+      status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
       kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
       ...(leagueCode ? { leagueCode } : {}),
       ...(matchday !== null ? { matchday } : {}),
@@ -150,7 +150,7 @@ export async function getMatchesPage(
     duplicateOf: { $exists: false },
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
-    status: { $nin: ["VOID", "CANCELLED"] },
+    status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
     kickoffAt: { $gte: bounds.start, $lt: bounds.end },
     $or: [
       { featuredNationalFixture: true },
@@ -314,7 +314,7 @@ export async function getMatch(providerMatchId: string) {
     duplicateOf: { $exists: false },
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
-    status: { $nin: ["VOID", "CANCELLED"] },
+    status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
   });
   if (!match) return null;
   const ids = [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId].filter(Boolean);
