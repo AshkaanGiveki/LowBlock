@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db/mongo";
 import { repairPersianText, teamName } from "./team-names";
 import { reviewedPersianTeamName } from "./persian-team-names";
+import { persianU17NationalTeamName } from "./persian-u17-national-team-names";
 import type { ProviderName } from "./types";
 import { teamLogoUrl, footballApiTeamLogoUrl, nationalTeamCrestUrl } from "./teamLogos";
 
@@ -36,6 +37,8 @@ export function centralTeamId(team: { centralTeamId?: string; provider: Provider
 }
 
 function initialFaName(provider: ProviderName, id: string, name: string) {
+  const youthName = persianU17NationalTeamName(name);
+  if (youthName) return youthName;
   const reviewed = reviewedPersianTeamName(name);
   if (reviewed) return reviewed;
   const candidates = [name, name.replace(/^(ssc|fc|afc|cf)\s+/i, ""), name.replace(/\s+hotspur$/i, "")];
@@ -62,7 +65,7 @@ export async function ensureCentralTeam(input: {
   if (byProvider) {
     await db.collection("centralTeams").updateOne(
       { _id: (byProvider as any)._id },
-      { $set: { [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}), ...(input.isNational ? { isNational: true } : {}) }, $addToSet: { aliases: input.sourceName } },
+      { $set: { [`providerNames.${input.provider}`]: input.sourceName, updatedAt: new Date(), ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}), ...(persianU17NationalTeamName(input.sourceName) ? { "names.fa": fa } : {}), ...(input.isNational ? { isNational: true } : {}), ...(persianU17NationalTeamName(input.sourceName) ? { "names.fa": fa } : {}) }, $addToSet: { aliases: input.sourceName } },
     );
     return byProvider.centralTeamId;
   }
