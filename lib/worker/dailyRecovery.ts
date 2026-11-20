@@ -27,8 +27,13 @@ export async function runCompleteDailyFootballCycle() {
   if (isH2HEnabled()) {
     const tomorrow = appDateKey(new Date(startedAt.getTime() + 86_400_000));
     const schedule = await ensureCurrentH2HLeagues(db, { sourceDate: tomorrow, batchIndex: 0, batchSize: 1000 });
-    const results = await refreshActiveH2HResults(db, getH2HWeek().key);
-    h2h = { enabled: true, tomorrow, schedule, results };
+    const currentWeekKey = getH2HWeek().key;
+    const previousWeekKey = getH2HWeek(new Date(startedAt), -1).key;
+    const [previousWeekResults, results] = await Promise.all([
+      refreshActiveH2HResults(db, previousWeekKey),
+      refreshActiveH2HResults(db, currentWeekKey),
+    ]);
+    h2h = { enabled: true, tomorrow, schedule, previousWeekResults, results };
   }
 
   const scoring = await runLeaderboardEngine({ recentOnly: true, batchIndex: 0, batchSize: 5000 });
