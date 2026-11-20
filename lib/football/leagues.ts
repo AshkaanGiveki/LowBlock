@@ -108,7 +108,7 @@ export const LEAGUES = [
     code: "WC_U17",
     apiLeagueId: 415,
     slug: "fifa-u17-world-cup",
-    logo: "https://digitalhub.fifa.com/transform/2d2d852a-345d-4337-8298-02818318bae9/FIFA-U-17-World-Cup-Qatar-2025-Official-Emblem?format=webp&io=transform%3Afit%2Cwidth%3A512&quality=90",
+    logo: "/leagues/fifa-u17-world-cup.webp",
     faName: "جام جهانی زیر ۱۷ سال",
     enName: "FIFA U-17 World Cup",
     short: "U-17 World Cup",
