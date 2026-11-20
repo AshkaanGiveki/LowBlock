@@ -96,6 +96,7 @@ export function MatchesView({
     return matches
       .filter(
         (match) =>
+          match.status !== "POSTPONED" &&
           (showAllMatches ||
             selected.includes(match.leagueCode) ||
             match.featuredNationalFixture === true ||
