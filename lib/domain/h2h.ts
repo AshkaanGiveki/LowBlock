@@ -399,7 +399,7 @@ export async function refreshH2HLeagueResults(db: Db, league: any) {
   const byMatch = new Map(matches.map((match) => [String(match.providerMatchId), match]));
   const completedSlates = (league.slates as H2HSlate[]).filter((slate) => slate.fixtureIds.every((matchId) => isH2HFixtureResolved(byMatch.get(matchId))));
   const now = new Date();
-  const validPlayerIds = [...new Set((league.players ?? []).map((id: any) => String(id)).filter((id: string) => id && id !== "undefined" && id !== "null"))];
+  const validPlayerIds: string[] = Array.from(new Set<string>((league.players ?? []).map((id: any) => String(id)).filter((id: string) => id && id !== "undefined" && id !== "null")));
   const completedMatchdays = completedSlates.map((slate) => Number(slate.matchday));
   const expectedPairKeys = completedSlates.flatMap((slate) =>
     buildH2HPairings(validPlayerIds, Number(slate.matchday) - 1).map((pairing) => `${pairing.playerA}:${pairing.playerB}`),
