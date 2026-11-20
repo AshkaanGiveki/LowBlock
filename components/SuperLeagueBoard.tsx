@@ -12,6 +12,23 @@ function Skeleton() {
   return <div className="mt-6 animate-pulse space-y-5" aria-label="Loading SuperLeague details"><div className="h-20 rounded-[1.35rem] border border-white/[.06] bg-white/[.04]" /><div className="h-72 max-w-5xl rounded-[1.5rem] border border-white/[.06] bg-white/[.04]" /><div className="h-80 max-w-2xl rounded-2xl border border-white/[.06] bg-white/[.04]" /></div>;
 }
 
+async function fetchJson(url: string) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error ?? `HTTP_${response.status}`);
+    return payload;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function Unavailable({ onRetry }: { onRetry: () => void }) {
+  return <div className="mt-6 max-w-5xl rounded-2xl border border-amber-400/20 bg-amber-400/[.05] p-4 text-sm text-white/65"><p>SuperLeague details could not be loaded.</p><button type="button" onClick={onRetry} className="mt-2 font-bold text-brand underline underline-offset-4">Retry</button></div>;
+}
+
 function preferredRoundIndex(slates: any[] = []) {
   const upcoming = slates.find((item) => new Date(item.firstKickoffAt).getTime() > Date.now());
   if (upcoming) return Math.max(0, Number(upcoming.matchday) - 1);
@@ -38,8 +55,8 @@ export default function SuperLeagueBoard() {
       return;
     }
     setLoading(true);
-    fetch(`/api/superleague/week/${encodeURIComponent(weekKey)}`, { cache: "no-store" })
-      .then((r) => r.json())
+    setError("");
+    fetchJson(`/api/superleague/week/${encodeURIComponent(weekKey)}`)
       .then((next) => {
         cache.current.set(weekKey, next);
         setDetail(next);
@@ -48,8 +65,9 @@ export default function SuperLeagueBoard() {
       .catch(() => setError("Could not load SuperLeague details"))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { fetch("/api/h2h/current", { cache: "no-store" }).then((r) => r.json()).then((next) => { setData(next); const currentIndex = next.availableWeeks?.indexOf(next.weekKey) ?? 0; setWeekIndex(Math.max(0, currentIndex)); if (next.detail?.league) { cache.current.set(next.league.weekKey, next.detail); setDetail(next.detail); setRoundIndex(preferredRoundIndex(next.detail.league.slates ?? [])); } else if (next.league?.weekKey) loadDetail(next.league.weekKey); }).catch(() => setError("Could not load SuperLeague")); }, []);
+  useEffect(() => { fetchJson("/api/h2h/current").then((next) => { setData(next); const currentIndex = next.availableWeeks?.indexOf(next.weekKey) ?? 0; setWeekIndex(Math.max(0, currentIndex)); if (next.league?.weekKey) loadDetail(next.league.weekKey); }).catch(() => { setError("Could not load SuperLeague"); setData({ enabled: true, reason: "LOAD_FAILED" }); }); }, []);
   if (!data) return <main className="min-h-screen bg-[#080b0a] px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><Skeleton /></div></main>;
+  if (data.reason === "LOAD_FAILED") return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><p className="rounded-2xl border border-red-400/20 bg-red-400/[.06] p-5 text-sm text-red-100">SuperLeague could not be loaded. Please retry.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 font-bold text-brand underline underline-offset-4">Retry</button></div></main>;
   if (!data.enabled) return null;
   const weekKeys: string[] = data.availableWeeks?.length ? data.availableWeeks : (data.league?.weekKey ? [data.league.weekKey] : []);
   if (!data.league && !weekKeys.some((weekKey) => weekKey !== data.weekKey)) return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={1} progressSlate={1} /><p className="mt-6 max-w-2xl rounded-2xl border border-white/[.08] bg-[#101713] p-5 text-sm text-white/60">{data.reason === "NO_CLUB" ? "Join a club to enter SuperLeague." : "This week’s SuperLeague group is being prepared."}</p></div></main>;
@@ -61,7 +79,7 @@ export default function SuperLeagueBoard() {
   const moveRound = (direction: number) => setRoundIndex((current) => Math.min(6, Math.max(0, current + direction)));
   return <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32"><div className="mx-auto max-w-7xl"><H2HHero slateCount={7} activeSlate={roundIndex + 1} progressSlate={roundIndex + 1} />
     <section dir="ltr" className="mt-6 flex items-center justify-between rounded-[1.35rem] border border-white/[.08] bg-[#101713] px-3 py-3.5 shadow-[0_16px_50px_rgba(0,0,0,.16)] md:px-5"><button type="button" onClick={() => moveWeek(-1)} disabled={weekIndex <= 0} aria-label="Previous SuperLeague week" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[.03] text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={20} /></button><div className="text-center"><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand"><T fa="هفته سوپرلیگ" en="SUPERLEAGUE WEEK" /></p><h2 className="mt-0.5 text-xl font-black"><T fa="هفته" en="Week" /> {weekIndex + 1}</h2><p className="mt-0.5 text-[10px] text-white/35">{weekKeys[weekIndex]}</p></div><button type="button" onClick={() => moveWeek(1)} disabled={weekIndex >= weekKeys.length - 1} aria-label="Next SuperLeague week" className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[.03] text-white/65 transition hover:border-brand/45 hover:bg-brand/10 hover:text-brand disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={20} /></button></section>
-    {data.viewerIncluded && (league?.slates ? <H2HTodayMatches slates={league.slates} leagueId={league.id} matchday={roundIndex + 1} /> : <div aria-label={loading ? "Loading Gold Picks" : "Gold Picks unavailable"} className="mt-6 h-56 max-w-5xl animate-pulse rounded-2xl border border-white/[.08] bg-white/[.035]" />)}
+    {data.viewerIncluded && (league?.slates ? <H2HTodayMatches slates={league.slates} leagueId={league.id} matchday={roundIndex + 1} /> : loading ? <div aria-label="Loading Gold Picks" className="mt-6 h-56 max-w-5xl animate-pulse rounded-2xl border border-white/[.08] bg-white/[.035]" /> : <Unavailable onRetry={() => loadDetail(weekKeys[weekIndex])} />)}
     <section dir="ltr" className="mt-3 flex items-center justify-between rounded-2xl border border-white/[.06] bg-white/[.02] px-3 py-2"><button type="button" onClick={() => moveRound(-1)} disabled={roundIndex <= 0} aria-label="Previous round" className="grid h-9 w-9 place-items-center rounded-lg text-white/50 hover:bg-white/[.06] disabled:opacity-20"><ChevronLeft size={17} /></button><span className="text-[10px] font-black uppercase tracking-[.16em] text-white/45">Round {roundIndex + 1}{slate?.sourceDate ? ` · ${slate.sourceDate}` : ""}</span><button type="button" onClick={() => moveRound(1)} disabled={roundIndex >= 6} aria-label="Next round" className="grid h-9 w-9 place-items-center rounded-lg text-white/50 hover:bg-white/[.06] disabled:opacity-20"><ChevronRight size={17} /></button></section>
-    {round ? <H2HRoundMatches round={round} /> : <div aria-label={loading ? "Loading player matchups" : "Player matchups unavailable"} className="mt-6 h-72 max-w-5xl animate-pulse rounded-2xl border border-white/[.08] bg-white/[.035]" />}{league?.standings ? <Standings rows={league.standings} viewerId={league.viewerId} /> : <div aria-label={loading ? "Loading standings" : "Standings unavailable"} className="mt-8 h-64 max-w-3xl animate-pulse rounded-2xl border border-white/[.08] bg-white/[.035]" />}{error && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}</div></main>;
+    {round ? <H2HRoundMatches round={round} /> : loading ? <div aria-label="Loading player matchups" className="mt-6 h-72 max-w-5xl animate-pulse rounded-2xl border border-white/[.08] bg-white/[.035]" /> : <Unavailable onRetry={() => loadDetail(weekKeys[weekIndex])} />}{league?.standings ? <Standings rows={league.standings} viewerId={league.viewerId} /> : loading ? <div aria-label="Loading standings" className="mt-8 h-64 max-w-3xl animate-pulse rounded-2xl border border-white/[.08] bg-white/[.035]" /> : <Unavailable onRetry={() => loadDetail(weekKeys[weekIndex])} />}{error && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}</div></main>;
 }
