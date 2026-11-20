@@ -433,11 +433,13 @@ export async function refreshH2HLeagueResults(db: Db, league: any) {
   return { standings, played: completedSlates.length };
 }
 
-/** Persist current standings/results for every active league after nightly sync. */
+/** Refresh active and recently completed league results after nightly sync. */
 export async function refreshActiveH2HResults(db: Db, weekKey = getH2HWeek().key) {
-  const leagues = await db.collection<any>("h2hLeagues").find({ weekKey, status: "ACTIVE" }).toArray();
+  const leagues = await db.collection<any>("h2hLeagues")
+    .find({ weekKey, status: { $in: ["ACTIVE", "COMPLETED"] } })
+    .toArray();
   for (const league of leagues) await refreshH2HLeagueResults(db, league);
-  return { updated: leagues.length };
+  return { updated: leagues.length, weekKey };
 }
 
 export async function calculateH2HStandings(db: Db, league: any) {
