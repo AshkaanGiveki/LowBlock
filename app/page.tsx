@@ -1,12 +1,20 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { FEATURED_COMPETITION_CODES, LEAGUES as ALL_LEAGUES } from "@/lib/football/leagues";
 import { T } from "@/components/LanguageProvider";
 import { HomeHeroSlang } from "@/components/HomeHeroSlang";
 import HomeLiveData from "@/components/HomeLiveData";
+import { AdminGate } from "@/components/admin/AdminGate";
 
 const LEAGUES = FEATURED_COMPETITION_CODES.map((code) => ALL_LEAGUES.find((league) => league.code === code)!).filter(Boolean);
 
-export default function Home() {
+export default async function Home() {
+  const requestHeaders = await headers();
+  const requestHosts = [requestHeaders.get("host"), requestHeaders.get("x-forwarded-host")]
+    .flatMap((value) => value?.split(",") ?? [])
+    .map((value) => value.trim().split(":")[0].toLowerCase());
+  if (requestHosts.includes("admin.lowblock.ir")) return <AdminGate />;
+
   return <main className="min-h-screen pb-24 pt-20"><div className="mx-auto max-w-7xl px-4 md:px-8">
     <section className="home-hero relative mt-5 overflow-hidden rounded-[2rem] border border-white/[.08] p-6 md:p-10"><div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" /><div className="relative"><p className="text-xs font-black tracking-[.2em] text-brand"><T fa="سلام لووبلاک" en="Welcome to LowBlock" /></p><h1 className="mt-3 max-w-2xl text-4xl font-black leading-tight md:text-6xl"><HomeHeroSlang /></h1><p className="mt-4 max-w-xl text-sm leading-7 text-white/60"><T fa="هر پیش‌بینی شما به لووبلاک و رقابت‌های شما کمک می‌کند." en="Every prediction contributes to LowBlock, leagues and your Club." /></p><div className="mt-7 flex flex-wrap gap-3"><Link href="/matches" className="rounded-xl bg-brand px-5 py-3 text-sm font-black">Predict matches</Link><Link href="/lowblock" className="rounded-xl border border-white/10 bg-white/[.04] px-5 py-3 text-sm font-black">Global standings</Link></div></div></section>
     <section className="mt-8"><div className="flex items-end justify-between"><div><p className="text-xs font-black tracking-[.16em] text-brand">COMPETITIONS</p><h2 className="mt-2 text-2xl font-black">Find your competition</h2></div><Link href="/leagues" className="text-xs font-bold text-brand">View all</Link></div><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{LEAGUES.map((league, index) => <Link key={league.code} href={`/leagues/${league.code}`} className="group relative isolate min-h-32 overflow-hidden rounded-[1.35rem] border border-white/10 bg-[linear-gradient(135deg,#17251b,#0d130f)] p-5 transition duration-300 hover:-translate-y-1 hover:border-brand/50"><span className="absolute -right-7 -top-8 h-28 w-28 rounded-full bg-brand/10 blur-2xl" /><span className="relative flex items-start justify-between gap-3"><span className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[.06] p-2"><img src={league.logo} alt="" className="league-logo h-full w-full object-contain" /></span><span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black tracking-[.14em] text-white/35">{String(index + 1).padStart(2, "0")}</span></span><span className="relative mt-5 block text-sm font-black"><T fa={league.faName} en={league.enName} /></span><span className="relative mt-1 block text-[10px] font-bold tracking-wide text-white/35">Explore fixtures</span></Link>)}</div></section>
