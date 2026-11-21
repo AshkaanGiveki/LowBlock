@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Activity, Award, Bell, Building2, CalendarDays, ChevronRight, CircleHelp, Copy, Database, Eye, EyeOff, Gauge, Globe2, Info, LayoutDashboard, LogOut, Menu, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
+import { Activity, Award, Bell, Building2, CalendarDays, Check, ChevronRight, CircleHelp, Copy, Database, Eye, EyeOff, Gauge, Globe2, Info, LayoutDashboard, LogOut, Menu, MoreHorizontal, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
 import { LEAGUES } from "@/lib/football/leagues";
 
 type Section = "overview" | "matches" | "sync" | "superleague" | "tournaments" | "users" | "clubs" | "teams" | "notifications" | "awards" | "analytics" | "system" | "access";
@@ -237,6 +237,7 @@ function Overview({ overview, busy, runAction, onNavigate }: any) {
 
 function DataSection({ section, dataset, overview, busy, query, setQuery, page, onPageChange, onNavigate, onAction, onUserAdmin, onAdminAction, onExport, selectedMatchIds, setSelectedMatchIds, showManualMatchForm, setShowManualMatchForm, showSlateAssignment, setShowSlateAssignment, reload }: any) {
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [actionMenuMatchId, setActionMenuMatchId] = useState<string | null>(null);
   const [copiedMatchId, setCopiedMatchId] = useState<string | null>(null);
   const copyFixtureId = async (id: string) => {
     try {
@@ -336,7 +337,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
         if (section === "matches") return <article className={`lb-admin-fixture-card ${isSelected ? "is-selected" : ""} ${row.adminHiddenFromListings ? "is-hidden" : ""}`} key={row._id ?? row.code ?? index}>
           <div className="lb-admin-fixture-topline">
             <div className="lb-admin-fixture-competition">{tournament?.logo ? <img src={tournament.logo} alt=""/> : <span className="lb-admin-fixture-competition-fallback"><Trophy size={15}/></span>}<span><b>{displayText(tournament?.enName ?? row.tournamentName ?? row.tournament, "Supported tournament")}</b><small>{displayText(tournament?.faName, displayText(row.leagueCode, "Competition"))}</small></span></div>
-            <div className="lb-admin-fixture-top-actions"><StatusPill value={row.status}/><button className="lb-admin-fixture-icon-button" aria-label={isExpanded ? "Hide fixture details" : "Show fixture details"} aria-expanded={isExpanded} title="Fixture details" onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}><Info size={16}/></button></div>
+            <div className="lb-admin-fixture-top-actions"><span className="lb-admin-fixture-kickoff">{kickoffTime}</span><StatusPill value={row.status}/><div className="lb-admin-fixture-menu"><button className="lb-admin-fixture-icon-button" aria-label="Open fixture actions" aria-expanded={actionMenuMatchId === matchId} title="Fixture actions" onClick={() => setActionMenuMatchId(actionMenuMatchId === matchId ? null : matchId)}><MoreHorizontal size={17}/></button>{actionMenuMatchId === matchId && <div className="lb-admin-fixture-menu-popover" role="menu"><button disabled={(!isSlateEligible && !isSelected) || (!isSelected && selectedMatchIds.length >= 5)} onClick={() => { setSelectedMatchIds((current: string[]) => current.includes(matchId) ? current.filter((value) => value !== matchId) : current.length < 5 ? [...current, matchId] : current); setActionMenuMatchId(null); }}><Check size={14}/>{isSelected ? "Remove from slate" : "Select for slate"}</button><button disabled={busy || !matchId} onClick={() => { void act(row); setActionMenuMatchId(null); }}><Eye size={14}/>{row.adminHiddenFromListings ? "Show in player matches" : "Hide from player matches"}</button><button disabled={!matchId} onClick={() => { void copyFixtureId(matchId); setActionMenuMatchId(null); }}><Copy size={14}/>{copiedMatchId === matchId ? "Copied fixture ID" : "Copy fixture ID"}</button></div>}</div><button className="lb-admin-fixture-icon-button" aria-label={isExpanded ? "Hide fixture details" : "Show fixture details"} aria-expanded={isExpanded} title={isExpanded ? "Hide details" : "Show details"} onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}><Info size={16}/></button></div>
           </div>
           <div className="lb-admin-fixture-main">
             <div className="lb-admin-fixture-team"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{displayText(first(row.homeTeamName, row.homeTeam?.name), "Home team")}</b><small>Home</small></div>
