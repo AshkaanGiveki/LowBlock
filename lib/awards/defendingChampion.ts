@@ -3,9 +3,10 @@ import { GLOBAL_LEAGUE_CODES } from "@/lib/football/leagues";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 
 export async function getDefendingChampionUserId(db: Db) {
-  // The throne badge represents the leader of the currently active Friday-to-
-  // Thursday period. Historical weekly awards remain available separately.
-  const period = getIranWeeklyPeriod();
+  // The throne badge represents the player who finished first on the previous
+  // weekly leaderboard. It must use the same Friday-to-Thursday period and
+  // tie-break order as the public "Previous week" leaderboard.
+  const period = getIranWeeklyPeriod(new Date(), 1);
   const [leader] = await db
     .collection("predictionScores")
     .aggregate([
@@ -38,7 +39,6 @@ export async function getDefendingChampionUserId(db: Db) {
         $sort: {
           points: -1,
           exact: -1,
-          correctOutcome: -1,
           predictions: -1,
           _id: 1,
         },
