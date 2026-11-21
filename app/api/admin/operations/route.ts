@@ -9,8 +9,8 @@ import { ensureCurrentH2HLeagues, getH2HWeek, isH2HEnabled, settleH2HLeagues } f
 export const maxDuration = 60;
 
 const bodySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("sync") }),
-  z.object({ action: z.literal("rebuild-scores") }),
+  z.object({ action: z.literal("sync"), confirmText: z.literal("SYNC PROVIDER") }),
+  z.object({ action: z.literal("rebuild-scores"), confirmText: z.literal("REBUILD SCORES") }),
   z.object({ action: z.literal("set-admin"), userId: z.string().regex(/^[a-f\d]{24}$/i), enabled: z.boolean(), confirmText: z.string() }),
   z.object({ action: z.literal("revoke-sessions"), userId: z.string().regex(/^[a-f\d]{24}$/i), confirmText: z.literal("REVOKE SESSIONS") }),
   z.object({ action: z.literal("set-club-settings"), clubId: z.string().regex(/^[a-f\d]{24}$/i), name: z.string().trim().min(2).max(60), visibility: z.enum(["PUBLIC", "PRIVATE"]), discoveryMode: z.enum(["INVITE_ONLY", "RECRUITING"]), confirmText: z.literal("UPDATE CLUB") }),

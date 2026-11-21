@@ -85,13 +85,14 @@ export function AdminConsole({ username }: { username: string }) {
 
   const changeSection = (target: Section) => { setSection(target); setQuery(""); setDataPage(0); setDataset(null); setMobileMenu(false); };
   const runAction = async (action: "sync" | "rebuild-scores") => {
+    const confirmation = action === "sync" ? "SYNC PROVIDER" : "REBUILD SCORES";
     const prompt = action === "sync"
-      ? "Run a provider sync now? This calls the configured football provider and may use its request quota."
-      : "Recalculate match scores and leaderboard totals now? Existing predictions are preserved, but score totals can change.";
-    if (!window.confirm(prompt)) return;
+      ? "Run a provider sync now? This calls the configured football provider and may use its request quota. Type SYNC PROVIDER to continue."
+      : "Recalculate match scores and leaderboard totals now? Existing predictions are preserved, but score totals can change. Type REBUILD SCORES to continue.";
+    if (window.prompt(prompt) !== confirmation) return;
     setBusy(true); setError("");
     try {
-      const result = await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const result = await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, confirmText: confirmation }) });
       setToast(action === "sync" ? "Sync completed. Review the run summary." : "Score rebuild completed.");
       setDataset({ section: action, total: 1, rows: [{ action, result: result.result, completedAt: new Date().toISOString() }] });
       await load("overview", query);
