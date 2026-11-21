@@ -7,7 +7,7 @@ import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { LEAGUES } from "@/lib/football/leagues";
 import { appScheduleDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
-import { H2H_EXCLUDED_LEAGUE_CODES, H2H_TOURNAMENT_WEIGHTS, ensureCurrentH2HLeagues, getH2HWeek, isH2HEnabled, materializeH2HLeague, scoreH2HFixture, settleH2HLeagues } from "@/lib/domain/h2h";
+import { H2H_EXCLUDED_LEAGUE_CODES, H2H_TOURNAMENT_WEIGHTS, ensureCurrentH2HLeagues, getH2HWeek, h2hTeamRating, isH2HEnabled, materializeH2HLeague, scoreH2HFixture, settleH2HLeagues } from "@/lib/domain/h2h";
 import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
 
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
           const kickoffAt = new Date(match.kickoffAt);
           if (!competition?.h2h || H2H_EXCLUDED_LEAGUE_CODES.has(String(match.leagueCode).toUpperCase()) || !Number.isFinite(kickoffAt.getTime()) || appScheduleDateKey(kickoffAt) !== sourceDate || kickoffAt <= new Date(now.getTime() + 45 * 60 * 1000) || ["FINISHED", "FT", "AET", "PEN", "CANCELLED", "POSTPONED", "VOID", "ABANDONED"].includes(String(match.status).toUpperCase())) throw new Error("MATCH_NOT_ELIGIBLE");
           const score = scoreH2HFixture(match) ?? 0;
-          return { matchId: String(match.providerMatchId), kickoffAt, score, leagueCode: String(match.leagueCode), homeTeam: match.homeTeam, awayTeam: match.awayTeam, homeRating: 0, awayRating: 0, tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(match.leagueCode)] ?? 1, ratingVersion: "admin-manual", selectionReason: "ADMIN_MANUAL_ASSIGNMENT" };
+          return { matchId: String(match.providerMatchId), kickoffAt, score, leagueCode: String(match.leagueCode), homeTeam: match.homeTeam, awayTeam: match.awayTeam, homeRating: h2hTeamRating(match, "home"), awayRating: h2hTeamRating(match, "away"), tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(match.leagueCode)] ?? 1, ratingVersion: "h2h-team-ratings-review", selectionReason: "ADMIN_MANUAL_ASSIGNMENT" };
         }).sort((a, b) => a.kickoffAt.getTime() - b.kickoffAt.getTime());
         const slates = await db.collection<any>("h2hLeagues").find({ weekKey: input.weekKey, status: "ACTIVE" }).toArray();
         if (!slates.length) throw new Error("H2H_NO_ACTIVE_LEAGUES");

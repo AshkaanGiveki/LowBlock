@@ -100,10 +100,10 @@ function kickoff(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function h2hTeamRating(
+export function h2hTeamRating(
   match: any,
   side: "home" | "away",
-  ratingMap: Map<string, number>,
+  ratingMap: Map<string, number> = ratings,
 ): number {
   const team = match[side + "Team"];
   const id = String(team?.centralTeamId ?? team?.teamId ?? "");
