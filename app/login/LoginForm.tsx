@@ -29,9 +29,8 @@ export default function LoginForm() {
       return;
     }
     await migrateGuestPredictions();
-    router.push(
-      new URLSearchParams(window.location.search).get("returnTo") || "/matches",
-    );
+    const requested = new URLSearchParams(window.location.search).get("returnTo");
+    router.push(requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/matches");
     router.refresh();
   }
   return (
