@@ -109,6 +109,10 @@ function normalized(f: Fixture, leagueCode: string) {
   };
 }
 
+function preserveManualMatchFields<T extends Record<string, any>>(match: T) {
+  return Object.fromEntries(Object.entries(match).map(([field, value]) => [field, { $cond: [{ $eq: [`$adminMatchOverrides.${field}`, true] }, `$${field}`, value] }]));
+}
+
 async function saveFixtures(
   db: Awaited<ReturnType<typeof getDb>>,
   leagueCode: string,
@@ -136,18 +140,9 @@ async function saveFixtures(
         provider: "football-api",
         providerMatchId: String(f.fixture.id),
       },
-      update: {
-        $set: {
-          ...normalized(f, leagueCode),
-          "homeTeam.centralTeamId": centralIds.get(String(f.teams.home.id)),
-          "awayTeam.centralTeamId": centralIds.get(String(f.teams.away.id)),
-          rawApiResponse: f,
-          apiDataType: detail ? "fixture-detail" : "current-window",
-          ...(detail ? { detailsUpdatedAt: new Date() } : {}),
-          updatedAt: new Date(),
-        },
-        $setOnInsert: { createdAt: new Date() },
-      },
+      update: [
+        { $set: { ...preserveManualMatchFields(normalized(f, leagueCode)), "homeTeam.centralTeamId": centralIds.get(String(f.teams.home.id)), "awayTeam.centralTeamId": centralIds.get(String(f.teams.away.id)), rawApiResponse: f, apiDataType: detail ? "fixture-detail" : "current-window", ...(detail ? { detailsUpdatedAt: new Date() } : {}), updatedAt: new Date(), createdAt: { $ifNull: ["$createdAt", new Date()] } } },
+      ],
       upsert: true,
     },
   }));

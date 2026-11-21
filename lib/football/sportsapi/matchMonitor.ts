@@ -726,9 +726,10 @@ class MatchMonitorService {
         updateFields.elapsed = snapshot.score.elapsed;
       }
 
+      const protectedFields = Object.fromEntries(["status", "elapsed", "homeGoals", "awayGoals"].filter((field) => field in updateFields).map((field) => [field, { $cond: [{ $eq: [`$adminMatchOverrides.${field}`, true] }, `$${field}`, updateFields[field]] }]));
       await db.collection("matches").updateOne(
         { provider: "sportsapi", providerMatchId: matchId },
-        { $set: updateFields },
+        [{ $set: { ...updateFields, ...protectedFields } }],
       );
 
       // 2. Persist to matchDetails collection

@@ -35,6 +35,10 @@ import { ensureCentralTeam } from "../centralTeams";
 // In-memory season cache to avoid redundant season requests
 const seasonIdCache = new Map<number, { tournamentId?: number; id: number; name: string; year: string; cachedAt: number }>();
 
+function preserveManualMatchFields(match: Record<string, any>) {
+  return Object.fromEntries(["status", "elapsed", "homeGoals", "awayGoals", "kickoffAt"].filter((field) => field in match).map((field) => [field, { $cond: [{ $eq: [`$adminMatchOverrides.${field}`, true] }, `$${field}`, match[field]] }]));
+}
+
 export class SportsApiFootballProvider implements FootballDataProvider {
   readonly name: ProviderName = "sportsapi";
 
@@ -80,13 +84,7 @@ export class SportsApiFootballProvider implements FootballDataProvider {
             provider: this.name,
             providerMatchId: match.providerMatchId,
           },
-          update: {
-            $set: {
-              ...matchData,
-              updatedAt: new Date(),
-            },
-            $setOnInsert: { createdAt: createdAt || new Date() },
-          },
+          update: [{ $set: { ...matchData, ...preserveManualMatchFields(matchData), updatedAt: new Date(), createdAt: { $ifNull: ["$createdAt", createdAt || new Date()] } } }],
           upsert: true,
         },
       };

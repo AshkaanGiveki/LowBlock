@@ -20,6 +20,7 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("revoke-sessions"), userId: z.string().regex(/^[a-f\d]{24}$/i), confirmText: z.literal("REVOKE SESSIONS") }),
   z.object({ action: z.literal("set-club-settings"), clubId: z.string().regex(/^[a-f\d]{24}$/i), name: z.string().trim().min(2).max(60), visibility: z.enum(["PUBLIC", "PRIVATE"]), discoveryMode: z.enum(["INVITE_ONLY", "RECRUITING"]), confirmText: z.literal("UPDATE CLUB") }),
   z.object({ action: z.literal("set-match-visibility"), matchId: z.string().min(1).max(120), hidden: z.boolean(), confirmText: z.literal("UPDATE MATCH VISIBILITY") }),
+  z.object({ action: z.literal("edit-match"), matchId: z.string().min(1).max(120), status: z.enum(["SCHEDULED", "LIVE", "FINISHED", "POSTPONED", "SUSPENDED", "CANCELLED", "VOID"]), elapsed: z.number().int().min(0).max(200).nullable(), homeGoals: z.number().int().min(0).max(99).nullable(), awayGoals: z.number().int().min(0).max(99).nullable(), kickoffAt: z.string().datetime().nullable(), protectFromSync: z.boolean(), confirmText: z.literal("UPDATE MATCH") }),
   z.object({ action: z.literal("create-manual-match"), leagueCode: z.string().min(2).max(32), homeTeamName: z.string().trim().min(2).max(80), awayTeamName: z.string().trim().min(2).max(80), kickoffAt: z.string().datetime(), confirmText: z.literal("ADD MATCH") }),
   z.object({ action: z.literal("h2h-assign-matches"), weekKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), matchday: z.number().int().min(1).max(7), matchIds: z.array(z.string().min(1).max(120)).min(4).max(5).refine((ids) => new Set(ids).size === ids.length), confirmText: z.literal("ASSIGN MATCHES") }),
   z.object({ action: z.literal("retry-notification"), jobId: z.string().regex(/^[a-f\d]{24}$/i), confirmText: z.literal("RETRY JOB") }),
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
     }
     try {
       const value = action === "sync" ? await getFootballProvider().sync({ deferScoring: true }) : await runLeaderboardEngine();
+      if (action === "rebuild-scores") await db.collection("matches").updateMany({ $or: [{ adminScoreRebuildRequired: true }, { leaderboardRebuildRequired: true }] }, { $set: { adminScoreRebuildRequired: false, leaderboardRebuildRequired: false, updatedAt: new Date() } });
       await audit(action === "sync" ? "FOOTBALL_SYNC" : "SCORE_REBUILD", "system", "SUCCESS", value);
       return NextResponse.json({ ok: true, action, result: value });
     } catch (error) {
@@ -131,6 +133,30 @@ export async function POST(request: Request) {
         if (!match) throw new Error("RECORD_NOT_FOUND");
         await db.collection("matches").updateOne({ _id: match._id }, { $set: { adminHiddenFromListings: input.hidden, updatedAt: new Date() } });
         return { fixture: `${match.homeTeam?.name ?? "Home"} vs ${match.awayTeam?.name ?? "Away"}`, hidden: input.hidden, predictionsPreserved: true };
+      });
+    case "edit-match":
+      return result("MATCH_MANUAL_OVERRIDE_UPDATED", input.matchId, async () => {
+        const match = await db.collection<any>("matches").findOne({ providerMatchId: input.matchId }, { projection: { providerMatchId: 1, status: 1, elapsed: 1, homeGoals: 1, awayGoals: 1, kickoffAt: 1, homeTeam: 1, awayTeam: 1, adminMatchOverrides: 1 } });
+        if (!match) throw new Error("RECORD_NOT_FOUND");
+        const now = new Date();
+        const update: any = {
+          $set: {
+            status: input.status,
+            elapsed: input.elapsed,
+            homeGoals: input.homeGoals,
+            awayGoals: input.awayGoals,
+            ...(input.kickoffAt ? { kickoffAt: new Date(input.kickoffAt) } : {}),
+            adminScoreRebuildRequired: true,
+            leaderboardRebuildRequired: true,
+            adminOverrideUpdatedAt: now,
+            adminOverrideUpdatedBy: auth.user.username ?? auth.userId,
+            updatedAt: now,
+            ...(input.protectFromSync ? { adminMatchOverrides: { status: true, elapsed: true, homeGoals: true, awayGoals: true, ...(input.kickoffAt ? { kickoffAt: true } : {}) } } : {}),
+          },
+          ...(input.protectFromSync ? {} : { $unset: { adminMatchOverrides: "" } }),
+        };
+        await db.collection("matches").updateOne({ _id: match._id }, update);
+        return { fixture: `${match.homeTeam?.name ?? "Home"} vs ${match.awayTeam?.name ?? "Away"}`, previous: { status: match.status, elapsed: match.elapsed ?? null, homeGoals: match.homeGoals ?? null, awayGoals: match.awayGoals ?? null, kickoffAt: match.kickoffAt ?? null }, manual: { status: input.status, elapsed: input.elapsed, homeGoals: input.homeGoals, awayGoals: input.awayGoals, kickoffAt: input.kickoffAt }, protectedFromSync: input.protectFromSync, scoringRebuildRequired: true, leaderboardRebuildRequired: true };
       });
     case "create-manual-match":
       return result("MANUAL_MATCH_CREATED", input.leagueCode, async () => {

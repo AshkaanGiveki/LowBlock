@@ -69,7 +69,7 @@ function TeamBadge({ name, logo }: { name: any; logo?: string }) {
 }
 function StatusPill({ value }: { value: any }) {
   const raw = String(value ?? "UNKNOWN").toUpperCase();
-  const label: Record<string, string> = { NS: "Upcoming", NOT_STARTED: "Upcoming", FT: "Finished", FINISHED: "Finished", LIVE: "Live", IN_PLAY: "Live", POSTPONED: "Postponed", CANCELLED: "Cancelled", FAILED: "Failed", SUCCESS: "Completed", COMPLETED: "Completed", PENDING: "Pending", PROCESSING: "Processing", DEAD: "Needs attention", PUBLIC: "Public", PRIVATE: "Private", OPEN: "Open", CLOSED: "Closed" };
+  const label: Record<string, string> = { NS: "Upcoming", NOT_STARTED: "Upcoming", SCHEDULED: "Scheduled", FT: "Finished", FINISHED: "Finished", LIVE: "Live", IN_PLAY: "Live", POSTPONED: "Postponed", CANCELLED: "Cancelled", FAILED: "Failed", SUCCESS: "Completed", COMPLETED: "Completed", PENDING: "Pending", PROCESSING: "Processing", DEAD: "Needs attention", PUBLIC: "Public", PRIVATE: "Private", OPEN: "Open", CLOSED: "Closed" };
   const tone = ["FAILED", "DEAD", "CANCELLED", "POSTPONED"].includes(raw) ? "warn" : ["FT", "FINISHED", "COMPLETED", "SUCCESS", "PUBLIC", "OPEN"].includes(raw) ? "good" : ["LIVE", "IN_PLAY"].includes(raw) ? "live" : "";
   return <span className={`lb-admin-friendly-status ${tone}`}>{label[raw] ?? labelize(raw)}</span>;
 }
@@ -238,6 +238,8 @@ function Overview({ overview, busy, runAction, onNavigate }: any) {
 function DataSection({ section, dataset, overview, busy, query, setQuery, page, onPageChange, onNavigate, onAction, onUserAdmin, onAdminAction, onExport, selectedMatchIds, setSelectedMatchIds, showManualMatchForm, setShowManualMatchForm, showSlateAssignment, setShowSlateAssignment, reload }: any) {
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [actionMenuMatchId, setActionMenuMatchId] = useState<string | null>(null);
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const [copiedMatchId, setCopiedMatchId] = useState<string | null>(null);
   const copyFixtureId = async (id: string) => {
     try {
@@ -334,9 +336,9 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
         const scoreText = hasScore ? `${displayText(first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals), "0")} – ${displayText(first(row.awayGoals, row.awayScore, row.score?.away, row.score?.awayGoals), "0")}` : null;
         const kickoffDate = validKickoff ? kickoff!.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "Kickoff not set";
         const kickoffTime = validKickoff ? kickoff!.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "—";
-        if (section === "matches") return <article className={`lb-admin-fixture-card ${isSelected ? "is-selected" : ""} ${row.adminHiddenFromListings ? "is-hidden" : ""}`} key={row._id ?? row.code ?? index}>
+        if (section === "matches") return <article className={`lb-admin-fixture-card ${isSelected ? "is-selected" : ""} ${row.adminHiddenFromListings ? "is-hidden" : ""} ${editingMatchId === matchId ? "is-editing" : ""}`} key={row._id ?? row.code ?? index} onPointerDown={(event) => { swipeStart.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={(event) => { const start = swipeStart.current; swipeStart.current = null; if (!start || Math.abs(event.clientY - start.y) > 70) return; const distance = event.clientX - start.x; if (distance < -90) setEditingMatchId(matchId); if (distance > 90 && editingMatchId === matchId) setEditingMatchId(null); }}>
           <div className="lb-admin-fixture-topline">
-            <div className="lb-admin-fixture-competition">{tournament?.logo ? <img src={tournament.logo} alt=""/> : <span className="lb-admin-fixture-competition-fallback"><Trophy size={15}/></span>}<span><b>{displayText(tournament?.enName ?? row.tournamentName ?? row.tournament, "Supported tournament")}</b><small>{displayText(tournament?.faName, displayText(row.leagueCode, "Competition"))}</small></span></div>
+            <div className="lb-admin-fixture-competition">{tournament?.logo ? <img src={tournament.logo} alt={displayText(tournament?.enName ?? row.tournamentName ?? row.tournament, "Tournament")} title={displayText(tournament?.enName ?? row.tournamentName ?? row.tournament, "Tournament")}/> : <span className="lb-admin-fixture-competition-fallback" title={displayText(row.leagueCode, "Competition")}><Trophy size={15}/></span>}</div>
             <div className="lb-admin-fixture-top-actions"><span className="lb-admin-fixture-kickoff">{kickoffTime}</span><StatusPill value={row.status}/><div className="lb-admin-fixture-menu"><button className="lb-admin-fixture-icon-button" aria-label="Open fixture actions" aria-expanded={actionMenuMatchId === matchId} title="Fixture actions" onClick={() => setActionMenuMatchId(actionMenuMatchId === matchId ? null : matchId)}><MoreHorizontal size={17}/></button>{actionMenuMatchId === matchId && <div className="lb-admin-fixture-menu-popover" role="menu"><button disabled={(!isSlateEligible && !isSelected) || (!isSelected && selectedMatchIds.length >= 5)} onClick={() => { setSelectedMatchIds((current: string[]) => current.includes(matchId) ? current.filter((value) => value !== matchId) : current.length < 5 ? [...current, matchId] : current); setActionMenuMatchId(null); }}><Check size={14}/>{isSelected ? "Remove from slate" : "Select for slate"}</button><button disabled={busy || !matchId} onClick={() => { void act(row); setActionMenuMatchId(null); }}><Eye size={14}/>{row.adminHiddenFromListings ? "Show in player matches" : "Hide from player matches"}</button><button disabled={!matchId} onClick={() => { void copyFixtureId(matchId); setActionMenuMatchId(null); }}><Copy size={14}/>{copiedMatchId === matchId ? "Copied fixture ID" : "Copy fixture ID"}</button></div>}</div><button className="lb-admin-fixture-icon-button" aria-label={isExpanded ? "Hide fixture details" : "Show fixture details"} aria-expanded={isExpanded} title={isExpanded ? "Hide details" : "Show details"} onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}><Info size={16}/></button></div>
           </div>
           <div className="lb-admin-fixture-main">
@@ -355,6 +357,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
             <div><small>Last updated</small><b>{pretty(row.updatedAt)}</b></div>
             <div><small>Kickoff</small><b>{validKickoff ? `${kickoffDate} · ${kickoffTime}` : "Not set"}</b></div>
             <div><small>Slate selection</small><b>{isSelected ? "Selected for manual slate" : isSlateEligible ? "Available for manual slate" : "Not currently eligible"}</b></div>
+            <div><small>Scoring state</small><b className={row.adminScoreRebuildRequired || row.leaderboardRebuildRequired ? "ineligible" : "eligible"}>{row.adminScoreRebuildRequired || row.leaderboardRebuildRequired ? "Rebuild required" : "Current"}</b></div>
           </div>}
           <div className="lb-admin-fixture-actions">
             <button className={`lb-admin-fixture-select ${isSelected ? "selected" : ""}`} disabled={(!isSlateEligible && !isSelected) || (!isSelected && selectedMatchIds.length >= 5)} title={!isSelected && selectedMatchIds.length >= 5 ? "Clear one of the five selected fixtures first" : isSlateEligible || isSelected ? "Select this fixture for a Super League slate" : "Future fixtures from Super League supported tournaments are eligible"} onClick={() => setSelectedMatchIds((current: string[]) => current.includes(matchId) ? current.filter((value) => value !== matchId) : current.length < 5 ? [...current, matchId] : current)}>{isSelected ? "✓ Selected for slate" : isSlateEligible ? "＋ Select for slate" : "Unavailable for slate"}</button>
@@ -363,6 +366,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
             <button className="lb-admin-fixture-details-button" aria-expanded={isExpanded} onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}>{isExpanded ? "Hide details" : "Details"}<ChevronRight size={15}/></button>
           </div>
           {isSelected && <div className="lb-admin-fixture-selected-note"><ShieldCheck size={14}/> Included in the current manual selection. Published slates stay locked and existing predictions are preserved.</div>}
+          {editingMatchId === matchId && <MatchEditPanel row={row} busy={busy} onCancel={() => setEditingMatchId(null)} onSave={async (payload: any) => { await onAdminAction({ action: "edit-match", ...payload, matchId }, "UPDATE MATCH", "Apply the manual match override. This will flag scoring and leaderboard data for rebuild."); setEditingMatchId(null); }} />}
         </article>;
         return <article className={`lb-admin-record-card ${section === "matches" ? "match" : ""}`} key={row._id ?? row.code ?? index}>
           {section === "matches" ? <div className="lb-admin-match-identity"><div className="lb-admin-team-side"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{displayText(first(row.homeTeamName, row.homeTeam?.name), "Home")}</b></div><span className="lb-admin-match-versus">VS</span><div className="lb-admin-team-side"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{displayText(first(row.awayTeamName, row.awayTeam?.name), "Away")}</b></div></div> : <div className="lb-admin-record-title-row"><TeamBadge name={title} logo={logo}/><div className="lb-admin-record-heading"><h4>{displayText(title, "Record")}</h4><span>{displayText(cardDetail(row), "")}</span></div></div>}
@@ -385,6 +389,33 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     </section>}
     {section === "users" && <div className="lb-admin-note"><Shield size={16}/><span>Granting or revoking admin access requires confirmation. Changes are recorded in the audit log; you cannot revoke your own active admin access here.</span></div>}
   </>;
+}
+
+function matchInputDate(value: any) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function MatchEditPanel({ row, busy, onCancel, onSave }: { row: any; busy: boolean; onCancel: () => void; onSave: (payload: any) => Promise<void> }) {
+  const currentScore = (side: "home" | "away") => first(side === "home" ? row.homeGoals : row.awayGoals, side === "home" ? row.homeScore : row.awayScore, row.score?.[side], row.score?.[`${side}Goals`]);
+  const [status, setStatus] = useState(String(row.status ?? "SCHEDULED").toUpperCase());
+  const [elapsed, setElapsed] = useState(row.elapsed === null || row.elapsed === undefined ? "" : String(row.elapsed));
+  const [homeGoals, setHomeGoals] = useState(currentScore("home") === undefined ? "" : String(currentScore("home")));
+  const [awayGoals, setAwayGoals] = useState(currentScore("away") === undefined ? "" : String(currentScore("away")));
+  const [kickoffAt, setKickoffAt] = useState(matchInputDate(row.kickoffAt));
+  const [protectFromSync, setProtectFromSync] = useState(() => Boolean(row.adminMatchOverrides && Object.values(row.adminMatchOverrides).some(Boolean)));
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    await onSave({ status, elapsed: elapsed === "" ? null : Number(elapsed), homeGoals: homeGoals === "" ? null : Number(homeGoals), awayGoals: awayGoals === "" ? null : Number(awayGoals), kickoffAt: kickoffAt ? new Date(kickoffAt).toISOString() : null, protectFromSync });
+  };
+  return <form className="lb-admin-match-editor" onSubmit={submit} onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>
+    <div className="lb-admin-match-editor-heading"><div><span>MANUAL OVERRIDE</span><b>Edit match data</b><small>Swipe right to close · changes are audited and flagged for scoring rebuild.</small></div><button type="button" className="lb-admin-fixture-icon-button" onClick={onCancel} aria-label="Close match editor" title="Close editor"><X size={15}/></button></div>
+    <div className="lb-admin-match-editor-grid"><label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}>{["SCHEDULED", "LIVE", "FINISHED", "POSTPONED", "SUSPENDED", "CANCELLED", "VOID"].map((value) => <option key={value}>{value}</option>)}</select></label><label>Elapsed minutes<input type="number" min="0" max="200" value={elapsed} onChange={(event) => setElapsed(event.target.value)} placeholder="—"/></label><label>Kickoff<input type="datetime-local" value={kickoffAt} onChange={(event) => setKickoffAt(event.target.value)}/></label><label>Home score<input type="number" min="0" max="99" value={homeGoals} onChange={(event) => setHomeGoals(event.target.value)} placeholder="—"/></label><label>Away score<input type="number" min="0" max="99" value={awayGoals} onChange={(event) => setAwayGoals(event.target.value)} placeholder="—"/></label></div>
+    <label className="lb-admin-match-editor-protect"><input type="checkbox" checked={protectFromSync} onChange={(event) => setProtectFromSync(event.target.checked)}/><span><b>Protect manual values from provider sync</b><small>When enabled, future API refreshes keep these edited fields until you turn protection off.</small></span></label>
+    <div className="lb-admin-match-editor-actions"><button type="button" className="lb-admin-button" onClick={onCancel}>Cancel</button><button type="submit" className="lb-admin-button primary" disabled={busy}>Save override</button></div>
+  </form>;
 }
 
 function friendlyOperationError(code: string) {
