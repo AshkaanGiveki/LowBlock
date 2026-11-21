@@ -151,6 +151,7 @@ export async function getMatchesPage(
     rawApiResponse: { $exists: true },
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
     status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
+    adminHiddenFromListings: { $ne: true },
     kickoffAt: { $gte: bounds.start, $lt: bounds.end },
     $or: [
       { featuredNationalFixture: true },

@@ -18,7 +18,7 @@ export async function GET() {
     db.collection("clubs").countDocuments({}),
     db.collection("syncRuns").find({}, { projection: { provider: 1, status: 1, startedAt: 1, finishedAt: 1, matchesUpserted: 1, matchesFetched: 1, error: 1 } }).sort({ startedAt: -1 }).limit(5).toArray(),
     db.collection("h2hWeeks").find({}, { projection: { weekKey: 1, startsAt: 1, endsAt: 1, status: 1, updatedAt: 1 } }).sort({ startsAt: -1 }).limit(5).toArray(),
-    db.collection("notificationQueue").countDocuments({ status: { $in: ["PENDING", "RETRY"] } }).catch(() => 0),
+    db.collection("notificationJobs").countDocuments({ status: { $in: ["PENDING", "FAILED", "PROCESSING"] } }).catch(() => 0),
   ]);
   const scoredPredictions = await db.collection("predictions").countDocuments({ points: { $exists: true } });
   return NextResponse.json({
