@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import "./admin-match-cards.css";
+import "./admin-slate.css";
 import { Providers } from "@/components/Providers";
 import { Nav } from "@/components/Nav";
 import { PageTransition } from "@/components/PageTransition";

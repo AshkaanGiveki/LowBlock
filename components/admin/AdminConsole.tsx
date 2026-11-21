@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Activity, Award, Bell, Building2, CalendarDays, Check, ChevronRight, CircleHelp, Copy, Database, Eye, EyeOff, Gauge, Globe2, Info, LayoutDashboard, LogOut, Menu, MoreHorizontal, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
+import Link from "next/link";
+import { Activity, Award, Bell, Building2, CalendarDays, Check, ChevronRight, CircleHelp, Copy, Database, Edit3, Eye, EyeOff, Gauge, Globe2, Info, LayoutDashboard, LogOut, Menu, MoreHorizontal, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
 import { LEAGUES } from "@/lib/football/leagues";
 
 type Section = "overview" | "matches" | "sync" | "superleague" | "tournaments" | "users" | "clubs" | "teams" | "notifications" | "awards" | "analytics" | "system" | "access";
@@ -239,6 +240,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [actionMenuMatchId, setActionMenuMatchId] = useState<string | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const [replacementTargetId, setReplacementTargetId] = useState<string | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const [copiedMatchId, setCopiedMatchId] = useState<string | null>(null);
   const copyFixtureId = async (id: string) => {
@@ -249,6 +251,14 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     } catch {
       setExpandedMatchId(id);
     }
+  };
+  const toggleMatchSelection = (id: string) => {
+    setSelectedMatchIds((current: string[]) => {
+      if (current.includes(id)) return current.filter((value) => value !== id);
+      if (replacementTargetId && current.includes(replacementTargetId)) return current.map((value) => value === replacementTargetId ? id : value);
+      return current.length < 5 ? [...current, id] : current;
+    });
+    if (replacementTargetId) setReplacementTargetId(null);
   };
   const item = nav.find((entry) => entry.id === section);
   const rows = dataset?.rows ?? [];
@@ -320,7 +330,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     {section !== "analytics" && section !== "system" && <section className="lb-admin-card lb-admin-directory">
       <div className="lb-admin-directory-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} {section === "matches" ? "fixtures" : section === "users" ? "players" : section === "clubs" ? "clubs" : section === "tournaments" ? "supported competitions" : section === "teams" ? "teams" : section === "superleague" ? "weeks" : section === "sync" ? "sync runs" : section === "notifications" ? "messages" : section === "awards" ? "awards" : "admin actions"}</h3><p>{section === "matches" ? "Browse fixtures, add a missing match, or build a manual slate." : "Browse and manage LowBlock records in plain language."}</p></div><div className="lb-admin-table-tools">{section === "matches" && <><button className="lb-admin-button" onClick={() => setShowManualMatchForm(!showManualMatchForm)}>＋ Add match manually</button><button className="lb-admin-button primary" disabled={selectedMatchIds.length < 4 || selectedMatchIds.length > 5} onClick={() => setShowSlateAssignment(!showSlateAssignment)}>Assign {selectedMatchIds.length || "selected"} to Super League</button></>}{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync fixtures</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Recalculate scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Create current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Download list</button>}<label className="lb-admin-search"><Search size={15}/><input aria-label="Search records" placeholder={`Search ${item?.label.toLowerCase() ?? "records"}`} value={query} onChange={(e) => { onPageChange(0); setQuery(e.target.value); }}/></label></div></div>
       {section === "matches" && showManualMatchForm && <ManualMatchForm onCancel={() => setShowManualMatchForm(false)} onCreated={async () => { setShowManualMatchForm(false); setQuery(""); onPageChange(0); await reload("", 0); }} />}
-      {section === "matches" && showSlateAssignment && <ManualSlateAssignment selectedMatchIds={selectedMatchIds} weeks={overview?.h2hWeeks ?? []} busy={busy} onCancel={() => setShowSlateAssignment(false)} onAssigned={async () => { setShowSlateAssignment(false); setSelectedMatchIds([]); await reload(); }} />}
+      {section === "matches" && showSlateAssignment && <ManualSlateAssignment selectedMatchIds={selectedMatchIds} selectedMatches={rows.filter((row: any) => selectedMatchIds.includes(String(row.providerMatchId ?? row.matchId ?? "")))} replacementTargetId={replacementTargetId} setReplacementTargetId={setReplacementTargetId} weeks={overview?.h2hWeeks ?? []} busy={busy} onCancel={() => setShowSlateAssignment(false)} onAssigned={async () => { setShowSlateAssignment(false); setReplacementTargetId(null); setSelectedMatchIds([]); await reload(); }} />}
       {busy && !dataset ? <div className="lb-admin-loading"><RefreshCw size={18} className="lb-spin"/>Loading…</div> : rows.length === 0 ? <div className="lb-admin-empty"><div className="lb-admin-empty-icon"><Database size={22}/></div><b>{dataset ? "Nothing here yet" : "Could not load this page"}</b><span>{dataset ? "Try another search, or refresh to check again." : "Refresh this page to try again."}</span></div> : <div className="lb-admin-record-grid">{rows.map((row: any, index: number) => {
         const title = recordTitle(row);
         const logo = image(row);
@@ -360,11 +370,13 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
             <div><small>Scoring state</small><b className={row.adminScoreRebuildRequired || row.leaderboardRebuildRequired ? "ineligible" : "eligible"}>{row.adminScoreRebuildRequired || row.leaderboardRebuildRequired ? "Rebuild required" : "Current"}</b></div>
           </div>}
           <div className="lb-admin-fixture-actions">
-            <button className={`lb-admin-fixture-select ${isSelected ? "selected" : ""}`} disabled={(!isSlateEligible && !isSelected) || (!isSelected && selectedMatchIds.length >= 5)} title={!isSelected && selectedMatchIds.length >= 5 ? "Clear one of the five selected fixtures first" : isSlateEligible || isSelected ? "Select this fixture for a Super League slate" : "Future fixtures from Super League supported tournaments are eligible"} onClick={() => setSelectedMatchIds((current: string[]) => current.includes(matchId) ? current.filter((value) => value !== matchId) : current.length < 5 ? [...current, matchId] : current)}>{isSelected ? "✓ Selected for slate" : isSlateEligible ? "＋ Select for slate" : "Unavailable for slate"}</button>
+            <button className={`lb-admin-fixture-select ${isSelected ? "selected" : ""}`} disabled={(!isSlateEligible && !isSelected) || (!isSelected && selectedMatchIds.length >= 5 && !replacementTargetId)} title={!isSelected && selectedMatchIds.length >= 5 && !replacementTargetId ? "Choose a slot in the slate builder to replace" : isSlateEligible || isSelected ? "Select this fixture for a Super League slate" : "Future fixtures from Super League supported tournaments are eligible"} onClick={() => toggleMatchSelection(matchId)}>{isSelected ? "✓ Selected for slate" : isSlateEligible ? "＋ Select for slate" : "Unavailable for slate"}</button>
             <button className="lb-admin-fixture-secondary" disabled={busy || !matchId} onClick={() => void act(row)}>{row.adminHiddenFromListings ? <Eye size={15}/> : <EyeOff size={15}/>} {row.adminHiddenFromListings ? "Show in Matches" : "Hide from Matches"}</button>
             <button className="lb-admin-fixture-secondary" disabled={!matchId} onClick={() => void copyFixtureId(matchId)}>{copiedMatchId === matchId ? <ShieldCheck size={15}/> : <Copy size={15}/>} {copiedMatchId === matchId ? "Fixture ID copied" : "Copy fixture ID"}</button>
             <button className="lb-admin-fixture-details-button" aria-expanded={isExpanded} onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}>{isExpanded ? "Hide details" : "Details"}<ChevronRight size={15}/></button>
           </div>
+          <button className="lb-admin-fixture-edit-trigger" type="button" onClick={() => setEditingMatchId(matchId)} title="Edit match manually" aria-label="Edit match manually"><Edit3 size={13}/><span>Edit</span></button>
+          <Link className="lb-admin-fixture-predictions-link" href={`/admin/matches/${encodeURIComponent(matchId)}`} title="Open match predictions"><Users size={13}/><span>Predictions</span></Link>
           {isSelected && <div className="lb-admin-fixture-selected-note"><ShieldCheck size={14}/> Included in the current manual selection. Published slates stay locked and existing predictions are preserved.</div>}
           {editingMatchId === matchId && <MatchEditPanel row={row} busy={busy} onCancel={() => setEditingMatchId(null)} onSave={async (payload: any) => { await onAdminAction({ action: "edit-match", ...payload, matchId }, "UPDATE MATCH", "Apply the manual match override. This will flag scoring and leaderboard data for rebuild."); setEditingMatchId(null); }} />}
         </article>;
@@ -464,7 +476,7 @@ function ManualMatchForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
   </form>;
 }
 
-function ManualSlateAssignment({ selectedMatchIds, weeks, busy, onCancel, onAssigned }: { selectedMatchIds: string[]; weeks: any[]; busy: boolean; onCancel: () => void; onAssigned: () => Promise<void> }) {
+function ManualSlateAssignment({ selectedMatchIds, selectedMatches, replacementTargetId, setReplacementTargetId, weeks, busy, onCancel, onAssigned }: { selectedMatchIds: string[]; selectedMatches: any[]; replacementTargetId: string | null; setReplacementTargetId: (id: string | null) => void; weeks: any[]; busy: boolean; onCancel: () => void; onAssigned: () => Promise<void> }) {
   const choices = weeks.filter((week) => week.status === "ACTIVE");
   const [weekKey, setWeekKey] = useState(choices[0]?.weekKey ?? "");
   const [matchday, setMatchday] = useState("1");
@@ -472,7 +484,7 @@ function ManualSlateAssignment({ selectedMatchIds, weeks, busy, onCancel, onAssi
   const [error, setError] = useState("");
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setError("");
-    if (selectedMatchIds.length < 4 || selectedMatchIds.length > 5) { setError("Select four or five matches for a complete slate."); return; }
+    if (selectedMatchIds.length !== 5) { setError("Fill all five slate slots before publishing."); return; }
     if (!weekKey) { setError("Choose an active Super League week."); return; }
     if (!window.confirm(`Publish these ${selectedMatchIds.length} fixtures to Week ${weekKey}, matchday ${matchday}? A published slate is locked. Existing predictions and golden picks will not be replaced or deleted.`)) return;
     setSubmitting(true);
@@ -483,6 +495,7 @@ function ManualSlateAssignment({ selectedMatchIds, weeks, busy, onCancel, onAssi
     finally { setSubmitting(false); }
   };
   return <form className="lb-admin-manual-form lb-admin-slate-form" onSubmit={submit}>
+    <div className="lb-admin-slate-slots">{Array.from({ length: 5 }, (_, index) => { const id = selectedMatchIds[index]; const match = selectedMatches.find((row: any) => String(row.providerMatchId ?? row.matchId ?? "") === id); return <button type="button" key={id ?? `empty-${index}`} className={`lb-admin-slate-slot ${replacementTargetId === id ? "is-replacing" : ""}`} onClick={() => id && setReplacementTargetId(replacementTargetId === id ? null : id)} disabled={!id}><span>{index + 1}</span>{match ? <><b>{match.homeTeam?.name ?? match.homeTeamName ?? "Home"}</b><i>vs</i><b>{match.awayTeam?.name ?? match.awayTeamName ?? "Away"}</b><small>{replacementTargetId === id ? "Choose a replacement below" : "Click to replace"}</small></> : <em>Open slot</em>}</button>; })}</div>{replacementTargetId && <div className="lb-admin-slate-replace-note">Replacement mode is active. Choose an eligible match card below to replace slot {selectedMatchIds.findIndex((id) => id === replacementTargetId) + 1}.</div>}
     <div className="lb-admin-form-heading"><div><b>Publish a manual Super League slate</b><span>Choose 4–5 future fixtures from the same schedule day, at least 45 minutes before kickoff. Published slates cannot be replaced.</span></div><button type="button" onClick={onCancel} aria-label="Close form"><X size={17}/></button></div>
     {error && <p className="lb-admin-form-error" role="alert">{error}</p>}
     {!choices.length ? <div className="lb-admin-inline-warning">No active Super League week is available. Create or activate a week from the Super League page.</div> : <div className="lb-admin-form-grid"><label>Week<select value={weekKey} onChange={(e) => setWeekKey(e.target.value)}>{choices.map((week) => <option key={week.weekKey} value={week.weekKey}>Week of {week.weekKey}</option>)}</select></label><label>Matchday<select value={matchday} onChange={(e) => setMatchday(e.target.value)}>{Array.from({ length: 7 }, (_, index) => <option key={index + 1} value={index + 1}>Day {index + 1}</option>)}</select></label><div className="lb-admin-selected-count">{selectedMatchIds.length} of 4–5 fixtures selected</div></div>}
