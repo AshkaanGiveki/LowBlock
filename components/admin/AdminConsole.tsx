@@ -344,13 +344,11 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
             <div className={`lb-admin-fixture-centre ${hasScore ? "has-score" : ""}`}><span>{hasScore ? "FINAL SCORE" : "KICKOFF"}</span><strong>{scoreText ?? kickoffTime}</strong><small>{hasScore ? kickoffDate : "Local time"}</small></div>
             <div className="lb-admin-fixture-team away"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{displayText(first(row.awayTeamName, row.awayTeam?.name), "Away team")}</b><small>Away</small></div>
           </div>
-          <div className="lb-admin-fixture-facts">
-            <div><CalendarDays size={15}/><span><small>Match date</small><b>{kickoffDate}</b></span></div>
-            <div><Users size={15}/><span><small>Predictions</small><b>{Number(first(row.predictionsCount, 0)).toLocaleString()}</b></span></div>
-            <div><ShieldCheck size={15}/><span><small>Super League</small><b className={isSlateEligible ? "eligible" : "ineligible"}>{isSlateEligible ? "Eligible" : "Not eligible"}</b></span></div>
-            <div><Eye size={15}/><span><small>Player listing</small><b className={row.adminHiddenFromListings ? "ineligible" : "eligible"}>{row.adminHiddenFromListings ? "Hidden" : "Visible"}</b></span></div>
-          </div>
           {isExpanded && <div className="lb-admin-fixture-details">
+            <div><small>Match date</small><b>{kickoffDate}</b></div>
+            <div><small>Predictions</small><b>{Number(first(row.predictionsCount, 0)).toLocaleString()}</b></div>
+            <div><small>Super League</small><b className={isSlateEligible ? "eligible" : "ineligible"}>{isSlateEligible ? "Eligible" : "Not eligible"}</b></div>
+            <div><small>Player listing</small><b className={row.adminHiddenFromListings ? "ineligible" : "eligible"}>{row.adminHiddenFromListings ? "Hidden" : "Visible"}</b></div>
             <div><small>Fixture ID</small><b title={matchId}>{matchId || "Not available"}</b></div>
             <div><small>Tournament code</small><b>{displayText(row.leagueCode, "—")}</b></div>
             <div><small>Source</small><b>{row.adminCreated ? `Manual entry${row.adminCreatedBy ? ` · ${displayText(row.adminCreatedBy)}` : ""}` : displayText(row.source ?? row.provider, "Provider feed")}</b></div>
