@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Award, Bell, Building2, CalendarDays, ChevronRight, CircleHelp, Database, Gauge, Globe2, LayoutDashboard, LogOut, Menu, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
 
 type Section = "overview" | "matches" | "sync" | "superleague" | "tournaments" | "users" | "clubs" | "teams" | "notifications" | "awards" | "analytics" | "system" | "access";
@@ -63,25 +63,45 @@ export function AdminConsole({ username }: { username: string }) {
   const [dataPage, setDataPage] = useState(0);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [toast, setToast] = useState("");
+  const requestSequence = useRef(0);
   const current = headings[section];
   const navGroups = useMemo(() => [...new Set(nav.map((item) => item.group))], []);
 
-  const load = useCallback(async (target = section, search = query, page = dataPage) => {
+  const load = useCallback(async (target: Section, search: string, page: number) => {
+    const requestId = ++requestSequence.current;
     setBusy(true); setError("");
     try {
       const tasks: Promise<any>[] = [jsonFetch("/api/admin/overview")];
       const item = nav.find((entry) => entry.id === target);
       if (item?.data) tasks.push(jsonFetch(`/api/admin/data?section=${item.data}&q=${encodeURIComponent(search)}&page=${page}`));
       const [summary, rows] = await Promise.all(tasks);
-      setOverview(summary); setDataset(rows ?? null);
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not load admin data"); }
-    finally { setBusy(false); }
-  }, [section, query, dataPage]);
+      if (requestId === requestSequence.current) {
+        setOverview(summary);
+        setDataset(rows ?? null);
+      }
+    } catch (e) {
+      if (requestId === requestSequence.current) setError(e instanceof Error ? e.message : "Could not load admin data");
+    } finally {
+      if (requestId === requestSequence.current) setBusy(false);
+    }
+  }, []);
 
-  useEffect(() => { void load(section, query); }, [section]);
-  useEffect(() => { setDataPage(0); const timer = setTimeout(() => { if (nav.find((item) => item.id === section)?.data) void load(section, query, 0); }, 300); return () => clearTimeout(timer); }, [query]);
-  useEffect(() => { if (nav.find((item) => item.id === section)?.data) void load(section, query, dataPage); }, [dataPage]);
-  useEffect(() => { const timer = setInterval(() => { if (section === "overview" || section === "system") void load(section, query); }, 30_000); return () => clearInterval(timer); }, [section, query, load]);
+  // One request cycle per visible state. Previously section, query, page and
+  // polling effects could overlap and let an older response clear a newer
+  // loading state or replace its data.
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(section, query, dataPage), query ? 250 : 0);
+    return () => {
+      window.clearTimeout(timer);
+      requestSequence.current += 1;
+    };
+  }, [section, query, dataPage, load]);
+
+  useEffect(() => {
+    if (section !== "overview" && section !== "system") return;
+    const timer = window.setInterval(() => void load(section, query, dataPage), 30_000);
+    return () => window.clearInterval(timer);
+  }, [section, query, dataPage, load]);
 
   const changeSection = (target: Section) => { setSection(target); setQuery(""); setDataPage(0); setDataset(null); setMobileMenu(false); };
   const runAction = async (action: "sync" | "rebuild-scores") => {
@@ -95,7 +115,7 @@ export function AdminConsole({ username }: { username: string }) {
       const result = await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, confirmText: confirmation }) });
       setToast(action === "sync" ? "Sync completed. Review the run summary." : "Score rebuild completed.");
       setDataset({ section: action, total: 1, rows: [{ action, result: result.result, completedAt: new Date().toISOString() }] });
-      await load("overview", query);
+      await load("overview", query, 0);
       window.setTimeout(() => setToast(""), 5000);
     } catch (e) { setError(e instanceof Error ? e.message : "Operation failed"); }
     finally { setBusy(false); }
@@ -109,7 +129,7 @@ export function AdminConsole({ username }: { username: string }) {
     try {
       await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "set-admin", userId: row._id, enabled, confirmText: phrase }) });
       setToast(enabled ? "Administrator access granted." : "Administrator access revoked.");
-      await load("users", query);
+      await load("users", query, 0);
       window.setTimeout(() => setToast(""), 4000);
     } catch (e) { setError(e instanceof Error ? e.message : "Role update failed"); }
     finally { setBusy(false); }
@@ -121,7 +141,7 @@ export function AdminConsole({ username }: { username: string }) {
     try {
       await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, confirmText: phrase }) });
       setToast(`${label} completed.`);
-      await load(reload, query);
+      await load(reload, query, dataPage);
       window.setTimeout(() => setToast(""), 4500);
     } catch (e) { setError(e instanceof Error ? e.message : "Operation failed"); }
     finally { setBusy(false); }
@@ -138,9 +158,9 @@ export function AdminConsole({ username }: { username: string }) {
   const content = <>
     <header className="lb-admin-header">
       <div className="lb-admin-heading"><div className="lb-admin-eyebrow">{current.eyebrow}</div><h1>{current.title}</h1><p>{current.description}</p></div>
-      <div className="lb-admin-header-actions"><span className="lb-admin-live"><i /> Live data</span><button aria-label="Refresh data" className="lb-admin-icon-btn" onClick={() => void load()}><RefreshCw size={17} className={busy ? "lb-spin" : ""} /></button><button className="lb-admin-avatar" title={username}>{username.slice(0, 1).toUpperCase()}</button></div>
+      <div className="lb-admin-header-actions"><span className="lb-admin-live"><i /> Live data</span><button aria-label="Refresh data" className="lb-admin-icon-btn" onClick={() => void load(section, query, dataPage)}><RefreshCw size={17} className={busy ? "lb-spin" : ""} /></button><button className="lb-admin-avatar" title={username}>{username.slice(0, 1).toUpperCase()}</button></div>
     </header>
-    {error && <div className="lb-admin-error" role="alert">{error}<button onClick={() => void load()}>Retry</button></div>}
+    {error && <div className="lb-admin-error" role="alert">{error}<button onClick={() => void load(section, query, dataPage)}>Retry</button></div>}
     {toast && <div className="lb-admin-toast"><ShieldCheck size={17}/>{toast}</div>}
     {section === "overview" ? <Overview overview={overview} busy={busy} runAction={runAction} onNavigate={changeSection} /> : <DataSection section={section} dataset={dataset} overview={overview} busy={busy} query={query} setQuery={setQuery} page={dataPage} onPageChange={setDataPage} onNavigate={changeSection} onAction={runAction} onUserAdmin={changeUserAdmin} onAdminAction={performAction} onExport={exportData} />}
     <footer className="lb-admin-footer"><span>Admin actions are recorded in the audit log.</span><span>Updated {overview?.generatedAt ? pretty(overview.generatedAt) : "—"}</span></footer>
@@ -227,9 +247,9 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     {section === "analytics" ? <Analytics onNavigate={onNavigate}/> : null}
     {section === "system" ? <SystemStatus overview={overview} onNavigate={onNavigate}/> : null}
     {section !== "analytics" && section !== "system" && <section className="lb-admin-card lb-admin-table-card">
-      <div className="lb-admin-table-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} records</h3></div><div className="lb-admin-table-tools">{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync now</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Rebuild scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Generate current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Export CSV</button>}<label className="lb-admin-search"><Search size={15}/><input placeholder="Search records" value={query} onChange={(e) => setQuery(e.target.value)}/><kbd>⌘ K</kbd></label></div></div>
+      <div className="lb-admin-table-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} records</h3></div><div className="lb-admin-table-tools">{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync now</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Rebuild scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Generate current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Export CSV</button>}<label className="lb-admin-search"><Search size={15}/><input placeholder="Search records" value={query} onChange={(e) => { onPageChange(0); setQuery(e.target.value); }}/><kbd>⌘ K</kbd></label></div></div>
       {(section === "users" || section === "matches" || section === "sync" || section === "superleague" || section === "clubs") && <div className="lb-admin-filter-row"><span>All records <b>{dataset?.total ?? 0}</b></span>{section === "matches" && <><button className="selected">All fixtures</button><button onClick={() => setQuery("LIVE")}>Live</button><button onClick={() => setQuery("FINISHED")}>Finished</button></>}<span className="lb-admin-filter-end">Showing up to 40 · Search to narrow results</span></div>}
-      {busy && !dataset ? <div className="lb-admin-loading"><RefreshCw size={18} className="lb-spin"/>Loading records…</div> : rows.length === 0 ? <div className="lb-admin-empty"><div className="lb-admin-empty-icon"><Database size={22}/></div><b>{dataset ? "No records to show" : "Connect this section"}</b><span>{dataset ? "Try a different search or refresh." : "This section is specified for the admin panel and will appear here as its data source is connected."}</span></div> : <>
+      {busy && !dataset ? <div className="lb-admin-loading"><RefreshCw size={18} className="lb-spin"/>Loading records…</div> : rows.length === 0 ? <div className="lb-admin-empty"><div className="lb-admin-empty-icon"><Database size={22}/></div><b>{dataset ? "No records to show" : "No data loaded"}</b><span>{dataset ? "Try a different search or refresh." : "The data source did not return records. Use Refresh or Retry to load this section again."}</span></div> : <>
         <div className="lb-admin-table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{labelize(column)}</th>)}<th>Actions</th></tr></thead><tbody>{rows.map((row: any, index: number) => <tr key={row._id ?? row.code ?? `${index}`}><>{columns.map((column) => <td key={column}><span className={column.toLowerCase().includes("status") || column === "outcome" ? `lb-admin-status-chip ${String(row[column]).toLowerCase()}` : ""}>{pretty(row[column])}</span></td>)}</><td><div className="lb-admin-row-actions">{section === "users" && <button className="lb-admin-row-action" disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Revoke admin" : "Grant admin"}</button>}{rowAction(row)}{section === "tournaments" && <span className="lb-admin-readonly">Code-managed</span>}</div></td></tr>)}</tbody></table></div>
         <div className="lb-admin-mobile-records">{rows.map((row: any, index: number) => <article key={row._id ?? row.code ?? index}><header><b>{pretty(row[columns[0]])}</b><div className="lb-admin-row-actions">{section === "users" && <button disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Revoke admin" : "Grant admin"}</button>}{rowAction(row)}</div></header>{columns.slice(1, 6).map((column) => <div key={column}><span>{labelize(column)}</span><b>{pretty(row[column])}</b></div>)}</article>)}</div>
         <div className="lb-admin-table-footer"><span>Page {page + 1} of {Math.max(1, Math.ceil((dataset?.total ?? 0) / (dataset?.limit ?? 40)))} · {rows.length} shown of {dataset.total}</span><div className="lb-admin-page-actions"><button disabled={busy || page <= 0} onClick={() => onPageChange(page - 1)}>Previous</button><button disabled={busy || (page + 1) * (dataset?.limit ?? 40) >= dataset.total} onClick={() => onPageChange(page + 1)}>Next</button></div></div>
