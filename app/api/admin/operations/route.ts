@@ -21,10 +21,11 @@ export async function POST(request: Request) {
   try {
     await db.collection("adminOperationLocks").insertOne({ _id: action, actorId: auth.userId, startedAt: now, expiresAt: new Date(now.getTime() + 90_000) });
   } catch {
-    const active = await db.collection("adminOperationLocks").findOne({ _id: action, expiresAt: { $gt: now } });
-    if (active) return NextResponse.json({ error: "OPERATION_ALREADY_RUNNING" }, { status: 409 });
-    await db.collection("adminOperationLocks").deleteOne({ _id: action });
-    await db.collection("adminOperationLocks").insertOne({ _id: action, actorId: auth.userId, startedAt: now, expiresAt: new Date(now.getTime() + 90_000) });
+    const recovered = await db.collection("adminOperationLocks").updateOne(
+      { _id: action, expiresAt: { $lte: now } },
+      { $set: { actorId: auth.userId, startedAt: now, expiresAt: new Date(now.getTime() + 90_000) } },
+    );
+    if (!recovered.modifiedCount) return NextResponse.json({ error: "OPERATION_ALREADY_RUNNING" }, { status: 409 });
   }
   let outcome: "SUCCESS" | "FAILED" = "SUCCESS";
   let result: any;
