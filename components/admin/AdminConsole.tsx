@@ -54,8 +54,18 @@ function pretty(value: any): string {
 }
 function labelize(key: string) { return key.replace(/([A-Z])/g, " $1").replace(/[_-]/g, " ").replace(/^./, (c) => c.toUpperCase()); }
 function first(...values: any[]) { return values.find((value) => value !== undefined && value !== null && value !== ""); }
-function TeamBadge({ name, logo }: { name: string; logo?: string }) {
-  return <span className="lb-admin-identity-logo">{logo ? <img src={logo} alt="" /> : <b>{name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</b>}</span>;
+function displayText(value: any, fallback = "—"): string {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map((part) => displayText(part, "")).filter(Boolean).join(", ") || fallback;
+  if (value && typeof value === "object") {
+    const localized = first(value.en, value.fa, value.name, value.shortName, value.displayName);
+    return localized === undefined ? fallback : displayText(localized, fallback);
+  }
+  return fallback;
+}
+function TeamBadge({ name, logo }: { name: any; logo?: string }) {
+  const label = displayText(name, "Team");
+  return <span className="lb-admin-identity-logo">{logo ? <img src={logo} alt="" /> : <b>{label.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</b>}</span>;
 }
 function StatusPill({ value }: { value: any }) {
   const raw = String(value ?? "UNKNOWN").toUpperCase();
@@ -264,7 +274,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     ? <button className="lb-admin-row-action" disabled={busy || actionLabel(row) === "—"} onClick={() => void act(row)}>{actionLabel(row)}</button>
     : null;
   const recordTitle = (row: any) => {
-    if (section === "matches") return `${first(row.homeTeamName, row.homeTeam?.name, "Home")} vs ${first(row.awayTeamName, row.awayTeam?.name, "Away")}`;
+    if (section === "matches") return `${displayText(first(row.homeTeamName, row.homeTeam?.name), "Home")} vs ${displayText(first(row.awayTeamName, row.awayTeam?.name), "Away")}`;
     if (section === "users") return first(row.displayName, row.username, "Player");
     if (section === "clubs") return first(row.name, "Unnamed club");
     if (section === "teams") return first(row.names?.en, row.names?.fa, row.centralTeamId, "Team");
@@ -277,7 +287,7 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     return "Record";
   };
   const cardDetail = (row: any) => {
-    if (section === "matches") return first(row.tournamentName, row.tournament, "Fixture");
+    if (section === "matches") return displayText(first(row.tournamentName, row.tournament), "Fixture");
     if (section === "users") return first(row.username ? `@${row.username}` : "Player account", row.platform);
     if (section === "clubs") return `${row.code ? `Code ${row.code} · ` : ""}${row.discoveryMode === "RECRUITING" ? "Recruiting members" : "Invite only"}`;
     if (section === "teams") return `${row.names?.fa ? `${row.names.fa} · ` : ""}${row.isNational ? "National team" : "Club team"}`;
@@ -304,9 +314,9 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
         const matchStatus = String(row.status ?? "").toUpperCase();
         const isSlateEligible = section === "matches" && Boolean(LEAGUES.find((league) => league.code === row.leagueCode)?.h2h) && Boolean(matchId) && !row.adminHiddenFromListings && new Date(row.kickoffAt).getTime() > Date.now() + 45 * 60 * 1000 && !["FINISHED", "FT", "AET", "PEN", "CANCELLED", "POSTPONED", "VOID", "ABANDONED"].includes(matchStatus);
         return <article className={`lb-admin-record-card ${section === "matches" ? "match" : ""}`} key={row._id ?? row.code ?? index}>
-          {section === "matches" ? <div className="lb-admin-match-identity"><div className="lb-admin-team-side"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{first(row.homeTeamName, row.homeTeam?.name, "Home")}</b></div><span className="lb-admin-match-versus">VS</span><div className="lb-admin-team-side"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{first(row.awayTeamName, row.awayTeam?.name, "Away")}</b></div></div> : <div className="lb-admin-record-title-row"><TeamBadge name={title} logo={logo}/><div className="lb-admin-record-heading"><h4>{title}</h4><span>{cardDetail(row)}</span></div></div>}
+          {section === "matches" ? <div className="lb-admin-match-identity"><div className="lb-admin-team-side"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{displayText(first(row.homeTeamName, row.homeTeam?.name), "Home")}</b></div><span className="lb-admin-match-versus">VS</span><div className="lb-admin-team-side"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{displayText(first(row.awayTeamName, row.awayTeam?.name), "Away")}</b></div></div> : <div className="lb-admin-record-title-row"><TeamBadge name={title} logo={logo}/><div className="lb-admin-record-heading"><h4>{displayText(title, "Record")}</h4><span>{displayText(cardDetail(row), "")}</span></div></div>}
           <div className="lb-admin-record-meta">
-            {section === "matches" && <><span className="lb-admin-tournament-name">{cardDetail(row)}</span><span>{pretty(first(row.kickoffAt, row.date))}</span><StatusPill value={row.status}/>{first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals) !== undefined && <b className="lb-admin-match-score">{first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals)} – {first(row.awayGoals, row.awayScore, row.score?.away, row.score?.awayGoals, "0")}</b>}</>}
+            {section === "matches" && <><span className="lb-admin-tournament-name">{displayText(cardDetail(row), "Fixture")}</span><span>{pretty(first(row.kickoffAt, row.date))}</span><StatusPill value={row.status}/>{first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals) !== undefined && <b className="lb-admin-match-score">{displayText(first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals), "0")} – {displayText(first(row.awayGoals, row.awayScore, row.score?.away, row.score?.awayGoals), "0")}</b>}</>}
             {section === "users" && <><StatusPill value={row.isAdmin || row.role === "ADMIN" ? "ADMIN" : "PLAYER"}/><span>{Number(first(row.globalPoints, row.points, 0)).toLocaleString()} points</span><span>Joined {pretty(row.createdAt)}</span></>}
             {section === "clubs" && <><StatusPill value={row.visibility ?? row.state}/><span>{first(row.discoveryMode, "Invite only")}</span><span>Created {pretty(row.createdAt)}</span></>}
             {section === "teams" && <><span>Super League rating</span><b className="lb-admin-rating">{first(row.h2hRating, "Not set")}</b><span>{row.h2hRatingUpdatedAt ? `Updated ${pretty(row.h2hRatingUpdatedAt)}` : "Default team data"}</span></>}
