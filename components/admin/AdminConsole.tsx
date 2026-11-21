@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Activity, Award, Bell, Building2, CalendarDays, ChevronRight, CircleHelp, Database, Gauge, Globe2, LayoutDashboard, LogOut, Menu, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
+import { Activity, Award, Bell, Building2, CalendarDays, ChevronRight, CircleHelp, Copy, Database, Eye, EyeOff, Gauge, Globe2, Info, LayoutDashboard, LogOut, Menu, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
 import { LEAGUES } from "@/lib/football/leagues";
 
 type Section = "overview" | "matches" | "sync" | "superleague" | "tournaments" | "users" | "clubs" | "teams" | "notifications" | "awards" | "analytics" | "system" | "access";
@@ -236,6 +236,17 @@ function Overview({ overview, busy, runAction, onNavigate }: any) {
 }
 
 function DataSection({ section, dataset, overview, busy, query, setQuery, page, onPageChange, onNavigate, onAction, onUserAdmin, onAdminAction, onExport, selectedMatchIds, setSelectedMatchIds, showManualMatchForm, setShowManualMatchForm, showSlateAssignment, setShowSlateAssignment, reload }: any) {
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [copiedMatchId, setCopiedMatchId] = useState<string | null>(null);
+  const copyFixtureId = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopiedMatchId(id);
+      window.setTimeout(() => setCopiedMatchId(null), 1800);
+    } catch {
+      setExpandedMatchId(id);
+    }
+  };
   const item = nav.find((entry) => entry.id === section);
   const rows = dataset?.rows ?? [];
   const act = (row: any) => {
@@ -312,7 +323,48 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
         const logo = image(row);
         const matchId = String(row.providerMatchId ?? row.matchId ?? "");
         const matchStatus = String(row.status ?? "").toUpperCase();
-        const isSlateEligible = section === "matches" && Boolean(LEAGUES.find((league) => league.code === row.leagueCode)?.h2h) && Boolean(matchId) && !row.adminHiddenFromListings && new Date(row.kickoffAt).getTime() > Date.now() + 45 * 60 * 1000 && !["FINISHED", "FT", "AET", "PEN", "CANCELLED", "POSTPONED", "VOID", "ABANDONED"].includes(matchStatus);
+        const tournament = section === "matches" ? LEAGUES.find((league) => league.code === row.leagueCode) : null;
+        const kickoff = row.kickoffAt ? new Date(row.kickoffAt) : null;
+        const validKickoff = kickoff && !Number.isNaN(kickoff.getTime());
+        const isSlateEligible = section === "matches" && Boolean(tournament?.h2h) && Boolean(matchId) && !row.adminHiddenFromListings && Boolean(validKickoff && kickoff!.getTime() > Date.now() + 45 * 60 * 1000) && !["FINISHED", "FT", "AET", "PEN", "CANCELLED", "POSTPONED", "VOID", "ABANDONED"].includes(matchStatus);
+        const isSelected = selectedMatchIds.includes(matchId);
+        const isExpanded = expandedMatchId === matchId;
+        const hasScore = first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals) !== undefined;
+        const scoreText = hasScore ? `${displayText(first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals), "0")} – ${displayText(first(row.awayGoals, row.awayScore, row.score?.away, row.score?.awayGoals), "0")}` : null;
+        const kickoffDate = validKickoff ? kickoff!.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "Kickoff not set";
+        const kickoffTime = validKickoff ? kickoff!.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "—";
+        if (section === "matches") return <article className={`lb-admin-fixture-card ${isSelected ? "is-selected" : ""} ${row.adminHiddenFromListings ? "is-hidden" : ""}`} key={row._id ?? row.code ?? index}>
+          <div className="lb-admin-fixture-topline">
+            <div className="lb-admin-fixture-competition">{tournament?.logo ? <img src={tournament.logo} alt=""/> : <span className="lb-admin-fixture-competition-fallback"><Trophy size={15}/></span>}<span><b>{displayText(tournament?.enName ?? row.tournamentName ?? row.tournament, "Supported tournament")}</b><small>{displayText(tournament?.faName, displayText(row.leagueCode, "Competition"))}</small></span></div>
+            <div className="lb-admin-fixture-top-actions"><StatusPill value={row.status}/><button className="lb-admin-fixture-icon-button" aria-label={isExpanded ? "Hide fixture details" : "Show fixture details"} aria-expanded={isExpanded} title="Fixture details" onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}><Info size={16}/></button></div>
+          </div>
+          <div className="lb-admin-fixture-main">
+            <div className="lb-admin-fixture-team"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{displayText(first(row.homeTeamName, row.homeTeam?.name), "Home team")}</b><small>Home</small></div>
+            <div className={`lb-admin-fixture-centre ${hasScore ? "has-score" : ""}`}><span>{hasScore ? "FINAL SCORE" : "KICKOFF"}</span><strong>{scoreText ?? kickoffTime}</strong><small>{hasScore ? kickoffDate : "Local time"}</small></div>
+            <div className="lb-admin-fixture-team away"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{displayText(first(row.awayTeamName, row.awayTeam?.name), "Away team")}</b><small>Away</small></div>
+          </div>
+          <div className="lb-admin-fixture-facts">
+            <div><CalendarDays size={15}/><span><small>Match date</small><b>{kickoffDate}</b></span></div>
+            <div><Users size={15}/><span><small>Predictions</small><b>{Number(first(row.predictionsCount, 0)).toLocaleString()}</b></span></div>
+            <div><ShieldCheck size={15}/><span><small>Super League</small><b className={isSlateEligible ? "eligible" : "ineligible"}>{isSlateEligible ? "Eligible" : "Not eligible"}</b></span></div>
+            <div><Eye size={15}/><span><small>Player listing</small><b className={row.adminHiddenFromListings ? "ineligible" : "eligible"}>{row.adminHiddenFromListings ? "Hidden" : "Visible"}</b></span></div>
+          </div>
+          {isExpanded && <div className="lb-admin-fixture-details">
+            <div><small>Fixture ID</small><b title={matchId}>{matchId || "Not available"}</b></div>
+            <div><small>Tournament code</small><b>{displayText(row.leagueCode, "—")}</b></div>
+            <div><small>Source</small><b>{row.adminCreated ? `Manual entry${row.adminCreatedBy ? ` · ${displayText(row.adminCreatedBy)}` : ""}` : displayText(row.source ?? row.provider, "Provider feed")}</b></div>
+            <div><small>Last updated</small><b>{pretty(row.updatedAt)}</b></div>
+            <div><small>Kickoff</small><b>{validKickoff ? `${kickoffDate} · ${kickoffTime}` : "Not set"}</b></div>
+            <div><small>Slate selection</small><b>{isSelected ? "Selected for manual slate" : isSlateEligible ? "Available for manual slate" : "Not currently eligible"}</b></div>
+          </div>}
+          <div className="lb-admin-fixture-actions">
+            <button className={`lb-admin-fixture-select ${isSelected ? "selected" : ""}`} disabled={(!isSlateEligible && !isSelected) || (!isSelected && selectedMatchIds.length >= 5)} title={!isSelected && selectedMatchIds.length >= 5 ? "Clear one of the five selected fixtures first" : isSlateEligible || isSelected ? "Select this fixture for a Super League slate" : "Future fixtures from Super League supported tournaments are eligible"} onClick={() => setSelectedMatchIds((current: string[]) => current.includes(matchId) ? current.filter((value) => value !== matchId) : current.length < 5 ? [...current, matchId] : current)}>{isSelected ? "✓ Selected for slate" : isSlateEligible ? "＋ Select for slate" : "Unavailable for slate"}</button>
+            <button className="lb-admin-fixture-secondary" disabled={busy || !matchId} onClick={() => void act(row)}>{row.adminHiddenFromListings ? <Eye size={15}/> : <EyeOff size={15}/>} {row.adminHiddenFromListings ? "Show in Matches" : "Hide from Matches"}</button>
+            <button className="lb-admin-fixture-secondary" disabled={!matchId} onClick={() => void copyFixtureId(matchId)}>{copiedMatchId === matchId ? <ShieldCheck size={15}/> : <Copy size={15}/>} {copiedMatchId === matchId ? "Fixture ID copied" : "Copy fixture ID"}</button>
+            <button className="lb-admin-fixture-details-button" aria-expanded={isExpanded} onClick={() => setExpandedMatchId(isExpanded ? null : matchId)}>{isExpanded ? "Hide details" : "Details"}<ChevronRight size={15}/></button>
+          </div>
+          {isSelected && <div className="lb-admin-fixture-selected-note"><ShieldCheck size={14}/> Included in the current manual selection. Published slates stay locked and existing predictions are preserved.</div>}
+        </article>;
         return <article className={`lb-admin-record-card ${section === "matches" ? "match" : ""}`} key={row._id ?? row.code ?? index}>
           {section === "matches" ? <div className="lb-admin-match-identity"><div className="lb-admin-team-side"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{displayText(first(row.homeTeamName, row.homeTeam?.name), "Home")}</b></div><span className="lb-admin-match-versus">VS</span><div className="lb-admin-team-side"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{displayText(first(row.awayTeamName, row.awayTeam?.name), "Away")}</b></div></div> : <div className="lb-admin-record-title-row"><TeamBadge name={title} logo={logo}/><div className="lb-admin-record-heading"><h4>{displayText(title, "Record")}</h4><span>{displayText(cardDetail(row), "")}</span></div></div>}
           <div className="lb-admin-record-meta">
