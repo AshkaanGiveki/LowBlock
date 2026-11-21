@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   let total = 0;
   if (section === "matches") {
     const query = regex ? { $or: [{ homeTeamName: regex }, { awayTeamName: regex }, { tournamentName: regex }, { tournament: regex }, { status: regex }] } : {};
-    [total, rows] = await Promise.all([db.collection("matches").countDocuments(query), db.collection("matches").find(query, { projection: { providerMatchId: 1, matchId: 1, homeTeamName: 1, awayTeamName: 1, homeTeam: 1, awayTeam: 1, tournamentName: 1, tournament: 1, kickoffAt: 1, status: 1, homeScore: 1, awayScore: 1, score: 1, source: 1, updatedAt: 1, predictionsCount: 1, adminHiddenFromListings: 1 } }).sort({ kickoffAt: -1 }).skip(page * limit).limit(limit).toArray()]);
+    [total, rows] = await Promise.all([db.collection("matches").countDocuments(query), db.collection("matches").find(query, { projection: { providerMatchId: 1, matchId: 1, homeTeamName: 1, awayTeamName: 1, homeTeam: 1, awayTeam: 1, tournamentName: 1, tournament: 1, kickoffAt: 1, status: 1, homeGoals: 1, awayGoals: 1, homeScore: 1, awayScore: 1, score: 1, source: 1, updatedAt: 1, predictionsCount: 1, adminHiddenFromListings: 1 } }).sort({ kickoffAt: -1 }).skip(page * limit).limit(limit).toArray()]);
   } else if (section === "users") {
     const query = regex ? { $or: [{ username: regex }, { displayName: regex }] } : {};
     [total, rows] = await Promise.all([db.collection("users").countDocuments(query), db.collection("users").find(query, { projection: { username: 1, displayName: 1, role: 1, isAdmin: 1, createdAt: 1, lastActiveAt: 1, points: 1, globalPoints: 1, platform: 1 } }).sort({ createdAt: -1 }).skip(page * limit).limit(limit).toArray()]);
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     [total, rows] = await Promise.all([db.collection("notificationJobs").countDocuments(query), db.collection("notificationJobs").find(query, { projection: { jobKey: 1, type: 1, status: 1, attempts: 1, runAt: 1, createdAt: 1, updatedAt: 1, lastError: 1 } }).sort({ runAt: -1 }).skip(page * limit).limit(limit).toArray()]);
   } else if (section === "teams") {
     const query = regex ? { $or: [{ "names.en": regex }, { "names.fa": regex }, { centralTeamId: regex }] } : {};
-    [total, rows] = await Promise.all([db.collection("centralTeams").countDocuments(query), db.collection("centralTeams").find(query, { projection: { centralTeamId: 1, names: 1, isNational: 1, h2hRating: 1, h2hRatingVersion: 1, h2hRatingUpdatedAt: 1 } }).sort({ "names.en": 1 }).skip(page * limit).limit(limit).toArray()]);
+    [total, rows] = await Promise.all([db.collection("centralTeams").countDocuments(query), db.collection("centralTeams").find(query, { projection: { centralTeamId: 1, names: 1, logoUrl: 1, isNational: 1, h2hRating: 1, h2hRatingVersion: 1, h2hRatingUpdatedAt: 1 } }).sort({ "names.en": 1 }).skip(page * limit).limit(limit).toArray()]);
   } else if (section === "audit") {
     const query = regex ? { $or: [{ "actor.username": regex }, { action: regex }, { target: regex }, { outcome: regex }] } : {};
     [total, rows] = await Promise.all([db.collection("adminAuditLog").countDocuments(query), db.collection("adminAuditLog").find(query, { projection: { actor: 1, action: 1, target: 1, outcome: 1, createdAt: 1, summary: 1 } }).sort({ createdAt: -1 }).skip(page * limit).limit(limit).toArray()]);

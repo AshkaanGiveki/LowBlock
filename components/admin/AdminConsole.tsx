@@ -45,13 +45,23 @@ async function jsonFetch(url: string, init?: RequestInit) {
 function pretty(value: any): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "object") return "—";
   const raw = String(value);
   const date = new Date(raw);
   if (/\d{4}-\d\d-\d\dT/.test(raw) && !Number.isNaN(date.getTime())) return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   return raw.length > 110 ? `${raw.slice(0, 107)}…` : raw;
 }
 function labelize(key: string) { return key.replace(/([A-Z])/g, " $1").replace(/[_-]/g, " ").replace(/^./, (c) => c.toUpperCase()); }
+function first(...values: any[]) { return values.find((value) => value !== undefined && value !== null && value !== ""); }
+function TeamBadge({ name, logo }: { name: string; logo?: string }) {
+  return <span className="lb-admin-identity-logo">{logo ? <img src={logo} alt="" /> : <b>{name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</b>}</span>;
+}
+function StatusPill({ value }: { value: any }) {
+  const raw = String(value ?? "UNKNOWN").toUpperCase();
+  const label: Record<string, string> = { NS: "Upcoming", NOT_STARTED: "Upcoming", FT: "Finished", FINISHED: "Finished", LIVE: "Live", IN_PLAY: "Live", POSTPONED: "Postponed", CANCELLED: "Cancelled", FAILED: "Failed", SUCCESS: "Completed", COMPLETED: "Completed", PENDING: "Pending", PROCESSING: "Processing", DEAD: "Needs attention", PUBLIC: "Public", PRIVATE: "Private", OPEN: "Open", CLOSED: "Closed" };
+  const tone = ["FAILED", "DEAD", "CANCELLED", "POSTPONED"].includes(raw) ? "warn" : ["FT", "FINISHED", "COMPLETED", "SUCCESS", "PUBLIC", "OPEN"].includes(raw) ? "good" : ["LIVE", "IN_PLAY"].includes(raw) ? "live" : "";
+  return <span className={`lb-admin-friendly-status ${tone}`}>{label[raw] ?? labelize(raw)}</span>;
+}
 
 export function AdminConsole({ username }: { username: string }) {
   const [section, setSection] = useState<Section>("overview");
@@ -206,7 +216,6 @@ function Overview({ overview, busy, runAction, onNavigate }: any) {
 function DataSection({ section, dataset, overview, busy, query, setQuery, page, onPageChange, onNavigate, onAction, onUserAdmin, onAdminAction, onExport }: any) {
   const item = nav.find((entry) => entry.id === section);
   const rows = dataset?.rows ?? [];
-  const columns = rows.length ? Object.keys(rows[0]).filter((key) => key !== "_id").slice(0, 9) : [];
   const act = (row: any) => {
     if (section === "matches") return onAdminAction({ action: "set-match-visibility", matchId: row.providerMatchId ?? row.matchId, hidden: row.adminHiddenFromListings !== true }, "UPDATE MATCH VISIBILITY", `${row.adminHiddenFromListings ? "Restore" : "Hide"} ${row.homeTeamName ?? row.homeTeam?.name ?? "Home"} vs ${row.awayTeamName ?? row.awayTeam?.name ?? "Away"} in the user matches list. Predictions remain intact.`);
     if (section === "clubs") {
@@ -216,9 +225,9 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
       return onAdminAction({ action: "set-club-settings", clubId: row._id, name, visibility: visibility.toUpperCase(), discoveryMode: discoveryMode.toUpperCase() }, "UPDATE CLUB", `Update settings for ${row.name}.`);
     }
     if (section === "notifications") {
-      if (row.status === "PENDING" || row.status === "PROCESSING" || row.status === "DONE" || row.status === "CANCELLED") return;
+      if (["PROCESSING", "DONE", "CANCELLED"].includes(row.status)) return;
       const retry = row.status !== "PENDING";
-      return onAdminAction({ action: retry ? "retry-notification" : "cancel-notification", jobId: row._id }, retry ? "RETRY JOB" : "CANCEL JOB", `${retry ? "Retry" : "Cancel"} notification job ${row.jobKey ?? row._id}.`);
+      return onAdminAction({ action: retry ? "retry-notification" : "cancel-notification", jobId: row._id }, retry ? "RETRY JOB" : "CANCEL JOB", `${retry ? "Retry" : "Cancel"} notification ${row.jobKey ?? row._id}.`);
     }
     if (section === "awards") return onAdminAction({ action: "set-award-revealed", awardId: row._id, revealed: !row.revealedAt }, "UPDATE AWARD", `${row.revealedAt ? "Reset reveal state for" : "Reveal"} ${row.title ?? row.type ?? "this award"}.`);
     if (section === "teams") {
@@ -239,28 +248,75 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     if (section === "users") return "Revoke sessions";
     return "Inspect";
   };
-  const rowAction = (row: any) => {
-    if (["matches", "clubs", "notifications", "awards", "teams", "superleague", "users"].includes(section)) return <button className="lb-admin-row-action" disabled={busy || actionLabel(row) === "—"} onClick={() => void act(row)}>{actionLabel(row)}</button>;
-    return <button className="lb-admin-row-action" onClick={() => window.alert(JSON.stringify(row, null, 2))}>Inspect</button>;
+  const rowAction = (row: any) => ["matches", "clubs", "notifications", "awards", "teams", "superleague", "users"].includes(section)
+    ? <button className="lb-admin-row-action" disabled={busy || actionLabel(row) === "—"} onClick={() => void act(row)}>{actionLabel(row)}</button>
+    : null;
+  const recordTitle = (row: any) => {
+    if (section === "matches") return `${first(row.homeTeamName, row.homeTeam?.name, "Home")} vs ${first(row.awayTeamName, row.awayTeam?.name, "Away")}`;
+    if (section === "users") return first(row.displayName, row.username, "Player");
+    if (section === "clubs") return first(row.name, "Unnamed club");
+    if (section === "teams") return first(row.names?.en, row.names?.fa, row.centralTeamId, "Team");
+    if (section === "superleague") return first(row.weekKey, "Super League week");
+    if (section === "tournaments") return first(row.name, row.faName, "Tournament");
+    if (section === "sync") return `${first(row.provider, "Football provider")} sync`;
+    if (section === "notifications") return first(row.type, row.jobKey, "Notification");
+    if (section === "awards") return first(row.title, row.type, "Award");
+    if (section === "access") return first(row.summary, row.action, "Admin activity");
+    return "Record";
   };
+  const cardDetail = (row: any) => {
+    if (section === "matches") return first(row.tournamentName, row.tournament, "Fixture");
+    if (section === "users") return first(row.username ? `@${row.username}` : "Player account", row.platform);
+    if (section === "clubs") return `${row.code ? `Code ${row.code} · ` : ""}${row.discoveryMode === "RECRUITING" ? "Recruiting members" : "Invite only"}`;
+    if (section === "teams") return `${row.names?.fa ? `${row.names.fa} · ` : ""}${row.isNational ? "National team" : "Club team"}`;
+    if (section === "superleague") return `${first(row.weekKey, "Week")} · ${row.startsAt ? pretty(row.startsAt) : "Schedule not set"}`;
+    if (section === "tournaments") return first(row.faName, row.code, "Supported tournament");
+    if (section === "sync") return `${first(row.mode, "Fixture refresh")} · ${row.startedAt ? pretty(row.startedAt) : "Time unavailable"}`;
+    if (section === "notifications") return first(row.jobKey, "Message delivery");
+    if (section === "awards") return `${row.weekKey ? `Week ${row.weekKey} · ` : ""}${row.source ?? "Player award"}`;
+    if (section === "access") return first(row.actor?.username ? `By ${row.actor.username}` : "Admin action", row.target);
+    return "";
+  };
+  const image = (row: any) => section === "matches" ? null : section === "tournaments" ? row.logo : section === "teams" ? first(row.logoUrl, row.logo) : null;
   return <>
-    {section === "analytics" ? <Analytics onNavigate={onNavigate}/> : null}
+    {section === "analytics" ? <Analytics overview={overview} onNavigate={onNavigate}/> : null}
     {section === "system" ? <SystemStatus overview={overview} onNavigate={onNavigate}/> : null}
-    {section !== "analytics" && section !== "system" && <section className="lb-admin-card lb-admin-table-card">
-      <div className="lb-admin-table-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} records</h3></div><div className="lb-admin-table-tools">{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync now</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Rebuild scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Generate current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Export CSV</button>}<label className="lb-admin-search"><Search size={15}/><input placeholder="Search records" value={query} onChange={(e) => { onPageChange(0); setQuery(e.target.value); }}/><kbd>⌘ K</kbd></label></div></div>
-      {(section === "users" || section === "matches" || section === "sync" || section === "superleague" || section === "clubs") && <div className="lb-admin-filter-row"><span>All records <b>{dataset?.total ?? 0}</b></span>{section === "matches" && <><button className="selected">All fixtures</button><button onClick={() => setQuery("LIVE")}>Live</button><button onClick={() => setQuery("FINISHED")}>Finished</button></>}<span className="lb-admin-filter-end">Showing up to 40 · Search to narrow results</span></div>}
-      {busy && !dataset ? <div className="lb-admin-loading"><RefreshCw size={18} className="lb-spin"/>Loading records…</div> : rows.length === 0 ? <div className="lb-admin-empty"><div className="lb-admin-empty-icon"><Database size={22}/></div><b>{dataset ? "No records to show" : "No data loaded"}</b><span>{dataset ? "Try a different search or refresh." : "The data source did not return records. Use Refresh or Retry to load this section again."}</span></div> : <>
-        <div className="lb-admin-table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{labelize(column)}</th>)}<th>Actions</th></tr></thead><tbody>{rows.map((row: any, index: number) => <tr key={row._id ?? row.code ?? `${index}`}><>{columns.map((column) => <td key={column}><span className={column.toLowerCase().includes("status") || column === "outcome" ? `lb-admin-status-chip ${String(row[column]).toLowerCase()}` : ""}>{pretty(row[column])}</span></td>)}</><td><div className="lb-admin-row-actions">{section === "users" && <button className="lb-admin-row-action" disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Revoke admin" : "Grant admin"}</button>}{rowAction(row)}{section === "tournaments" && <span className="lb-admin-readonly">Code-managed</span>}</div></td></tr>)}</tbody></table></div>
-        <div className="lb-admin-mobile-records">{rows.map((row: any, index: number) => <article key={row._id ?? row.code ?? index}><header><b>{pretty(row[columns[0]])}</b><div className="lb-admin-row-actions">{section === "users" && <button disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Revoke admin" : "Grant admin"}</button>}{rowAction(row)}</div></header>{columns.slice(1, 6).map((column) => <div key={column}><span>{labelize(column)}</span><b>{pretty(row[column])}</b></div>)}</article>)}</div>
-        <div className="lb-admin-table-footer"><span>Page {page + 1} of {Math.max(1, Math.ceil((dataset?.total ?? 0) / (dataset?.limit ?? 40)))} · {rows.length} shown of {dataset.total}</span><div className="lb-admin-page-actions"><button disabled={busy || page <= 0} onClick={() => onPageChange(page - 1)}>Previous</button><button disabled={busy || (page + 1) * (dataset?.limit ?? 40) >= dataset.total} onClick={() => onPageChange(page + 1)}>Next</button></div></div>
-      </>}
+    {section !== "analytics" && section !== "system" && <section className="lb-admin-card lb-admin-directory">
+      <div className="lb-admin-directory-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} {section === "matches" ? "fixtures" : section === "users" ? "players" : section === "clubs" ? "clubs" : section === "tournaments" ? "supported competitions" : section === "teams" ? "teams" : section === "superleague" ? "weeks" : section === "sync" ? "sync runs" : section === "notifications" ? "messages" : section === "awards" ? "awards" : "admin actions"}</h3><p>Browse and manage LowBlock records in plain language.</p></div><div className="lb-admin-table-tools">{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync fixtures</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Recalculate scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Create current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Download list</button>}<label className="lb-admin-search"><Search size={15}/><input aria-label="Search records" placeholder={`Search ${item?.label.toLowerCase() ?? "records"}`} value={query} onChange={(e) => { onPageChange(0); setQuery(e.target.value); }}/></label></div></div>
+      {busy && !dataset ? <div className="lb-admin-loading"><RefreshCw size={18} className="lb-spin"/>Loading…</div> : rows.length === 0 ? <div className="lb-admin-empty"><div className="lb-admin-empty-icon"><Database size={22}/></div><b>{dataset ? "Nothing here yet" : "Could not load this page"}</b><span>{dataset ? "Try another search, or refresh to check again." : "Refresh this page to try again."}</span></div> : <div className="lb-admin-record-grid">{rows.map((row: any, index: number) => {
+        const title = recordTitle(row);
+        const logo = image(row);
+        return <article className={`lb-admin-record-card ${section === "matches" ? "match" : ""}`} key={row._id ?? row.code ?? index}>
+          {section === "matches" ? <div className="lb-admin-match-identity"><div className="lb-admin-team-side"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{first(row.homeTeamName, row.homeTeam?.name, "Home")}</b></div><span className="lb-admin-match-versus">VS</span><div className="lb-admin-team-side"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{first(row.awayTeamName, row.awayTeam?.name, "Away")}</b></div></div> : <div className="lb-admin-record-title-row"><TeamBadge name={title} logo={logo}/><div className="lb-admin-record-heading"><h4>{title}</h4><span>{cardDetail(row)}</span></div></div>}
+          <div className="lb-admin-record-meta">
+            {section === "matches" && <><span className="lb-admin-tournament-name">{cardDetail(row)}</span><span>{pretty(first(row.kickoffAt, row.date))}</span><StatusPill value={row.status}/>{first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals) !== undefined && <b className="lb-admin-match-score">{first(row.homeGoals, row.homeScore, row.score?.home, row.score?.homeGoals)} – {first(row.awayGoals, row.awayScore, row.score?.away, row.score?.awayGoals, "0")}</b>}</>}
+            {section === "users" && <><StatusPill value={row.isAdmin || row.role === "ADMIN" ? "ADMIN" : "PLAYER"}/><span>{Number(first(row.globalPoints, row.points, 0)).toLocaleString()} points</span><span>Joined {pretty(row.createdAt)}</span></>}
+            {section === "clubs" && <><StatusPill value={row.visibility ?? row.state}/><span>{first(row.discoveryMode, "Invite only")}</span><span>Created {pretty(row.createdAt)}</span></>}
+            {section === "teams" && <><span>Super League rating</span><b className="lb-admin-rating">{first(row.h2hRating, "Not set")}</b><span>{row.h2hRatingUpdatedAt ? `Updated ${pretty(row.h2hRatingUpdatedAt)}` : "Default team data"}</span></>}
+            {section === "tournaments" && <><StatusPill value={row.globalLeaderboard ? "GLOBAL" : "H2H"}/><span>{row.code}</span><span>{row.h2h ? "Eligible for Super League" : "Not used in Super League"}</span></>}
+            {section === "superleague" && <><StatusPill value={row.status}/><span>{row.startsAt ? pretty(row.startsAt) : "Start not set"} – {row.endsAt ? pretty(row.endsAt) : "End not set"}</span><span>{first(row.matchCount, row.matches?.length, "Schedule available")}</span></>}
+            {section === "sync" && <><StatusPill value={row.status}/><span>{first(row.matchesFetched, 0)} fixtures checked</span><span>{first(row.matchesUpserted, 0)} updated</span><span>{row.finishedAt ? `Finished ${pretty(row.finishedAt)}` : "Still running"}</span></>}
+            {section === "notifications" && <><StatusPill value={row.status}/><span>{first(row.attempts, 0)} attempts</span><span>Scheduled {pretty(first(row.runAt, row.createdAt))}</span>{row.lastError && <span className="lb-admin-record-error">{row.lastError}</span>}</>}
+            {section === "awards" && <><StatusPill value={row.revealedAt ? "REVEALED" : "PENDING"}/><span>{row.userId ? `Player ${String(row.userId).slice(-6)}` : "Player award"}</span><span>{pretty(row.createdAt)}</span></>}
+            {section === "access" && <><StatusPill value={row.outcome}/><span>{row.actor?.username ? `By ${row.actor.username}` : "Admin activity"}</span><span>{pretty(row.createdAt)}</span></>}
+          </div>
+          <div className="lb-admin-record-footer">{section === "users" && <button className="lb-admin-row-action" disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Remove admin access" : "Make administrator"}</button>}{rowAction(row)}{section === "tournaments" && <span className="lb-admin-readonly">Tournament rules are configured in the app</span>}{section === "matches" && <span className="lb-admin-record-footnote">{row.adminHiddenFromListings ? "Hidden from player listings" : `${first(row.predictionsCount, 0)} predictions · visible to players`}</span>}</div>
+        </article>;
+      })}</div>}
+      {!!rows.length && <div className="lb-admin-table-footer"><span>Page {page + 1} of {Math.max(1, Math.ceil((dataset?.total ?? 0) / (dataset?.limit ?? 40)))} · Showing {rows.length} of {dataset.total}</span><div className="lb-admin-page-actions"><button disabled={busy || page <= 0} onClick={() => onPageChange(page - 1)}>Previous</button><button disabled={busy || (page + 1) * (dataset?.limit ?? 40) >= dataset.total} onClick={() => onPageChange(page + 1)}>Next</button></div></div>}
     </section>}
     {section === "users" && <div className="lb-admin-note"><Shield size={16}/><span>Granting or revoking admin access requires confirmation. Changes are recorded in the audit log; you cannot revoke your own active admin access here.</span></div>}
   </>;
 }
 
-function Analytics({ onNavigate }: any) {
-  return <div className="lb-admin-stats lb-admin-analytics-cards">{[{ title: "Player growth", section: "users", icon: Users }, { title: "Prediction activity", section: "matches", icon: Trophy }, { title: "Club participation", section: "clubs", icon: Building2 }, { title: "Competition coverage", section: "tournaments", icon: Globe2 }].map((item) => { const Icon = item.icon; return <button key={item.title} className="lb-admin-stat lb-admin-analytics-link" onClick={() => onNavigate(item.section)}><div className="lb-admin-stat-icon mint"><Icon size={18}/></div><div className="lb-admin-stat-label">Open report</div><strong className="lb-admin-analytics-title">{item.title}</strong><small>View source records <ChevronRight size={12}/></small></button>; })}<div className="lb-admin-note full"><Activity size={16}/> Product analytics are limited to available operational collections. Event-level engagement analytics are not currently persisted by the app.</div></div>;
+function Analytics({ overview, onNavigate }: any) {
+  const c = overview?.counts;
+  return <><div className="lb-admin-stats lb-admin-analytics-cards">{[
+    { title: "Players", value: c?.users, detail: "Registered accounts", section: "users", icon: Users },
+    { title: "Fixtures", value: c?.matches, detail: `${c?.upcoming ?? 0} upcoming`, section: "matches", icon: CalendarDays },
+    { title: "Predictions", value: c?.predictions, detail: `${c?.unscoredPredictions ?? 0} need scoring`, section: "matches", icon: Trophy },
+    { title: "Clubs", value: c?.clubs, detail: "Community spaces", section: "clubs", icon: Building2 },
+  ].map((item) => { const Icon = item.icon; return <button key={item.title} className="lb-admin-stat lb-admin-analytics-link" onClick={() => onNavigate(item.section)}><div className="lb-admin-stat-icon mint"><Icon size={18}/></div><div className="lb-admin-stat-label">{item.title}</div><strong className="lb-admin-analytics-title">{item.value?.toLocaleString?.() ?? "—"}</strong><small>{item.detail} <ChevronRight size={12}/></small></button>; })}</div><div className="lb-admin-card lb-admin-analytics-note"><Activity size={18}/><div><b>About these numbers</b><span>These are live totals from LowBlock’s operational records. Engagement events such as page views are not currently collected.</span></div><button className="lb-admin-text-btn" onClick={() => onNavigate("tournaments")}>Review competitions <ChevronRight size={15}/></button></div></>;
 }
 
 function SystemStatus({ overview, onNavigate }: any) {
