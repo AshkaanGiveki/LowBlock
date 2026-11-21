@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/admin";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
+import { LEAGUES } from "@/lib/football/leagues";
+import { appScheduleDateKey, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
 import { runLeaderboardEngine } from "@/lib/scoring/scoreEngine";
-import { ensureCurrentH2HLeagues, getH2HWeek, isH2HEnabled, settleH2HLeagues } from "@/lib/domain/h2h";
+import { H2H_EXCLUDED_LEAGUE_CODES, H2H_TOURNAMENT_WEIGHTS, ensureCurrentH2HLeagues, getH2HWeek, isH2HEnabled, materializeH2HLeague, scoreH2HFixture, settleH2HLeagues } from "@/lib/domain/h2h";
+import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
+import { centralTeamLogo } from "@/lib/football/centralTeams";
 
 export const maxDuration = 60;
 
@@ -15,6 +20,8 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("revoke-sessions"), userId: z.string().regex(/^[a-f\d]{24}$/i), confirmText: z.literal("REVOKE SESSIONS") }),
   z.object({ action: z.literal("set-club-settings"), clubId: z.string().regex(/^[a-f\d]{24}$/i), name: z.string().trim().min(2).max(60), visibility: z.enum(["PUBLIC", "PRIVATE"]), discoveryMode: z.enum(["INVITE_ONLY", "RECRUITING"]), confirmText: z.literal("UPDATE CLUB") }),
   z.object({ action: z.literal("set-match-visibility"), matchId: z.string().min(1).max(120), hidden: z.boolean(), confirmText: z.literal("UPDATE MATCH VISIBILITY") }),
+  z.object({ action: z.literal("create-manual-match"), leagueCode: z.string().min(2).max(32), homeTeamName: z.string().trim().min(2).max(80), awayTeamName: z.string().trim().min(2).max(80), kickoffAt: z.string().datetime(), confirmText: z.literal("ADD MATCH") }),
+  z.object({ action: z.literal("h2h-assign-matches"), weekKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), matchday: z.number().int().min(1).max(7), matchIds: z.array(z.string().min(1).max(120)).min(4).max(5).refine((ids) => new Set(ids).size === ids.length), confirmText: z.literal("ASSIGN MATCHES") }),
   z.object({ action: z.literal("retry-notification"), jobId: z.string().regex(/^[a-f\d]{24}$/i), confirmText: z.literal("RETRY JOB") }),
   z.object({ action: z.literal("cancel-notification"), jobId: z.string().regex(/^[a-f\d]{24}$/i), confirmText: z.literal("CANCEL JOB") }),
   z.object({ action: z.literal("set-award-revealed"), awardId: z.string().regex(/^[a-f\d]{24}$/i), revealed: z.boolean(), confirmText: z.literal("UPDATE AWARD") }),
@@ -124,6 +131,85 @@ export async function POST(request: Request) {
         if (!match) throw new Error("RECORD_NOT_FOUND");
         await db.collection("matches").updateOne({ _id: match._id }, { $set: { adminHiddenFromListings: input.hidden, updatedAt: new Date() } });
         return { fixture: `${match.homeTeam?.name ?? "Home"} vs ${match.awayTeam?.name ?? "Away"}`, hidden: input.hidden, predictionsPreserved: true };
+      });
+    case "create-manual-match":
+      return result("MANUAL_MATCH_CREATED", input.leagueCode, async () => {
+        const competition = LEAGUES.find((entry) => entry.code === input.leagueCode);
+        if (!competition) throw new Error("UNSUPPORTED_TOURNAMENT");
+        const kickoffAt = new Date(input.kickoffAt);
+        if (kickoffAt.getTime() <= Date.now()) throw new Error("KICKOFF_MUST_BE_FUTURE");
+        const homeName = input.homeTeamName.trim();
+        const awayName = input.awayTeamName.trim();
+        if (homeName.localeCompare(awayName, undefined, { sensitivity: "accent" }) === 0) throw new Error("TEAMS_MUST_BE_DIFFERENT");
+        const hash = createHash("sha256").update(`${input.leagueCode}|${kickoffAt.toISOString()}|${homeName.toLocaleLowerCase()}|${awayName.toLocaleLowerCase()}`).digest("hex").slice(0, 24);
+        const providerMatchId = `manual:${hash}`;
+        const existing = await db.collection<any>("matches").findOne({ providerMatchId }, { projection: { providerMatchId: 1, adminCreated: 1, homeTeam: 1, awayTeam: 1 } });
+        if (existing) {
+          if (existing.adminCreated) return { providerMatchId, alreadyAdded: true, fixture: `${existing.homeTeam?.name ?? homeName} vs ${existing.awayTeam?.name ?? awayName}` };
+          throw new Error("DUPLICATE_MATCH");
+        }
+        const exactName = (name: string) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+        const teamSnapshot = async (name: string) => {
+          const exact = exactName(name);
+          const central = await db.collection<any>("centralTeams").findOne({ $or: [{ "names.en": exact }, { "names.fa": exact }, { aliases: exact }] }, { projection: { centralTeamId: 1, names: 1, logoUrl: 1, providerIds: 1 } });
+          return { id: Number(central?.providerIds?.[getFootballProvider().name] ?? 0) || 0, name, ...(central?.names?.fa ? { faName: central.names.fa } : {}), ...(central?.centralTeamId ? { centralTeamId: central.centralTeamId } : {}), logoUrl: centralTeamLogo(central) };
+        };
+        const [homeTeam, awayTeam] = await Promise.all([teamSnapshot(homeName), teamSnapshot(awayName)]);
+        const now = new Date();
+        const fixture = { provider: getFootballProvider().name, providerMatchId, leagueCode: competition.code, matchday: 0, kickoffAt, status: "SCHEDULED", elapsed: null, homeGoals: null, awayGoals: null, homeTeam, awayTeam, seasonStartYear: kickoffAt.getUTCMonth() < 6 ? kickoffAt.getUTCFullYear() - 1 : kickoffAt.getUTCFullYear(), rawApiResponse: { adminManualEntry: true, tournamentCode: competition.code }, adminCreated: true, adminCreatedBy: auth.user.username ?? auth.userId, source: "ADMIN_MANUAL", createdAt: now, updatedAt: now };
+        const from = new Date(kickoffAt.getTime() - 15 * 60 * 1000);
+        const to = new Date(kickoffAt.getTime() + 15 * 60 * 1000);
+        const duplicate = await db.collection<any>("matches").findOne({ leagueCode: competition.code, kickoffAt: { $gte: from, $lte: to }, $or: [{ "homeTeam.name": exactName(homeName), "awayTeam.name": exactName(awayName) }, { "homeTeam.name": exactName(awayName), "awayTeam.name": exactName(homeName) }] }, { projection: { providerMatchId: 1 } });
+        if (duplicate) throw new Error("DUPLICATE_MATCH");
+        await db.collection("matches").insertOne(fixture as any);
+        return { providerMatchId, alreadyAdded: false, fixture: `${homeName} vs ${awayName}`, tournament: competition.enName, kickoffAt: kickoffAt.toISOString(), adminCreated: true };
+      });
+    case "h2h-assign-matches":
+      if (!isH2HEnabled()) return NextResponse.json({ error: "H2H_DISABLED" }, { status: 409 });
+      return result("H2H_MANUAL_SLATE_PUBLISHED", `${input.weekKey}/${input.matchday}`, async () => {
+        const week = await db.collection<any>("h2hWeeks").findOne({ weekKey: input.weekKey, status: "ACTIVE" });
+        if (!week) throw new Error("H2H_WEEK_NOT_FOUND");
+        const now = new Date();
+        const fixtureRows = await db.collection<any>("matches").find({ providerMatchId: { $in: input.matchIds } }).toArray();
+        if (fixtureRows.length !== input.matchIds.length) throw new Error("MATCH_NOT_FOUND");
+        const dates = providerWeekDateKeys(new Date(week.startsAt));
+        const sourceDate = dates[input.matchday - 1];
+        if (!sourceDate) throw new Error("INVALID_MATCHDAY");
+        const fixtures = fixtureRows.map((match) => {
+          const competition = LEAGUES.find((entry) => entry.code === match.leagueCode);
+          const kickoffAt = new Date(match.kickoffAt);
+          if (!competition?.h2h || H2H_EXCLUDED_LEAGUE_CODES.has(String(match.leagueCode).toUpperCase()) || !Number.isFinite(kickoffAt.getTime()) || appScheduleDateKey(kickoffAt) !== sourceDate || kickoffAt <= new Date(now.getTime() + 45 * 60 * 1000) || ["FINISHED", "FT", "AET", "PEN", "CANCELLED", "POSTPONED", "VOID", "ABANDONED"].includes(String(match.status).toUpperCase())) throw new Error("MATCH_NOT_ELIGIBLE");
+          const score = scoreH2HFixture(match) ?? 0;
+          return { matchId: String(match.providerMatchId), kickoffAt, score, leagueCode: String(match.leagueCode), homeTeam: match.homeTeam, awayTeam: match.awayTeam, homeRating: 0, awayRating: 0, tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(match.leagueCode)] ?? 1, ratingVersion: "admin-manual", selectionReason: "ADMIN_MANUAL_ASSIGNMENT" };
+        }).sort((a, b) => a.kickoffAt.getTime() - b.kickoffAt.getTime());
+        const slates = await db.collection<any>("h2hLeagues").find({ weekKey: input.weekKey, status: "ACTIVE" }).toArray();
+        if (!slates.length) throw new Error("H2H_NO_ACTIVE_LEAGUES");
+        const existingStates = slates.map((league) => ({ league, slate: league.slates?.find((entry: any) => entry.matchday === input.matchday || entry.sourceDate === sourceDate) }));
+        const signature = (items: any[]) => [...items].map((item) => String(item.matchId)).sort().join("|");
+        for (const item of existingStates) if (item.slate && signature(item.slate.fixtures ?? []) !== signature(fixtures)) throw new Error("H2H_SLATE_ALREADY_PUBLISHED");
+        const pickedLeagueIds = slates.map((league) => league._id);
+        const existingGold = await db.collection("h2hGoldPicks").findOne({ leagueId: { $in: pickedLeagueIds }, matchday: input.matchday, matchId: { $in: input.matchIds } });
+        if (existingGold && existingStates.every((item) => !item.slate)) throw new Error("H2H_GOLD_PICK_ALREADY_EXISTS");
+        const existingFixture = await db.collection("h2hSlateFixtures").findOne({ weekId: week._id, matchId: { $in: input.matchIds } });
+        if (existingFixture && existingStates.every((item) => !item.slate)) throw new Error("H2H_MATCH_ALREADY_ASSIGNED");
+        const firstKickoffAt = fixtures[0].kickoffAt;
+        const slate = { matchday: input.matchday, sourceDate, fixtureIds: fixtures.map((fixture) => fixture.matchId), fixtures, firstKickoffAt, goldDeadline: firstKickoffAt };
+        let assigned = 0;
+        for (const item of existingStates) {
+          let league = item.league;
+          if (!item.slate) {
+            const publication = await publishH2HSlateOnce(db, league, slate);
+            if (publication.action !== "PUBLISHED") {
+              const found = publication.league.slates?.find((entry: any) => entry.matchday === input.matchday || entry.sourceDate === sourceDate);
+              if (!found || signature(found.fixtures ?? []) !== signature(fixtures)) throw new Error("H2H_SLATE_ALREADY_PUBLISHED");
+            }
+            league = publication.league;
+          }
+          await materializeH2HLeague(db, league);
+          assigned++;
+        }
+        await db.collection("h2hAuditEvents").insertOne({ type: "MANUAL_SLATE_ASSIGNED", eventKey: `MANUAL_SLATE_ASSIGNED:${input.weekKey}:${input.matchday}:${signature(fixtures)}`, weekKey: input.weekKey, matchday: input.matchday, fixtureIds: input.matchIds, assignedLeagueCount: assigned, createdAt: now, actor: { userId: auth.userId, username: auth.user.username ?? null } }).catch(() => undefined);
+        return { weekKey: input.weekKey, matchday: input.matchday, sourceDate, fixtureIds: input.matchIds, assignedLeagueCount: assigned, alreadyPublished: existingStates.every((item) => Boolean(item.slate)), predictionsPreserved: true };
       });
     case "retry-notification":
       return result("NOTIFICATION_RETRY_QUEUED", input.jobId, async () => {

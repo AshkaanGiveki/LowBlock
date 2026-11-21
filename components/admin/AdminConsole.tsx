@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Activity, Award, Bell, Building2, CalendarDays, ChevronRight, CircleHelp, Database, Gauge, Globe2, LayoutDashboard, LogOut, Menu, RefreshCw, Search, ShieldCheck, Shield, Trophy, Users, X, Zap } from "lucide-react";
+import { LEAGUES } from "@/lib/football/leagues";
 
 type Section = "overview" | "matches" | "sync" | "superleague" | "tournaments" | "users" | "clubs" | "teams" | "notifications" | "awards" | "analytics" | "system" | "access";
 const nav: Array<{ id: Section; label: string; icon: any; data?: string; group: string }> = [
@@ -73,6 +74,9 @@ export function AdminConsole({ username }: { username: string }) {
   const [dataPage, setDataPage] = useState(0);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [toast, setToast] = useState("");
+  const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
+  const [showManualMatchForm, setShowManualMatchForm] = useState(false);
+  const [showSlateAssignment, setShowSlateAssignment] = useState(false);
   const requestSequence = useRef(0);
   const current = headings[section];
   const navGroups = useMemo(() => [...new Set(nav.map((item) => item.group))], []);
@@ -80,20 +84,28 @@ export function AdminConsole({ username }: { username: string }) {
   const load = useCallback(async (target: Section, search: string, page: number) => {
     const requestId = ++requestSequence.current;
     setBusy(true); setError("");
+    const item = nav.find((entry) => entry.id === target);
+    const summaryTask = jsonFetch("/api/admin/overview").then((summary) => {
+      if (requestId === requestSequence.current) setOverview(summary);
+    }).catch((cause) => {
+      if (requestId === requestSequence.current && ["overview", "system", "analytics"].includes(target)) setError(cause instanceof Error ? cause.message : "Could not load the overview");
+    });
+    if (!item?.data) {
+      await summaryTask;
+      if (requestId === requestSequence.current) setBusy(false);
+      return;
+    }
     try {
-      const tasks: Promise<any>[] = [jsonFetch("/api/admin/overview")];
-      const item = nav.find((entry) => entry.id === target);
-      if (item?.data) tasks.push(jsonFetch(`/api/admin/data?section=${item.data}&q=${encodeURIComponent(search)}&page=${page}`));
-      const [summary, rows] = await Promise.all(tasks);
-      if (requestId === requestSequence.current) {
-        setOverview(summary);
-        setDataset(rows ?? null);
-      }
-    } catch (e) {
-      if (requestId === requestSequence.current) setError(e instanceof Error ? e.message : "Could not load admin data");
+      const rows = await jsonFetch(`/api/admin/data?section=${item.data}&q=${encodeURIComponent(search)}&page=${page}`);
+      if (requestId === requestSequence.current) setDataset(rows ?? null);
+    } catch (cause) {
+      if (requestId === requestSequence.current) setError(cause instanceof Error ? cause.message : "Could not load this page");
     } finally {
       if (requestId === requestSequence.current) setBusy(false);
     }
+    // Directory pages render as soon as their own records arrive; overview data
+    // remains a separate request and cannot hold the Matches screen in loading.
+    void summaryTask;
   }, []);
 
   // One request cycle per visible state. Previously section, query, page and
@@ -113,7 +125,7 @@ export function AdminConsole({ username }: { username: string }) {
     return () => window.clearInterval(timer);
   }, [section, query, dataPage, load]);
 
-  const changeSection = (target: Section) => { setSection(target); setQuery(""); setDataPage(0); setDataset(null); setMobileMenu(false); };
+  const changeSection = (target: Section) => { setSection(target); setQuery(""); setDataPage(0); setDataset(null); setMobileMenu(false); if (target !== "matches") { setSelectedMatchIds([]); setShowManualMatchForm(false); setShowSlateAssignment(false); } };
   const runAction = async (action: "sync" | "rebuild-scores") => {
     const confirmation = action === "sync" ? "SYNC PROVIDER" : "REBUILD SCORES";
     const prompt = action === "sync"
@@ -172,7 +184,7 @@ export function AdminConsole({ username }: { username: string }) {
     </header>
     {error && <div className="lb-admin-error" role="alert">{error}<button onClick={() => void load(section, query, dataPage)}>Retry</button></div>}
     {toast && <div className="lb-admin-toast"><ShieldCheck size={17}/>{toast}</div>}
-    {section === "overview" ? <Overview overview={overview} busy={busy} runAction={runAction} onNavigate={changeSection} /> : <DataSection section={section} dataset={dataset} overview={overview} busy={busy} query={query} setQuery={setQuery} page={dataPage} onPageChange={setDataPage} onNavigate={changeSection} onAction={runAction} onUserAdmin={changeUserAdmin} onAdminAction={performAction} onExport={exportData} />}
+    {section === "overview" ? <Overview overview={overview} busy={busy} runAction={runAction} onNavigate={changeSection} /> : <DataSection section={section} dataset={dataset} overview={overview} busy={busy} query={query} setQuery={setQuery} page={dataPage} onPageChange={setDataPage} onNavigate={changeSection} onAction={runAction} onUserAdmin={changeUserAdmin} onAdminAction={performAction} onExport={exportData} selectedMatchIds={selectedMatchIds} setSelectedMatchIds={setSelectedMatchIds} showManualMatchForm={showManualMatchForm} setShowManualMatchForm={setShowManualMatchForm} showSlateAssignment={showSlateAssignment} setShowSlateAssignment={setShowSlateAssignment} reload={(search?: string, page?: number) => load(section, search ?? query, page ?? dataPage)} />}
     <footer className="lb-admin-footer"><span>Admin actions are recorded in the audit log.</span><span>Updated {overview?.generatedAt ? pretty(overview.generatedAt) : "—"}</span></footer>
   </>;
 
@@ -213,7 +225,7 @@ function Overview({ overview, busy, runAction, onNavigate }: any) {
   </>;
 }
 
-function DataSection({ section, dataset, overview, busy, query, setQuery, page, onPageChange, onNavigate, onAction, onUserAdmin, onAdminAction, onExport }: any) {
+function DataSection({ section, dataset, overview, busy, query, setQuery, page, onPageChange, onNavigate, onAction, onUserAdmin, onAdminAction, onExport, selectedMatchIds, setSelectedMatchIds, showManualMatchForm, setShowManualMatchForm, showSlateAssignment, setShowSlateAssignment, reload }: any) {
   const item = nav.find((entry) => entry.id === section);
   const rows = dataset?.rows ?? [];
   const act = (row: any) => {
@@ -282,10 +294,15 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
     {section === "analytics" ? <Analytics overview={overview} onNavigate={onNavigate}/> : null}
     {section === "system" ? <SystemStatus overview={overview} onNavigate={onNavigate}/> : null}
     {section !== "analytics" && section !== "system" && <section className="lb-admin-card lb-admin-directory">
-      <div className="lb-admin-directory-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} {section === "matches" ? "fixtures" : section === "users" ? "players" : section === "clubs" ? "clubs" : section === "tournaments" ? "supported competitions" : section === "teams" ? "teams" : section === "superleague" ? "weeks" : section === "sync" ? "sync runs" : section === "notifications" ? "messages" : section === "awards" ? "awards" : "admin actions"}</h3><p>Browse and manage LowBlock records in plain language.</p></div><div className="lb-admin-table-tools">{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync fixtures</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Recalculate scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Create current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Download list</button>}<label className="lb-admin-search"><Search size={15}/><input aria-label="Search records" placeholder={`Search ${item?.label.toLowerCase() ?? "records"}`} value={query} onChange={(e) => { onPageChange(0); setQuery(e.target.value); }}/></label></div></div>
+      <div className="lb-admin-directory-toolbar"><div><span className="lb-admin-card-eyebrow">{item?.group?.toUpperCase()}</span><h3>{dataset?.total?.toLocaleString?.() ?? "—"} {section === "matches" ? "fixtures" : section === "users" ? "players" : section === "clubs" ? "clubs" : section === "tournaments" ? "supported competitions" : section === "teams" ? "teams" : section === "superleague" ? "weeks" : section === "sync" ? "sync runs" : section === "notifications" ? "messages" : section === "awards" ? "awards" : "admin actions"}</h3><p>{section === "matches" ? "Browse fixtures, add a missing match, or build a manual slate." : "Browse and manage LowBlock records in plain language."}</p></div><div className="lb-admin-table-tools">{section === "matches" && <><button className="lb-admin-button" onClick={() => setShowManualMatchForm(!showManualMatchForm)}>＋ Add match manually</button><button className="lb-admin-button primary" disabled={selectedMatchIds.length < 4 || selectedMatchIds.length > 5} onClick={() => setShowSlateAssignment(!showSlateAssignment)}>Assign {selectedMatchIds.length || "selected"} to Super League</button></>}{section === "sync" && <><button className="lb-admin-button" disabled={busy} onClick={() => onAction("sync")}><RefreshCw size={15}/> Sync fixtures</button><button className="lb-admin-button primary" disabled={busy} onClick={() => onAction("rebuild-scores")}><Trophy size={15}/> Recalculate scores</button></>}{section === "superleague" && <button className="lb-admin-button primary" disabled={busy} onClick={() => onAdminAction({ action: "h2h-generate" }, "GENERATE CURRENT WEEK", "Generate or refresh the current Super League week.")}>Create current week</button>}{rows.length > 0 && <button className="lb-admin-button" onClick={onExport}>Download list</button>}<label className="lb-admin-search"><Search size={15}/><input aria-label="Search records" placeholder={`Search ${item?.label.toLowerCase() ?? "records"}`} value={query} onChange={(e) => { onPageChange(0); setQuery(e.target.value); }}/></label></div></div>
+      {section === "matches" && showManualMatchForm && <ManualMatchForm onCancel={() => setShowManualMatchForm(false)} onCreated={async () => { setShowManualMatchForm(false); setQuery(""); onPageChange(0); await reload("", 0); }} />}
+      {section === "matches" && showSlateAssignment && <ManualSlateAssignment selectedMatchIds={selectedMatchIds} weeks={overview?.h2hWeeks ?? []} busy={busy} onCancel={() => setShowSlateAssignment(false)} onAssigned={async () => { setShowSlateAssignment(false); setSelectedMatchIds([]); await reload(); }} />}
       {busy && !dataset ? <div className="lb-admin-loading"><RefreshCw size={18} className="lb-spin"/>Loading…</div> : rows.length === 0 ? <div className="lb-admin-empty"><div className="lb-admin-empty-icon"><Database size={22}/></div><b>{dataset ? "Nothing here yet" : "Could not load this page"}</b><span>{dataset ? "Try another search, or refresh to check again." : "Refresh this page to try again."}</span></div> : <div className="lb-admin-record-grid">{rows.map((row: any, index: number) => {
         const title = recordTitle(row);
         const logo = image(row);
+        const matchId = String(row.providerMatchId ?? row.matchId ?? "");
+        const matchStatus = String(row.status ?? "").toUpperCase();
+        const isSlateEligible = section === "matches" && Boolean(LEAGUES.find((league) => league.code === row.leagueCode)?.h2h) && Boolean(matchId) && !row.adminHiddenFromListings && new Date(row.kickoffAt).getTime() > Date.now() + 45 * 60 * 1000 && !["FINISHED", "FT", "AET", "PEN", "CANCELLED", "POSTPONED", "VOID", "ABANDONED"].includes(matchStatus);
         return <article className={`lb-admin-record-card ${section === "matches" ? "match" : ""}`} key={row._id ?? row.code ?? index}>
           {section === "matches" ? <div className="lb-admin-match-identity"><div className="lb-admin-team-side"><TeamBadge name={first(row.homeTeamName, row.homeTeam?.name, "Home")} logo={row.homeTeam?.logoUrl ?? row.homeTeamLogo}/><b>{first(row.homeTeamName, row.homeTeam?.name, "Home")}</b></div><span className="lb-admin-match-versus">VS</span><div className="lb-admin-team-side"><TeamBadge name={first(row.awayTeamName, row.awayTeam?.name, "Away")} logo={row.awayTeam?.logoUrl ?? row.awayTeamLogo}/><b>{first(row.awayTeamName, row.awayTeam?.name, "Away")}</b></div></div> : <div className="lb-admin-record-title-row"><TeamBadge name={title} logo={logo}/><div className="lb-admin-record-heading"><h4>{title}</h4><span>{cardDetail(row)}</span></div></div>}
           <div className="lb-admin-record-meta">
@@ -300,13 +317,85 @@ function DataSection({ section, dataset, overview, busy, query, setQuery, page, 
             {section === "awards" && <><StatusPill value={row.revealedAt ? "REVEALED" : "PENDING"}/><span>{row.userId ? `Player ${String(row.userId).slice(-6)}` : "Player award"}</span><span>{pretty(row.createdAt)}</span></>}
             {section === "access" && <><StatusPill value={row.outcome}/><span>{row.actor?.username ? `By ${row.actor.username}` : "Admin activity"}</span><span>{pretty(row.createdAt)}</span></>}
           </div>
-          <div className="lb-admin-record-footer">{section === "users" && <button className="lb-admin-row-action" disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Remove admin access" : "Make administrator"}</button>}{rowAction(row)}{section === "tournaments" && <span className="lb-admin-readonly">Tournament rules are configured in the app</span>}{section === "matches" && <span className="lb-admin-record-footnote">{row.adminHiddenFromListings ? "Hidden from player listings" : `${first(row.predictionsCount, 0)} predictions · visible to players`}</span>}</div>
+          <div className="lb-admin-record-footer">{section === "users" && <button className="lb-admin-row-action" disabled={busy} onClick={() => void onUserAdmin(row)}>{row.isAdmin || row.role === "ADMIN" || row.role === "admin" ? "Remove admin access" : "Make administrator"}</button>}{rowAction(row)}{section === "tournaments" && <span className="lb-admin-readonly">Tournament rules are configured in the app</span>}{section === "matches" && <><button className={`lb-admin-row-action lb-admin-select-match ${selectedMatchIds.includes(matchId) ? "selected" : ""}`} disabled={!isSlateEligible && !selectedMatchIds.includes(matchId)} title={isSlateEligible ? "Select this fixture for an unpublished Super League slate" : "Only future fixtures from Super League supported tournaments can be assigned"} onClick={() => { const id = matchId; setSelectedMatchIds((current: string[]) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 5 ? [...current, id] : current); }}>{selectedMatchIds.includes(matchId) ? "✓ Selected for slate" : isSlateEligible ? "Select for slate" : "Not eligible"}</button><span className="lb-admin-record-footnote">{row.adminCreated ? "Manually added" : `${first(row.predictionsCount, 0)} predictions`} · {row.adminHiddenFromListings ? "Hidden from player listings" : "visible to players"}</span></>}</div>
         </article>;
       })}</div>}
       {!!rows.length && <div className="lb-admin-table-footer"><span>Page {page + 1} of {Math.max(1, Math.ceil((dataset?.total ?? 0) / (dataset?.limit ?? 40)))} · Showing {rows.length} of {dataset.total}</span><div className="lb-admin-page-actions"><button disabled={busy || page <= 0} onClick={() => onPageChange(page - 1)}>Previous</button><button disabled={busy || (page + 1) * (dataset?.limit ?? 40) >= dataset.total} onClick={() => onPageChange(page + 1)}>Next</button></div></div>}
     </section>}
     {section === "users" && <div className="lb-admin-note"><Shield size={16}/><span>Granting or revoking admin access requires confirmation. Changes are recorded in the audit log; you cannot revoke your own active admin access here.</span></div>}
   </>;
+}
+
+function friendlyOperationError(code: string) {
+  const messages: Record<string, string> = {
+    H2H_DISABLED: "Super League scheduling is currently disabled.",
+    H2H_WEEK_NOT_FOUND: "That Super League week could not be found. Refresh and choose an available week.",
+    H2H_NO_ACTIVE_LEAGUES: "There are no active club slates for that week yet. Create the current week first.",
+    H2H_SLATE_ALREADY_PUBLISHED: "That matchday is already published. Published fixtures cannot be changed.",
+    MATCH_NOT_FOUND: "One or more selected matches no longer exist. Refresh the Matches page and try again.",
+    MATCH_NOT_ELIGIBLE: "Choose upcoming matches from supported tournaments on the selected day.",
+    DUPLICATE_MATCH: "A matching fixture already exists in the schedule.",
+    H2H_GOLD_PICK_ALREADY_EXISTS: "A golden pick already exists for one of these fixtures, so the slate was not changed.",
+    H2H_MATCH_ALREADY_ASSIGNED: "One of these fixtures is already assigned to another Super League matchday.",
+    UNSUPPORTED_TOURNAMENT: "Choose one of LowBlock’s supported tournaments.",
+    KICKOFF_MUST_BE_FUTURE: "The kickoff time must be in the future.",
+    TEAMS_MUST_BE_DIFFERENT: "Choose two different teams.",
+    INVALID_REQUEST: "Some details are missing or invalid. Check the form and try again.",
+  };
+  return messages[code] ?? code.replaceAll("_", " ").toLowerCase();
+}
+
+function ManualMatchForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => Promise<void> }) {
+  const [home, setHome] = useState("");
+  const [away, setAway] = useState("");
+  const [leagueCode, setLeagueCode] = useState<string>(LEAGUES[0]?.code ?? "");
+  const [kickoffAt, setKickoffAt] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setError("");
+    const league = LEAGUES.find((entry) => entry.code === leagueCode);
+    if (!league || !home.trim() || !away.trim() || !kickoffAt) { setError("Enter both teams, a supported tournament, and a kickoff time."); return; }
+    if (!window.confirm(`Add ${home.trim()} vs ${away.trim()} to ${league.enName}? The fixture will be visible to players and can receive predictions.`)) return;
+    setSubmitting(true);
+    try {
+      await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create-manual-match", leagueCode, homeTeamName: home.trim(), awayTeamName: away.trim(), kickoffAt: new Date(kickoffAt).toISOString(), confirmText: "ADD MATCH" }) });
+      await onCreated();
+    } catch (cause) { setError(friendlyOperationError(cause instanceof Error ? cause.message : "Could not create fixture")); }
+    finally { setSubmitting(false); }
+  };
+  return <form className="lb-admin-manual-form" onSubmit={submit}>
+    <div className="lb-admin-form-heading"><div><b>Add a fixture</b><span>Only tournaments already supported by LowBlock are available here.</span></div><button type="button" onClick={onCancel} aria-label="Close form"><X size={17}/></button></div>
+    {error && <p className="lb-admin-form-error" role="alert">{error}</p>}
+    <div className="lb-admin-form-grid"><label>Home team<input required value={home} onChange={(e) => setHome(e.target.value)} placeholder="e.g. Persepolis" maxLength={80}/></label><label>Away team<input required value={away} onChange={(e) => setAway(e.target.value)} placeholder="e.g. Sepahan" maxLength={80}/></label><label>Tournament<select value={leagueCode} onChange={(e) => setLeagueCode(e.target.value)}>{LEAGUES.map((league) => <option key={league.code} value={league.code}>{league.enName} · {league.faName}</option>)}</select></label><label>Kickoff time<input required type="datetime-local" value={kickoffAt} onChange={(e) => setKickoffAt(e.target.value)}/></label></div>
+    <div className="lb-admin-form-actions"><button type="button" className="lb-admin-button" onClick={onCancel}>Cancel</button><button className="lb-admin-button primary" disabled={submitting}>{submitting ? "Adding fixture…" : "Add fixture"}</button></div>
+  </form>;
+}
+
+function ManualSlateAssignment({ selectedMatchIds, weeks, busy, onCancel, onAssigned }: { selectedMatchIds: string[]; weeks: any[]; busy: boolean; onCancel: () => void; onAssigned: () => Promise<void> }) {
+  const choices = weeks.filter((week) => week.status === "ACTIVE");
+  const [weekKey, setWeekKey] = useState(choices[0]?.weekKey ?? "");
+  const [matchday, setMatchday] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setError("");
+    if (selectedMatchIds.length < 4 || selectedMatchIds.length > 5) { setError("Select four or five matches for a complete slate."); return; }
+    if (!weekKey) { setError("Choose an active Super League week."); return; }
+    if (!window.confirm(`Publish these ${selectedMatchIds.length} fixtures to Week ${weekKey}, matchday ${matchday}? A published slate is locked. Existing predictions and golden picks will not be replaced or deleted.`)) return;
+    setSubmitting(true);
+    try {
+      await jsonFetch("/api/admin/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "h2h-assign-matches", weekKey, matchday: Number(matchday), matchIds: selectedMatchIds, confirmText: "ASSIGN MATCHES" }) });
+      await onAssigned();
+    } catch (cause) { setError(friendlyOperationError(cause instanceof Error ? cause.message : "Could not publish slate")); }
+    finally { setSubmitting(false); }
+  };
+  return <form className="lb-admin-manual-form lb-admin-slate-form" onSubmit={submit}>
+    <div className="lb-admin-form-heading"><div><b>Publish a manual Super League slate</b><span>Choose 4–5 future fixtures from the same schedule day, at least 45 minutes before kickoff. Published slates cannot be replaced.</span></div><button type="button" onClick={onCancel} aria-label="Close form"><X size={17}/></button></div>
+    {error && <p className="lb-admin-form-error" role="alert">{error}</p>}
+    {!choices.length ? <div className="lb-admin-inline-warning">No active Super League week is available. Create or activate a week from the Super League page.</div> : <div className="lb-admin-form-grid"><label>Week<select value={weekKey} onChange={(e) => setWeekKey(e.target.value)}>{choices.map((week) => <option key={week.weekKey} value={week.weekKey}>Week of {week.weekKey}</option>)}</select></label><label>Matchday<select value={matchday} onChange={(e) => setMatchday(e.target.value)}>{Array.from({ length: 7 }, (_, index) => <option key={index + 1} value={index + 1}>Day {index + 1}</option>)}</select></label><div className="lb-admin-selected-count">{selectedMatchIds.length} of 4–5 fixtures selected</div></div>}
+    <div className="lb-admin-form-actions"><button type="button" className="lb-admin-button" onClick={onCancel}>Cancel</button><button className="lb-admin-button primary" disabled={submitting || busy || !choices.length || selectedMatchIds.length < 4 || selectedMatchIds.length > 5}>{submitting ? "Publishing slate…" : "Publish slate"}</button></div>
+  </form>;
 }
 
 function Analytics({ overview, onNavigate }: any) {
