@@ -49,7 +49,15 @@ export default function InvitePage({
       setBusy(false);
       return;
     }
-    setMessage(t("به باشگاه پیوستید.", "You joined the Club."));
+    const success = t("به باشگاه پیوستید.", "You joined the Club.");
+    setMessage(success);
+    showToast(success, "success", {
+      title: t("به باشگاه پیوستید", "Joined Club"),
+      button: {
+        title: t("مشاهده باشگاه", "View Club"),
+        onClick: () => router.replace("/club"),
+      },
+    });
     setTimeout(() => router.replace("/club"), 700);
   }
 

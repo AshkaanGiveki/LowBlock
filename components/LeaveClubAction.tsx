@@ -29,7 +29,9 @@ export function LeaveClubAction({ clubId }: { clubId: string }) {
         return;
       }
       setOpen(false);
-      showToast(t("از باشگاه خارج شدید.", "You left the Club."), "success");
+      showToast(t("از باشگاه خارج شدید.", "You left the Club."), "success", {
+        title: t("عضویت پایان یافت", "Membership ended"),
+      });
       router.replace("/club");
       router.refresh();
     } catch {

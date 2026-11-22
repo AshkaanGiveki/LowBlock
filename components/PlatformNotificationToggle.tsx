@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, Check, Globe2, Trophy } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useToast } from "@/components/ToastProvider";
 
 type Provider = "telegram" | "bale";
 export type TelegramReminderScope = "ALL_MATCHES" | "GLOBAL_LEADERBOARD";
@@ -77,6 +78,7 @@ export function PlatformNotificationToggle({
   username: string | null;
 }) {
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const [enabled, setEnabled] = useState(true);
   const [connected, setConnected] = useState(true);
   const [scope, setScope] =
@@ -107,7 +109,19 @@ export function PlatformNotificationToggle({
       body: JSON.stringify({ provider, enabled: !enabled }),
     });
     const data = await response.json().catch(() => null);
-    if (response.ok) setEnabled(data?.enabled === true);
+    if (response.ok) {
+      const nextEnabled = data?.enabled === true;
+      setEnabled(nextEnabled);
+      showToast(
+        nextEnabled
+          ? t(`${name} فعال شد.`, `${name} reminders enabled.`)
+          : t(`${name} غیرفعال شد.`, `${name} reminders disabled.`),
+        "success",
+        { title: nextEnabled ? t("یادآوری‌ها فعال شد", "Reminders enabled") : t("یادآوری‌ها خاموش شد", "Reminders disabled") },
+      );
+    } else {
+      showToast(t("تنظیمات ذخیره نشد.", "Could not save reminder settings."));
+    }
     setBusy(false);
   }
   async function changeScope(nextScope: TelegramReminderScope) {
@@ -119,7 +133,12 @@ export function PlatformNotificationToggle({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ provider, reminderScope: nextScope }),
     });
-    if (response.ok) setScope(nextScope);
+    if (response.ok) {
+      setScope(nextScope);
+      showToast(t("محدوده یادآوری به‌روز شد.", "Reminder scope updated."), "success");
+    } else {
+      showToast(t("تنظیمات ذخیره نشد.", "Could not save reminder settings."));
+    }
     setBusy(false);
   }
   return (

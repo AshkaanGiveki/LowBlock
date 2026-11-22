@@ -31,7 +31,11 @@ export default function RequestJoin({
       showToast(friendly);
       return;
     }
-    setMessage(t("درخواست ارسال شد.", "Request sent."));
+    const success = t("درخواست ارسال شد.", "Request sent.");
+    setMessage(success);
+    showToast(success, "success", {
+      title: t("درخواست ارسال شد", "Request sent"),
+    });
     setTimeout(() => router.replace("/club"), 900);
   }
   return (

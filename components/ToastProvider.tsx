@@ -1,94 +1,61 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { AlertCircle, CheckCircle2, X } from "lucide-react";
+import { createContext, useCallback, useContext, useMemo } from "react";
+import { dynaura, Toaster, type ToastOptions as DynauraToastOptions } from "dynaura";
 import { useLanguage } from "@/components/LanguageProvider";
 
-type Toast = { id: number; message: string; tone: "error" | "success" };
-type ToastContextValue = {
-  showToast: (message: string, tone?: Toast["tone"]) => void;
+type ToastTone = "error" | "success" | "warning" | "info";
+type ToastOptions = Omit<DynauraToastOptions, "title" | "description"> & {
+  title?: string;
+  description?: DynauraToastOptions["description"];
 };
+type ToastContextValue = {
+  showToast: (message: string, tone?: ToastTone, options?: ToastOptions) => string;
+  showSuccess: (message: string, options?: ToastOptions) => string;
+  showError: (message: string, options?: ToastOptions) => string;
+  showInfo: (message: string, options?: ToastOptions) => string;
+  showWarning: (message: string, options?: ToastOptions) => string;
+};
+
 const ToastContext = createContext<ToastContextValue>({
-  showToast: () => undefined,
+  showToast: () => "",
+  showSuccess: () => "",
+  showError: () => "",
+  showInfo: () => "",
+  showWarning: () => "",
 });
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const { t } = useLanguage();
   const showToast = useCallback(
-    (message: string, tone: Toast["tone"] = "error") => {
-      const id = Date.now() + Math.random();
-      setToasts((current) => [...current.slice(-2), { id, message, tone }]);
-      window.setTimeout(
-        () =>
-          setToasts((current) => current.filter((toast) => toast.id !== id)),
-        5200,
-      );
+    (message: string, tone: ToastTone = "error", options: ToastOptions = {}) => {
+      const title = options.title ?? (tone === "success"
+        ? t("انجام شد", "All set")
+        : tone === "error"
+          ? t("یک مشکل پیش آمد", "Something needs attention")
+          : tone === "warning"
+            ? t("توجه", "Heads up")
+            : t("اطلاع", "Update"));
+      return dynaura[tone]({ title, description: message, ...options });
     },
-    [],
+    [t],
   );
+  const value = useMemo<ToastContextValue>(() => ({
+    showToast,
+    showSuccess: (message, options) => showToast(message, "success", options),
+    showError: (message, options) => showToast(message, "error", options),
+    showInfo: (message, options) => showToast(message, "info", options),
+    showWarning: (message, options) => showToast(message, "warning", options),
+  }), [showToast]);
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
-      <ToastViewport
-        toasts={toasts}
-        dismiss={(id) =>
-          setToasts((current) => current.filter((toast) => toast.id !== id))
-        }
-      />
+      <Toaster position="top-center" theme="dark" queue={false} dedupe="id" swipe="both" timer haptics={false} />
     </ToastContext.Provider>
   );
 }
+
 export function useToast() {
   return useContext(ToastContext);
-}
-function ToastViewport({
-  toasts,
-  dismiss,
-}: {
-  toasts: Toast[];
-  dismiss: (id: number) => void;
-}) {
-  const { t } = useLanguage();
-  return (
-    <div className="toast-viewport" aria-live="polite" aria-atomic="true">
-      <AnimatePresence initial={false}>
-        {toasts.map((toast) => (
-          <motion.div
-            key={toast.id}
-            role="alert"
-            initial={{ opacity: 0, y: -18, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 420, damping: 28 }}
-            className={`app-toast app-toast-${toast.tone}`}
-          >
-            <span className="app-toast-icon">
-              {toast.tone === "error" ? (
-                <AlertCircle size={19} />
-              ) : (
-                <CheckCircle2 size={19} />
-              )}
-            </span>
-            <span className="app-toast-copy">
-              <b>
-                {toast.tone === "error"
-                  ? t("یک مشکل پیش آمد", "Something needs attention")
-                  : t("انجام شد", "All set")}
-              </b>
-              <span>{toast.message}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => dismiss(toast.id)}
-              aria-label={t("بستن پیام", "Dismiss message")}
-            >
-              <X size={16} />
-            </button>
-            <span className="app-toast-progress" />
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
 }

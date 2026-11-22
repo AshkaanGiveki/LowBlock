@@ -7,6 +7,7 @@ import { Trophy, X } from "lucide-react";
 import { sharePublicAward } from "@/lib/awards/share";
 import { useLanguage } from "@/components/LanguageProvider";
 import DepthCarousel from "@/components/DepthCarousel";
+import { useToast } from "@/components/ToastProvider";
 
 type Award = {
   id: string;
@@ -64,6 +65,7 @@ function awardGroupKey(a: Award) {
 
 export function PublicAwardsSection({ username }: { username: string }) {
   const { t, language } = useLanguage();
+  const { showToast } = useToast();
   const [awards, setAwards] = useState<Award[]>([]);
   const [details, setDetails] = useState(false);
   const [message, setMessage] = useState("");
@@ -130,8 +132,17 @@ export function PublicAwardsSection({ username }: { username: string }) {
             )
           : t("با موفقیت به اشتراک گذاشته شد.", "Shared successfully."),
       );
+      showToast(
+        result === "saved"
+          ? t("تصویر ذخیره شد؛ لینک کپی شد.", "Image saved; link copied.")
+          : t("با موفقیت به اشتراک گذاشته شد.", "Shared successfully."),
+        "success",
+        { title: t("اشتراک‌گذاری انجام شد", "Award shared") },
+      );
     } catch {
-      setMessage(t("اشتراک‌گذاری در دسترس نیست.", "Sharing is unavailable."));
+      const message = t("اشتراک‌گذاری در دسترس نیست.", "Sharing is unavailable.");
+      setMessage(message);
+      showToast(message);
     }
   }
   if (!awards.length) return null;
