@@ -52,17 +52,18 @@ export function HomeFixtureSlider({
     return (
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {visibleMatches.map((match, cardIndex) => (
-          <PredictionCard
-            key={match.providerMatchId}
-            match={match}
-            index={cardIndex}
-            onPredictionSaved={(prediction) =>
-              setPredictionMap((current) => ({
-                ...current,
-                [match.providerMatchId]: prediction,
-              }))
-            }
-          />
+          <div key={match.providerMatchId} className="min-w-0">
+            <PredictionCard
+              match={match}
+              index={cardIndex}
+              onPredictionSaved={(prediction) =>
+                setPredictionMap((current) => ({
+                  ...current,
+                  [match.providerMatchId]: prediction,
+                }))
+              }
+            />
+          </div>
         ))}
       </div>
     );
