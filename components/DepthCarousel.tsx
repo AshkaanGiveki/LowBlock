@@ -79,8 +79,6 @@ export default function DepthCarousel({
         const el = cards.current[i];
         if (!el) continue;
         let distance = i - pos;
-        if (!event.currentTarget.contains(event.target as Node)) return;
-        if (contentMode && !event.currentTarget.querySelector(".depth-carousel__stage")?.contains(event.target as Node)) return;
         if (count > 1) {
           distance = ((distance % count) + count) % count;
           if (distance > count / 2) distance -= count;
