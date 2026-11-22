@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { dynaura, Toaster, type ToastOptions as DynauraToastOptions } from "dynaura";
+import { dynaura, type ToastOptions as DynauraToastOptions } from "dynaura";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type ToastTone = "error" | "success" | "warning" | "info";
@@ -17,6 +17,10 @@ type ToastContextValue = {
   showWarning: (message: string, options?: ToastOptions) => string;
 };
 
+// Keep the Dynaura integration ready for a later product decision, but do not
+// show transient notifications until the notification UX is approved.
+const DYNAURA_NOTIFICATIONS_ENABLED = false;
+
 const ToastContext = createContext<ToastContextValue>({
   showToast: () => "",
   showSuccess: () => "",
@@ -29,6 +33,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const showToast = useCallback(
     (message: string, tone: ToastTone = "error", options: ToastOptions = {}) => {
+      if (!DYNAURA_NOTIFICATIONS_ENABLED) return "";
       const title = options.title ?? (tone === "success"
         ? t("انجام شد", "All set")
         : tone === "error"
@@ -51,25 +56,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <Toaster
-        position="top-center"
-        theme={{
-          background: "#08120d",
-          foreground: "#f2fff7",
-          muted: "rgba(221, 255, 235, .62)",
-          ring: "rgba(75, 226, 145, .22)",
-          button: "rgba(75, 226, 145, .13)",
-          success: "#4be291",
-          error: "#ff7186",
-          warning: "#ffd166",
-          info: "#75b9ff",
-        }}
-        queue={false}
-        dedupe="id"
-        swipe="both"
-        timer
-        haptics={false}
-      />
     </ToastContext.Provider>
   );
 }
