@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -60,6 +61,7 @@ type Props = {
     awayGoals: number;
   }) => void;
   openOnMount?: boolean;
+  portalOverlays?: boolean;
   submitPrediction?: (prediction: {
     matchId: string;
     homeGoals: number;
@@ -75,6 +77,7 @@ export function PredictionCard({
   onDrawerChange,
   onPredictionSaved,
   openOnMount = false,
+  portalOverlays = false,
   submitPrediction,
 }: Props) {
   const { language, t } = useLanguage();
@@ -331,6 +334,9 @@ export function PredictionCard({
     const target = event.target as HTMLElement;
     if (window.innerWidth < 768 && !target.closest("button, input")) open();
   };
+  const renderOverlays = (overlays: React.ReactNode) =>
+    portalOverlays && typeof document !== "undefined" ? createPortal(overlays, document.body) : overlays;
+
   return (
     <>
       {authToast && <AuthRedirectToast language={language} />}
@@ -456,48 +462,52 @@ export function PredictionCard({
           )}
         </button>
       </motion.article>
-      <AnimatePresence initial={false}>
-        {drawerOpen && (
-          <PredictionDrawer
-            competition={competition}
-            included={countsInLeaderboard}
-            home={{
-              id: match.homeTeam.id,
-              name: match.homeTeam.name,
-              faName: match.homeTeam.faName,
-              logo: match.homeTeam.logoUrl,
-            }}
-            away={{
-              id: match.awayTeam.id,
-              name: match.awayTeam.name,
-              faName: match.awayTeam.faName,
-              logo: match.awayTeam.logoUrl,
-            }}
-            homeValue={home}
-            awayValue={away}
-            setHome={update(setHome)}
-            setAway={update(setAway)}
-            onClose={closeDrawer}
-            onSubmit={submit}
-            matchId={match.providerMatchId}
-            insightsOpen={insightsOpen}
-            onToggleInsights={() => setInsightsOpen((value) => !value)}
-            busy={busy}
-            saved={saved}
-            error={error}
-            language={language}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence initial={false}>
-        {analyticsOpen && (
-          <MatchAnalytics
-            matchId={match.providerMatchId}
-            initialMatch={match}
-            onClose={closeAnalytics}
-          />
-        )}
-      </AnimatePresence>
+      {renderOverlays((
+        <>
+          <AnimatePresence initial={false}>
+            {drawerOpen && (
+              <PredictionDrawer
+                competition={competition}
+                included={countsInLeaderboard}
+                home={{
+                  id: match.homeTeam.id,
+                  name: match.homeTeam.name,
+                  faName: match.homeTeam.faName,
+                  logo: match.homeTeam.logoUrl,
+                }}
+                away={{
+                  id: match.awayTeam.id,
+                  name: match.awayTeam.name,
+                  faName: match.awayTeam.faName,
+                  logo: match.awayTeam.logoUrl,
+                }}
+                homeValue={home}
+                awayValue={away}
+                setHome={update(setHome)}
+                setAway={update(setAway)}
+                onClose={closeDrawer}
+                onSubmit={submit}
+                matchId={match.providerMatchId}
+                insightsOpen={insightsOpen}
+                onToggleInsights={() => setInsightsOpen((value) => !value)}
+                busy={busy}
+                saved={saved}
+                error={error}
+                language={language}
+              />
+            )}
+          </AnimatePresence>
+          <AnimatePresence initial={false}>
+            {analyticsOpen && (
+              <MatchAnalytics
+                matchId={match.providerMatchId}
+                initialMatch={match}
+                onClose={closeAnalytics}
+              />
+            )}
+          </AnimatePresence>
+        </>
+      ))}
     </>
   );
 }
