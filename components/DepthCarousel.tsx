@@ -152,6 +152,7 @@ export default function DepthCarousel({
         }
       }}
       onPointerDown={(event) => {
+        if (contentMode && !event.currentTarget.querySelector(".depth-carousel__stage")?.contains(event.target as Node)) return;
         if (count > 1)
           drag.current = {
             x: event.clientX,
