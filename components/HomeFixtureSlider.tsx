@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import DepthCarousel from "@/components/DepthCarousel";
 import { MatchEmptyState } from "@/components/MatchEmptyState";
 import type { MatchRecord } from "@/lib/football/data";
 import { PredictionCard } from "@/components/PredictionCard";
@@ -17,7 +18,7 @@ export function HomeFixtureSlider({
   matches: MatchRecord[];
   predictions?: Record<string, { homeGoals: number; awayGoals: number }>;
   allPredicted?: boolean;
-  layout?: "slider" | "grid";
+  layout?: "slider" | "grid" | "depth";
 }) {
   const [index, setIndex] = useState(0);
   const [predictionOpen, setPredictionOpen] = useState(false);
@@ -34,7 +35,7 @@ export function HomeFixtureSlider({
     setIndex((current) => (count ? Math.min(current, count - 1) : 0));
   }, [count]);
   useEffect(() => {
-    if (layout === "grid" || count < 2 || predictionOpen) return;
+    if (layout !== "slider" || count < 2 || predictionOpen) return;
     const timer = window.setInterval(
       () => setIndex((current) => (current + 1) % count),
       6000,
@@ -48,6 +49,37 @@ export function HomeFixtureSlider({
         compact
       />
     );
+  if (layout === "depth") {
+    const fa = language === "fa";
+    return (
+      <DepthCarousel
+        contentMode
+        label={fa ? "مسابقه‌های پیش‌رو" : "Upcoming matches"}
+        previousLabel={fa ? "مسابقه قبلی" : "Previous match"}
+        nextLabel={fa ? "مسابقه بعدی" : "Next match"}
+        rtl={fa}
+        cardWidth={480}
+        spread={150}
+        items={visibleMatches.slice(0, 5).map((match, cardIndex) => ({
+          id: match.providerMatchId,
+          title: fa ? `نمایش مسابقه ${cardIndex + 1}` : `Show match ${cardIndex + 1}`,
+          content: (
+            <PredictionCard
+              match={match}
+              index={cardIndex}
+              portalOverlays
+              onPredictionSaved={(prediction) =>
+                setPredictionMap((current) => ({
+                  ...current,
+                  [match.providerMatchId]: prediction,
+                }))
+              }
+            />
+          ),
+        }))}
+      />
+    );
+  }
   if (layout === "grid")
     return (
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
