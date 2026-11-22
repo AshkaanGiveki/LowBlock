@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import "./globals.css";
 import "dynaura/styles.css";
+import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Nav } from "@/components/Nav";
 import { PageTransition } from "@/components/PageTransition";
