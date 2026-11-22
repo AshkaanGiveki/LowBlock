@@ -2,24 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  CalendarCheck2,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { MatchEmptyState } from "@/components/MatchEmptyState";
 import type { MatchRecord } from "@/lib/football/data";
 import { PredictionCard } from "@/components/PredictionCard";
-import { T, useLanguage } from "@/components/LanguageProvider";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export function HomeFixtureSlider({
   matches,
   predictions = {},
   allPredicted = false,
+  layout = "slider",
 }: {
   matches: MatchRecord[];
   predictions?: Record<string, { homeGoals: number; awayGoals: number }>;
   allPredicted?: boolean;
+  layout?: "slider" | "grid";
 }) {
   const [index, setIndex] = useState(0);
   const [predictionOpen, setPredictionOpen] = useState(false);
@@ -36,44 +34,41 @@ export function HomeFixtureSlider({
     setIndex((current) => (count ? Math.min(current, count - 1) : 0));
   }, [count]);
   useEffect(() => {
-    if (count < 2 || predictionOpen) return;
+    if (layout === "grid" || count < 2 || predictionOpen) return;
     const timer = window.setInterval(
       () => setIndex((current) => (current + 1) % count),
       6000,
     );
     return () => window.clearInterval(timer);
-  }, [count, predictionOpen]);
+  }, [count, predictionOpen, layout]);
   if (!count)
-    return allPredicted || matches.length > 0 ? (
-      <div className="home-all-predicted relative overflow-hidden rounded-[30px] border border-brand/25 bg-[radial-gradient(circle_at_50%_0%,rgba(32,184,121,.22),transparent_55%),linear-gradient(145deg,#142a1e,#08100b)] p-8 text-center shadow-[0_20px_60px_rgba(0,0,0,.2)]">
-        <div className="home-all-predicted-icon mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] border border-brand/35 bg-brand/15 text-brand shadow-[0_0_35px_rgba(32,184,121,.18)]">
-          <CalendarCheck2 size={30} />
-        </div>
-        <h3 className="mt-5 text-xl font-black text-white">
-          <T
-            fa="همه مسابقه‌های امروز را پیش‌بینی کرده‌اید"
-            en="You’ve predicted all today’s matches"
+    return (
+      <MatchEmptyState
+        variant={allPredicted || matches.length > 0 ? "complete" : "upcoming"}
+        compact
+      />
+    );
+  if (layout === "grid")
+    return (
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {visibleMatches.map((match, cardIndex) => (
+          <PredictionCard
+            key={match.providerMatchId}
+            match={match}
+            index={cardIndex}
+            onPredictionSaved={(prediction) =>
+              setPredictionMap((current) => ({
+                ...current,
+                [match.providerMatchId]: prediction,
+              }))
+            }
           />
-        </h3>
-        <p className="mx-auto mt-2 max-w-sm text-xs leading-6 text-white/55">
-          <T
-            fa="پیش‌بینی‌های شما برای بازی‌های امروز ثبت شده است."
-            en="Your predictions for today’s fixtures are safely recorded."
-          />
-        </p>
-        <Sparkles className="mx-auto mt-5 text-[#e8c66a]" size={18} />
-      </div>
-    ) : (
-      <div className="rounded-[30px] border border-dashed border-white/10 bg-black/20 p-12 text-center text-sm text-white/50">
-        <T
-          fa="در انتظار مسابقه رسمی بعدی"
-          en="Waiting for the next official fixture"
-        />
+        ))}
       </div>
     );
   const go = (direction: number) =>
     setIndex((current) => (current + direction + count) % count);
-  const activeMatch = visibleMatches[index];
+  const activeMatch = visibleMatches[Math.min(index, count - 1)];
   return (
     <div className="relative mx-auto w-full max-w-2xl overflow-x-hidden">
       <AnimatePresence mode="wait" initial={false}>

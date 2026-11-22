@@ -6,13 +6,15 @@ import { Check, Globe2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { isFeaturedFixture, LEAGUES } from "@/lib/football/leagues";
 import { MatchAnalyticsCard } from "@/components/MatchAnalyticsCard";
+import { MatchEmptyState } from "@/components/MatchEmptyState";
+import { matchTabFor, type MatchTab } from "@/lib/football/matchState";
 import { useLanguage, T } from "@/components/LanguageProvider";
 
 type Match = React.ComponentProps<typeof MatchAnalyticsCard>["match"] & {
   leagueCode: string;
   featuredNationalFixture?: boolean;
 };
-type Tab = "open" | "started";
+type Tab = MatchTab;
 type Cursor = {
   globalPriority: 0 | 1;
   kickoffAt: string;
@@ -25,18 +27,6 @@ type MatchPage = {
   hasMore: boolean;
 };
 
-function stateOf(match: Match, now: number) {
-  const kickoff = new Date(match.kickoffAt).getTime();
-  const finished =
-    match.status === "FINISHED" ||
-    (now >= kickoff + 120 * 60_000 && match.status !== "POSTPONED");
-  const started =
-    finished ||
-    match.status === "LIVE" ||
-    match.status === "SUSPENDED" ||
-    (match.status === "SCHEDULED" && now >= kickoff);
-  return { finished, live: false, started };
-}
 function encodeCursor(cursor: Exclude<Cursor, null>) {
   return btoa(JSON.stringify(cursor));
 }
@@ -65,13 +55,7 @@ export function MatchesView({
   focusMatchId?: string;
   initialTab?: Tab;
 }) {
-  const { t: translate, language } = useLanguage();
-  const t = (fa: string, en: string) =>
-    en === "Live & results"
-      ? language === "fa"
-        ? "نتایج"
-        : "Results"
-      : translate(fa, en);
+  const { t } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const [matches, setMatches] = useState<Match[]>(initialMatches);
@@ -79,6 +63,8 @@ export function MatchesView({
   const [nextCursor, setNextCursor] = useState<Cursor>(initialCursor ?? null);
   const [hasMore, setHasMore] = useState(initialHasMore ?? false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [selected, setSelected] = useState<string[]>(initialSelectedLeagues);
   const [showAllMatches, setShowAllMatches] = useState(initialShowAllMatches);
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -92,7 +78,6 @@ export function MatchesView({
     [matches],
   );
   const filtered = useMemo(() => {
-    const now = Date.now();
     return matches
       .filter(
         (match) =>
@@ -105,9 +90,7 @@ export function MatchesView({
               match.homeTeam.name,
               match.awayTeam.name,
             )) &&
-          (tab === "open"
-            ? !stateOf(match, now).started
-            : stateOf(match, now).started),
+          matchTabFor(match, now) === tab,
       )
       .sort(
         (a, b) =>
@@ -115,7 +98,7 @@ export function MatchesView({
           new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime() ||
           a.providerMatchId.localeCompare(b.providerMatchId),
       );
-  }, [matches, selected, showAllMatches, tab]);
+  }, [matches, selected, showAllMatches, tab, now]);
   const savePreference = useCallback(async (payload: object) => {
     await fetch("/api/tournament-preferences", {
       method: "PUT",
@@ -140,6 +123,7 @@ export function MatchesView({
     if (!hasMore || !nextCursor || loadLock.current) return;
     loadLock.current = true;
     setLoadingMore(true);
+    setLoadError(false);
     try {
       const params = new URLSearchParams({
         cursor: encodeCursor(nextCursor),
@@ -162,7 +146,7 @@ export function MatchesView({
       setNextCursor(page.nextCursor);
       setHasMore(page.hasMore);
     } catch {
-      setHasMore(false);
+      setLoadError(true);
     } finally {
       loadLock.current = false;
       setLoadingMore(false);
@@ -194,7 +178,7 @@ export function MatchesView({
   useEffect(() => setTab(initialTab), [initialTab]);
   useEffect(() => {
     const node = loadSentinel.current;
-    if (!node) return;
+    if (!node || loadError) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void loadMore();
@@ -203,9 +187,10 @@ export function MatchesView({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadMore]);
+  }, [loadMore, loadError]);
   useEffect(() => {
     const timer = window.setInterval(() => {
+      setNow(Date.now());
       if (document.visibilityState === "visible") void refreshMatches();
     }, 60_000);
     return () => window.clearInterval(timer);
@@ -252,11 +237,13 @@ export function MatchesView({
             <span className="text-xs text-brand">
               {tab === "open"
                 ? t("آماده پیش‌بینی", "Prediction open")
-                : t("زنده و نتایج", "Live & results")}
+                : tab === "live"
+                  ? t("در جریان بازی", "On the pitch")
+                  : t("نتایج نهایی", "Final scores")}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/[.07] bg-black/20 p-1">
-            {(["open", "started"] as const).map((value) => (
+          <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/[.07] bg-black/20 p-1">
+            {(["open", "live", "started"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
@@ -272,9 +259,19 @@ export function MatchesView({
                 )}
                 <span className="relative z-10">
                   <T
-                    fa={value === "open" ? "مسابقه‌های پیش‌رو" : "زنده و نتایج"}
+                    fa={
+                      value === "open"
+                        ? "پیش‌رو"
+                        : value === "live"
+                          ? "زنده"
+                          : "نتایج"
+                    }
                     en={
-                      value === "open" ? "Upcoming matches" : "Live & results"
+                      value === "open"
+                        ? "Upcoming"
+                        : value === "live"
+                          ? "Live"
+                          : "Results"
                     }
                   />
                 </span>
@@ -339,24 +336,63 @@ export function MatchesView({
               </motion.div>
             ))}
           </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-white/15 p-14 text-center text-sm text-[var(--muted)]">
-            {t(
-              "مسابقه‌ای برای این فیلتر نیست.",
-              "No matches match this filter.",
-            )}
+        ) : hasMore && !loadError ? (
+          <div
+            className="h-72 animate-pulse rounded-[1.75rem] border border-white/[.08] bg-white/[.04] motion-reduce:animate-none"
+            role="status"
+          >
+            <span className="sr-only">
+              {t("در حال بررسی مسابقه‌ها…", "Finding fixtures…")}
+            </span>
           </div>
+        ) : (
+          <MatchEmptyState
+            variant={
+              loadError
+                ? "error"
+                : !showAllMatches
+                  ? "filtered"
+                  : tab === "open"
+                    ? "upcoming"
+                    : tab === "live"
+                      ? "live"
+                      : "results"
+            }
+            onAction={
+              loadError
+                ? () => void loadMore()
+                : !showAllMatches
+                  ? showAll
+                  : tab !== "open"
+                    ? () => changeTab("open")
+                    : undefined
+            }
+            busy={loadingMore}
+          />
         )}
         <div
           ref={loadSentinel}
           className="flex min-h-16 items-center justify-center py-5 text-xs text-[var(--muted)]"
           aria-live="polite"
         >
-          {loadingMore
-            ? t("در حال بارگیری…", "Loading more matches…")
-            : hasMore
-              ? t("برای مشاهده بیشتر اسکرول کنید", "Scroll for more matches")
-              : ""}
+          {loadError && filtered.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => void loadMore()}
+              className="rounded-xl border border-white/15 px-4 py-3 text-brand"
+            >
+              {t(
+                "بارگیری بیشتر ناموفق بود؛ تلاش دوباره",
+                "Couldn’t load more. Try again",
+              )}
+            </button>
+          ) : loadingMore ? (
+            t("در حال بارگیری…", "Loading more matches…")
+          ) : hasMore ? (
+            t("برای مشاهده بیشتر اسکرول کنید", "Scroll for more matches")
+          ) : (
+            ""
+          )}
         </div>
       </div>
     </main>

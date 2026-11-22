@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { currentUserId } from "@/lib/auth/session";
 import { getMatchesPage, getPredictions } from "@/lib/football/data";
 import { getTournamentPreferences } from "@/lib/football/preferences";
+import { matchTabFor } from "@/lib/football/matchState";
 import { MatchesView } from "@/components/MatchesView";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,10 @@ function MatchesLoading() {
         <div className="h-24 rounded-[2rem] bg-white/[.06]" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }, (_, index) => (
-            <div key={index} className="h-64 rounded-[1.75rem] bg-white/[.06]" />
+            <div
+              key={index}
+              className="h-64 rounded-[1.75rem] bg-white/[.06]"
+            />
           ))}
         </div>
       </div>
@@ -40,16 +44,14 @@ async function MatchesData({ query }: { query: MatchesQuery }) {
   const focused = query.match
     ? page.matches.find((match) => match.providerMatchId === query.match)
     : undefined;
-  const started =
-    focused &&
-    (focused.status === "LIVE" ||
-      focused.status === "FINISHED" ||
-      focused.status === "SUSPENDED" ||
-      new Date(focused.kickoffAt).getTime() <= Date.now());
   const initialTab =
-    query.tab === "started" || (!query.tab && Boolean(started))
-      ? "started"
-      : "open";
+    query.tab === "live"
+      ? "live"
+      : query.tab === "started" || query.tab === "results"
+        ? "started"
+        : !query.tab && focused
+          ? (matchTabFor(focused) ?? "open")
+          : "open";
 
   return (
     <MatchesView

@@ -35,6 +35,7 @@ export function DesktopHomeDashboard({
   points,
   exact,
   clubName,
+  fixtureContent,
 }: {
   matches: MatchRecord[];
   predictions: Record<string, { homeGoals: number; awayGoals: number }>;
@@ -45,6 +46,7 @@ export function DesktopHomeDashboard({
   points: number;
   exact: number;
   clubName: string | null;
+  fixtureContent?: React.ReactNode;
 }) {
   const featured = FEATURED_COMPETITION_CODES.map((code) =>
     LEAGUES.find((league) => league.code === code),
@@ -189,11 +191,13 @@ export function DesktopHomeDashboard({
               </p>
             </div>
             <div className="desktop-fixture-stage">
-              <HomeFixtureSlider
-                matches={matches.slice(0, 3)}
-                predictions={predictions}
-                allPredicted={allPredicted}
-              />
+              {fixtureContent ?? (
+                <HomeFixtureSlider
+                  matches={matches.slice(0, 3)}
+                  predictions={predictions}
+                  allPredicted={allPredicted}
+                />
+              )}
             </div>
           </section>
           <div className="desktop-league-strip">

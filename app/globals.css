@@ -3493,7 +3493,7 @@ html[dir="ltr"] body > header > div > div > div {
   .desktop-home-only {
     display: block;
   }
-  main:has(.desktop-home-dashboard) > div > section:not(.desktop-home-only) {
+  main:has(.desktop-home-dashboard) > div > section:not(.desktop-home-only):not(.home-upcoming-section) {
     display: none;
   }
   .desktop-home-dashboard {

@@ -1,0 +1,275 @@
+.state {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 5vw, 72px);
+  min-height: 330px;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 42px 32px;
+  border: 1px solid rgba(132, 173, 150, 0.14);
+  border-radius: 28px;
+  background:
+    radial-gradient(
+      ellipse at 10% 50%,
+      rgba(32, 184, 121, 0.09),
+      transparent 60%
+    ),
+    linear-gradient(135deg, #111d17, #0b100e);
+}
+.state::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.2;
+  background-image: radial-gradient(
+    rgba(156, 188, 167, 0.35) 0.6px,
+    transparent 0.6px
+  );
+  background-size: 16px 16px;
+  mask-image: linear-gradient(90deg, #000, transparent 80%);
+}
+.art {
+  position: relative;
+  width: 230px;
+  height: 190px;
+  flex-shrink: 0;
+}
+.pitch {
+  position: absolute;
+  inset: 10px 0;
+  border: 1px solid #3a695148;
+  border-radius: 18px;
+  transform: rotate(-10deg);
+  background: repeating-linear-gradient(
+    90deg,
+    #1c3a2825 0 32px,
+    transparent 32px 64px
+  );
+}
+.half {
+  position: absolute;
+  inset: 0 50%;
+  border-inline-start: 1px solid #54856538;
+}
+.circle {
+  position: absolute;
+  width: 62px;
+  height: 62px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid #54856538;
+  border-radius: 50%;
+}
+.goalLeft,
+.goalRight {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 70px;
+  border: 1px solid #54856538;
+}
+.goalLeft {
+  left: -1px;
+  border-radius: 0 8px 8px 0;
+}
+.goalRight {
+  right: -1px;
+  border-radius: 8px 0 0 8px;
+}
+.ticket {
+  position: absolute;
+  inset: 47px 0 37px;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  border: 1px solid #53776165;
+  border-radius: 18px;
+  background: linear-gradient(125deg, #20392b, #101c16);
+  box-shadow:
+    0 18px 35px #0007,
+    inset 0 1px #ffffff0d;
+  transform: rotate(-5deg);
+}
+.crest {
+  width: 32px;
+  height: 39px;
+  clip-path: polygon(0 0, 100% 0, 94% 68%, 50% 100%, 6% 68%);
+  background: linear-gradient(140deg, #71968170, #345a4540);
+}
+.crest:last-child {
+  background: linear-gradient(140deg, #b7bda05c, #7c85662e);
+}
+.score {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #79c99d;
+}
+.score i {
+  width: 24px;
+  height: 31px;
+  border: 1px solid #749e7e38;
+  background: #050f0966;
+  border-radius: 5px;
+}
+.score b {
+  font-size: 14px;
+  font-weight: 400;
+  color: #7d9785;
+}
+.badge {
+  position: absolute;
+  bottom: 19px;
+  inset-inline-end: 18px;
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid #65b58a50;
+  border-radius: 14px;
+  color: #79dda8;
+  background: #173324;
+  box-shadow: 0 8px 20px #0006;
+  transform: rotate(7deg);
+}
+.copy {
+  max-width: 390px;
+  min-width: 0;
+}
+.label {
+  color: #80c9a3;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.copy h3 {
+  margin: 12px 0 10px;
+  color: #f1f6f3;
+  font-size: clamp(23px, 2.4vw, 30px);
+  font-weight: 850;
+  line-height: 1.35;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.copy p {
+  margin: 0;
+  font-size: 13px;
+  color: #a0b0a7;
+  line-height: 1.9;
+  text-wrap: pretty;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 24px;
+}
+.primary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 17px;
+  border: 1px solid #87d4a828;
+  border-radius: 12px;
+  background: #b7f4cf;
+  color: #10291b;
+  font-size: 12px;
+  font-weight: 800;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.primary:hover {
+  background: #d0ffdf;
+  transform: translateY(-1px);
+}
+.primary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid #a9f1c9;
+  outline-offset: 5px;
+}
+.secondary {
+  color: #c0cfc6;
+  font-size: 12px;
+  font-weight: 650;
+}
+.secondary:hover {
+  color: #fff;
+}
+.compact {
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 300px;
+  padding: 24px 20px;
+  text-align: center;
+}
+.compact .art {
+  width: 170px;
+  height: 132px;
+}
+.compact .ticket {
+  inset: 27px 0 26px;
+}
+.compact .pitch {
+  inset: 3px 0;
+}
+.compact .badge {
+  bottom: 9px;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+}
+.compact .crest {
+  width: 24px;
+  height: 30px;
+}
+.compact .copy h3 {
+  font-size: 21px;
+  margin-top: 9px;
+}
+.compact .copy p {
+  font-size: 12px;
+}
+.compact .actions {
+  justify-content: center;
+  margin-top: 18px;
+}
+@media (max-width: 639px) {
+  .state {
+    flex-direction: column;
+    gap: 12px;
+    padding: 28px 22px 32px;
+    text-align: center;
+    border-radius: 24px;
+  }
+  .art {
+    width: 190px;
+    height: 155px;
+  }
+  .ticket {
+    inset: 35px 0 30px;
+  }
+  .copy h3 {
+    font-size: 24px;
+  }
+  .actions {
+    justify-content: center;
+    gap: 18px;
+  }
+  .compact .copy h3 {
+    font-size: 21px;
+  }
+}

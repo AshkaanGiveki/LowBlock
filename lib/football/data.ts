@@ -142,6 +142,7 @@ function todayBounds() {
 export async function getMatchesPage(
   limit = 30,
   cursor?: MatchPageCursor | null,
+  options: { upcomingOnly?: boolean; unpredictedFor?: string } = {},
 ) {
   const db = await getDb();
   const bounds = todayBounds();
@@ -159,6 +160,12 @@ export async function getMatchesPage(
       { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
     ],
   };
+  // Apply eligibility before pagination so finished/already-predicted fixtures
+  // cannot consume the home feed's first page.
+  if (options.upcomingOnly) {
+    query.status = "SCHEDULED";
+    query.kickoffAt.$gt = new Date();
+  }
   const cursorKickoff = cursor ? new Date(cursor.kickoffAt) : null;
   if (cursor) {
     if (
@@ -215,6 +222,22 @@ export async function getMatchesPage(
       },
     },
   ];
+  if (options.unpredictedFor) {
+    pipeline.push(
+      { $lookup: {
+        from: "predictions",
+        let: { matchId: "$providerMatchId" },
+        pipeline: [
+          { $match: { userId: options.unpredictedFor, $expr: { $eq: ["$matchId", "$$matchId"] } } },
+          { $limit: 1 },
+          { $project: { _id: 1 } },
+        ],
+        as: "viewerPredictions",
+      } },
+      { $match: { "viewerPredictions.0": { $exists: false } } },
+      { $project: { viewerPredictions: 0 } },
+    );
+  }
   if (cursor) {
     pipeline.push({
       $match: {
