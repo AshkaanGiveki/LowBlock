@@ -128,3 +128,34 @@
   width: 20px;
   background: #e8c66a;
 }
+
+.depth-carousel--content {
+  display: block;
+  min-height: 0;
+  height: auto;
+  padding: 0.5rem 0 3.5rem;
+  overflow-x: clip;
+}
+.depth-carousel--content .depth-carousel__stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  padding-inline: 0.5rem;
+}
+.depth-carousel__content-card {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  transform-origin: center;
+}
+.depth-carousel__content-card[aria-hidden="true"] {
+  opacity: 0;
+}
+.depth-carousel--content .depth-carousel__arrow {
+  top: auto;
+  bottom: 0;
+}
+.depth-carousel--content .depth-carousel__dots {
+  bottom: 0;
+}
