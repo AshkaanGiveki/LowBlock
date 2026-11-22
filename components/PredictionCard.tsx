@@ -236,15 +236,32 @@ export function PredictionCard({
         }
         throw new Error(getPredictionError(data.error, t));
       }
+      const wasUpdate = savedPrediction !== null;
+      showToast(
+        wasUpdate
+          ? t("پیش‌بینی به‌روزرسانی شد.", "Prediction updated.")
+          : t("پیش‌بینی ذخیره شد.", "Prediction saved."),
+        "success",
+        {
+          title: wasUpdate
+            ? t("به‌روزرسانی شد", "Prediction updated")
+            : t("ذخیره شد", "Prediction saved"),
+          description: `${home} – ${away}`,
+          button: {
+            title: t("پیش‌بینی‌های من", "My predictions"),
+            onClick: () => router.push("/predictions"),
+          },
+        },
+      );
       setSavedPrediction({ homeGoals: Number(home), awayGoals: Number(away) });
       onPredictionSaved?.({ homeGoals: Number(home), awayGoals: Number(away) });
       closeDrawer();
     } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong."),
-      );
+      const message = reason instanceof Error
+        ? reason.message
+        : t("در ثبت پیش‌بینی مشکلی پیش آمد.", "Something went wrong.");
+      setError(message);
+      showToast(message);
     } finally {
       setBusy(false);
     }

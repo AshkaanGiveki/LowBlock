@@ -4,10 +4,13 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/LanguageProvider";
 import { BackButton } from "@/components/BackButton";
+import { useToast } from "@/components/ToastProvider";
+import { friendlyError } from "@/lib/userErrors";
 
 export default function CreateClubPage() {
   const router = useRouter();
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<"INVITE_ONLY" | "RECRUITING">("INVITE_ONLY");
   const [error, setError] = useState("");
@@ -21,12 +24,17 @@ export default function CreateClubPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name, discoveryMode: mode }),
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      setError(data.error ?? "Could not create Club");
+      const message = friendlyError(data.error, t);
+      setError(message);
+      showToast(message);
       setBusy(false);
       return;
     }
+    showToast(t("باشگاه ساخته شد.", "Club created."), "success", {
+      title: t("باشگاه آماده است", "Club ready"),
+    });
     router.replace("/club");
   }
 

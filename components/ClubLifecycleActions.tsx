@@ -31,6 +31,7 @@ export function ClubLifecycleActions({
       showToast(friendlyError(data.error, t));
       return;
     }
+    showToast(t("باشگاه بسته شد.", "Club closed."), "success");
     router.replace("/club");
   }
   if (!isOwner || memberCount > 1) return null;
