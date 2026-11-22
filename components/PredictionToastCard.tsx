@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, LockKeyhole, Sparkles } from "lucide-react";
 import { TeamCrest } from "@/components/TeamCrest";
 
 type PredictionToastCardProps = {
@@ -27,36 +27,50 @@ export function PredictionToastCard({
   const fa = language === "fa";
   return (
     <div className="lowblock-prediction-toast" dir={fa ? "rtl" : "ltr"}>
-      <div className="lowblock-prediction-toast__eyebrow">
-        <span className="lowblock-prediction-toast__eyebrow-mark">
+      <div className="lowblock-prediction-toast__ticket-head">
+        <div className="lowblock-prediction-toast__brand-lockup">
+          <span className="lowblock-prediction-toast__brand-mark">
+            <Sparkles size={13} strokeWidth={2.8} />
+          </span>
+          <span className="lowblock-prediction-toast__brand-name">LOWBLOCK</span>
+        </div>
+        <span className="lowblock-prediction-toast__ticket-status">
           <Check size={12} strokeWidth={3} />
-        </span>
-        <span>{fa ? "انتخاب شما" : "YOUR PICK"}</span>
-        <span className="lowblock-prediction-toast__dot" />
-        <span className="lowblock-prediction-toast__state">
-          {updated ? (fa ? "به‌روزرسانی شد" : "UPDATED") : fa ? "ذخیره شد" : "SAVED"}
+          {updated ? (fa ? "به‌روز شد" : "UPDATED") : fa ? "ثبت شد" : "SAVED"}
         </span>
       </div>
 
-      <div className="lowblock-prediction-toast__match" dir="ltr">
-        <div className="lowblock-prediction-toast__team">
+      <div className="lowblock-prediction-toast__match-label">
+        <span>{fa ? "پیش‌بینی شما" : "YOUR PREDICTION"}</span>
+        <span className="lowblock-prediction-toast__match-label-line" />
+        <span>{fa ? "نتیجه دقیق" : "EXACT SCORE"}</span>
+      </div>
+
+      <div className="lowblock-prediction-toast__fixture" dir="ltr">
+        <div className="lowblock-prediction-toast__team-card">
           <TeamCrest name={homeName} logo={homeLogo} className="lowblock-prediction-toast__crest" />
           <span dir="auto">{homeName}</span>
         </div>
-        <div className="lowblock-prediction-toast__score" aria-label={`${homeGoals} ${fa ? "در برابر" : "against"} ${awayGoals}`}>
-          <strong>{homeGoals}</strong>
-          <span>–</span>
-          <strong>{awayGoals}</strong>
+        <div className="lowblock-prediction-toast__score-lockup" aria-label={`${homeGoals} ${fa ? "در برابر" : "against"} ${awayGoals}`}>
+          <div className="lowblock-prediction-toast__score">
+            <strong>{homeGoals}</strong>
+            <span>–</span>
+            <strong>{awayGoals}</strong>
+          </div>
+          <span className="lowblock-prediction-toast__score-caption">
+            <LockKeyhole size={10} /> {fa ? "قفل شد" : "LOCKED IN"}
+          </span>
         </div>
-        <div className="lowblock-prediction-toast__team lowblock-prediction-toast__team--away">
+        <div className="lowblock-prediction-toast__team-card">
           <TeamCrest name={awayName} logo={awayLogo} className="lowblock-prediction-toast__crest" />
           <span dir="auto">{awayName}</span>
         </div>
       </div>
 
-      <p className="lowblock-prediction-toast__hint">
-        {fa ? "پیش‌بینی شما برای این مسابقه ثبت شد" : "Your score prediction is locked in"}
-      </p>
+      <div className="lowblock-prediction-toast__ticket-foot">
+        <span>{fa ? "امتیاز شما از این انتخاب ثبت می‌شود" : "This pick now counts toward your score"}</span>
+        <span className="lowblock-prediction-toast__ticket-check"><Check size={11} strokeWidth={3} /></span>
+      </div>
     </div>
   );
 }
