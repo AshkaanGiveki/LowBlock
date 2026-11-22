@@ -671,7 +671,7 @@ html[dir="rtl"] .logo-loop-track {
 /* Keep the six featured homepage marks white while every other surface keeps
    the original tournament colors. */
 main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(2) img.league-logo,
-main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3) img.league-logo {
+main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3):not(.home-upcoming-section) img.league-logo {
   filter: brightness(0) invert(1) !important;
 }
 /* Normalize the four narrow source marks to the same square-safe presentation
@@ -711,11 +711,11 @@ img[src="/leagues/conference-league.png"] {
 /* The home competition rail is intentionally compact on phones: six useful cards, two per row. */
 @media (max-width: 639px) {
   main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(2) > div.grid,
-  main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3) > div.grid {
+  main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3):not(.home-upcoming-section) > div.grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(2) > div.grid > a,
-  main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3) > div.grid > a {
+  main:has(.home-hero) > div.max-w-7xl > section:nth-of-type(3):not(.home-upcoming-section) > div.grid > a {
     min-height: 9rem;
     padding: 1rem;
   }
