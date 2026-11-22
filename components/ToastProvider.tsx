@@ -51,7 +51,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <Toaster position="top-center" theme="dark" queue={false} dedupe="id" swipe="both" timer haptics={false} />
+      <Toaster
+        position="top-center"
+        theme={{
+          background: "#08120d",
+          foreground: "#f2fff7",
+          muted: "rgba(221, 255, 235, .62)",
+          ring: "rgba(75, 226, 145, .22)",
+          button: "rgba(75, 226, 145, .13)",
+          success: "#4be291",
+          error: "#ff7186",
+          warning: "#ffd166",
+          info: "#75b9ff",
+        }}
+        queue={false}
+        dedupe="id"
+        swipe="both"
+        timer
+        haptics={false}
+      />
     </ToastContext.Provider>
   );
 }

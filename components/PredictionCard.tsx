@@ -34,6 +34,7 @@ import { getLeague } from "@/lib/football/leagues";
 import { BadgeMinus } from "lucide-react";
 import { DrawerCompetitionMeta } from "./DrawerCompetitionMeta";
 import { LIVE_SCORE_UI_ENABLED } from "@/lib/football/liveScore";
+import { PredictionToastCard } from "@/components/PredictionToastCard";
 
 type Team = { id: number; name: string; faName?: string; logoUrl: string | null };
 type Match = {
@@ -246,7 +247,21 @@ export function PredictionCard({
           title: wasUpdate
             ? t("به‌روزرسانی شد", "Prediction updated")
             : t("ذخیره شد", "Prediction saved"),
-          description: `${home} – ${away}`,
+          description: (
+            <PredictionToastCard
+              homeName={homeName}
+              awayName={awayName}
+              homeLogo={match.homeTeam.logoUrl}
+              awayLogo={match.awayTeam.logoUrl}
+              homeGoals={Number(home)}
+              awayGoals={Number(away)}
+              language={language}
+              updated={wasUpdate}
+            />
+          ),
+          variant: "card",
+          duration: 9000,
+          className: "lowblock-toast lowblock-toast--prediction",
           button: {
             title: t("پیش‌بینی‌های من", "My predictions"),
             onClick: () => router.push("/predictions"),
