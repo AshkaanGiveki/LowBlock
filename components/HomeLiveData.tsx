@@ -149,7 +149,7 @@ export default function HomeLiveData() {
         </div>
         {fixtureContent ?? (
           <HomeFixtureSlider
-            layout="grid"
+            layout="depth"
             matches={value.matches}
             predictions={value.predictions}
             allPredicted={value.allPredicted}
