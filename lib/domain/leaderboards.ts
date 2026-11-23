@@ -1,5 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { unstable_cache } from "next/cache";
+import { readPublishedLeaderboard } from "@/lib/domain/leaderboardPublications";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
@@ -189,8 +190,15 @@ export async function getCanonicalLeaderboard(
     predictions: number;
     userId: string;
   },
+  fresh = false,
 ) {
-  const materialized = await getMaterializedLeaderboard(
+  // Normal requests read a completed, published ranking instead of computing
+  // standings again. Recovery and publication builds explicitly bypass it.
+  if (!fresh) {
+    const published = await readPublishedLeaderboard(db, scope, limit, cursor);
+    if (published !== null) return published;
+  }
+  const materialized = fresh ? null : await getMaterializedLeaderboard(
     db,
     scope,
     limit,
@@ -225,23 +233,12 @@ export async function getCanonicalLeaderboard(
     ? getIranWeeklyPeriod(new Date(), scope.weeklyOffset ?? 0)
     : null;
   const pipeline: any[] = [];
+  // The score ledger already stores the kickoff time. Rejoining every score
+  // to the fixtures collection for a weekly request was unnecessarily costly.
   if (period)
-    pipeline.push(
-      {
-        $lookup: {
-          from: "matches",
-          localField: "matchId",
-          foreignField: "providerMatchId",
-          as: "fixture",
-        },
-      },
-      { $unwind: "$fixture" },
-      {
-        $match: {
-          "fixture.kickoffAt": { $gte: period.start, $lt: period.end },
-        },
-      },
-    );
+    pipeline.push({
+      $match: { kickoffAt: { $gte: period.start, $lt: period.end } },
+    });
   pipeline.push(
     ...(!scope.clubId && !scope.leagueCode && scope.matchday == null
       ? [{ $match: { globalEligible: true } }]
@@ -251,27 +248,6 @@ export async function getCanonicalLeaderboard(
       : !scope.clubId && !scope.leagueCode && !scope.matchday
         ? [{ $match: { leagueCode: { $in: GLOBAL_LEAGUE_CODES } } }]
         : []),
-    {
-      $lookup: {
-        from: "predictions",
-        let: { uid: "$userId", mid: "$matchId" },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $eq: ["$userId", "$$uid"] },
-                  { $eq: ["$matchId", "$$mid"] },
-                ],
-              },
-            },
-          },
-          { $project: { createdAt: 1 } },
-        ],
-        as: "prediction",
-      },
-    },
-    { $unwind: { path: "$prediction", preserveNullAndEmptyArrays: true } },
     { $match: scoreMatch(scope) },
     {
       $group: {
@@ -280,7 +256,7 @@ export async function getCanonicalLeaderboard(
         exact: { $sum: { $cond: ["$exactScore", 1, 0] } },
         correctOutcome: { $sum: { $cond: ["$correctOutcome", 1, 0] } },
         predictions: { $sum: 1 },
-        earliestPredictionAt: { $min: "$prediction.createdAt" },
+        earliestPredictionAt: { $min: "$predictionCreatedAt" },
       },
     },
   );
@@ -377,7 +353,7 @@ export async function getCachedCanonicalLeaderboard(
   const cached = unstable_cache(
     () => getCanonicalLeaderboard(db, scope, limit),
     ["canonical-leaderboard-v1", JSON.stringify(scope), String(limit)],
-    { revalidate: 60, tags: ["leaderboards"] },
+    { revalidate: 15, tags: ["leaderboards"] },
   );
   return cached();
 }
