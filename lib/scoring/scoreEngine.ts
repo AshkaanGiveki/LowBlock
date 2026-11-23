@@ -258,6 +258,17 @@ export async function runScoreEngine(
       new Date(prior.kickoffAt).getTime() !== new Date(match.kickoffAt).getTime();
   });
   const updatedMatchIds = [...new Set(scoredPredictions.map((prediction) => prediction.matchId))];
+  // Most nightly syncs find unchanged finished results. Avoid opening a
+  // transaction or constructing aggregate maps when there are no score deltas.
+  if (!rebuildLeaderboards && scoredPredictions.length === 0)
+    return {
+      matches: matches.length,
+      scores: 0,
+      leaderboards: 0,
+      touchedUsers: [] as string[],
+      updatedMatchIds: [] as string[],
+      awards: null,
+    };
   const scoreOps = scoredPredictions.map((prediction) => {
     const match = byMatch.get(prediction.matchId)!;
     const globalEligible =
