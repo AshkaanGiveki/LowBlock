@@ -3,6 +3,7 @@ import {
   leaderboardPublicationKey,
   clubPublicationPolicy,
   MAX_PUBLISHED_ROWS,
+  readPublishedLeaderboard,
 } from "@/lib/domain/leaderboardPublications";
 
 describe("published leaderboard scopes", () => {
@@ -39,5 +40,60 @@ describe("published leaderboard scopes", () => {
     expect(clubPublicationPolicy(["GB1"]))
       .not.toBe(clubPublicationPolicy(["GB1", "GB_FA"]));
     expect(MAX_PUBLISHED_ROWS).toBe(100);
+  });
+});
+
+describe("reading published standings", () => {
+  function fakeDb(rows: any[] | null, clubCodes = ["GB1", "UCL"]) {
+    const db = {
+      collection(name: string) {
+        return {
+          async findOne() {
+            if (name === "leaderboardPublications") {
+              return rows === null ? null : {
+                rows,
+                policyKey: clubPublicationPolicy(clubCodes),
+              };
+            }
+            if (name === "clubs") return { leaderboardCompetitionCodes: clubCodes };
+            throw new Error(`Unexpected collection ${name}`);
+          },
+        };
+      },
+    };
+    return db as any;
+  }
+
+  it("returns an intentionally empty published ranking without recalculating", async () => {
+    expect(await readPublishedLeaderboard(fakeDb([]), {}, 20)).toEqual([]);
+    expect(await readPublishedLeaderboard(fakeDb(null), {}, 20)).toBeNull();
+  });
+
+  it("supports a cursor inside the published top rows and falls back for unknown cursors", async () => {
+    const rows = [
+      { userId: "alpha", points: 10 },
+      { userId: "beta", points: 7 },
+      { userId: "gamma", points: 5 },
+    ];
+    expect(await readPublishedLeaderboard(fakeDb(rows), {}, 1, { userId: "alpha", points: 10 }))
+      .toEqual([rows[1]]);
+    expect(await readPublishedLeaderboard(fakeDb(rows), {}, 1, { userId: "missing", points: 12 }))
+      .toBeNull();
+  });
+
+  it("avoids serving outdated club rules", async () => {
+    const id = "507f1f77bcf86cd799439011";
+    const db = fakeDb([{ userId: "alpha", points: 10 }], ["GB1"]);
+    // Policy signatures do not match, so the fallback must recompute.
+    const original = db.collection.bind(db);
+    db.collection = (name: string) => {
+      const collection = original(name);
+      if (name === "leaderboardPublications") return {
+        ...collection,
+        findOne: async () => ({ rows: [{ userId: "alpha", points: 10 }], policyKey: clubPublicationPolicy(["GB1", "UCL"]) }),
+      };
+      return collection;
+    };
+    expect(await readPublishedLeaderboard(db, { clubId: id }, 20)).toBeNull();
   });
 });
