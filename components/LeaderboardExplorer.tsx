@@ -31,6 +31,7 @@ export function LeaderboardExplorer({
   weekly = false,
   weekOffset = 0,
   me,
+  myWeeklySummary,
 }: {
   initialRows: Row[];
   seasonStartYear: number;
@@ -39,6 +40,7 @@ export function LeaderboardExplorer({
   weekly?: boolean;
   weekOffset?: number;
   me: string | null;
+  myWeeklySummary?: { rank: number; points: number } | null;
 }) {
   const { t } = useLanguage();
   const [selection, setSelection] = useState<LeaderboardSelection>({
@@ -122,6 +124,14 @@ export function LeaderboardExplorer({
           <Link href="/matches" className="rounded-xl bg-brand px-4 py-2 text-xs font-black text-[#07100b]">
             {t("پیش‌بینی مسابقات", "Predict matches")}
           </Link>
+        </div>
+      )}
+      {selection.weekly && selection.weekOffset === 0 && !selection.leagueCode && myWeeklySummary && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[.04] px-4 py-3">
+          <p className="text-sm font-semibold text-white">
+            {t("رتبه شما در این هفته", "Your rank this week")}: #{myWeeklySummary.rank}
+          </p>
+          <p className="text-sm font-black text-brand">{myWeeklySummary.points} {t("امتیاز", "points")}</p>
         </div>
       )}
       {error && (
