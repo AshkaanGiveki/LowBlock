@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { getDb, withMongoTransaction } from "@/lib/db/mongo";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
+import { hasScoredPredictionChanged } from "@/lib/scoring/scoreChanges";
 import {
   createLockSnapshot,
   isPredictionLocked,
@@ -249,6 +250,8 @@ export async function runScoreEngine(
             actualHomeGoals: 1, actualAwayGoals: 1, globalEligible: 1,
             clubIdAtLock: 1, seasonStartYear: 1, leagueCode: 1,
             matchday: 1, kickoffAt: 1, scoringVersion: 1,
+            roundId: 1, predictionCreatedAt: 1,
+            predictedHomeGoals: 1, predictedAwayGoals: 1,
           } },
         ).toArray();
       for (const row of rows)
@@ -267,17 +270,23 @@ export async function runScoreEngine(
         match.leagueCode === "NATIONS" ||
         isFeaturedFixture(match.leagueCode, match.homeTeam.name, match.awayTeam.name));
     const lockedClub = snapshots.get(`${prediction.userId}:${prediction.matchId}`)?.clubIdAtLock ?? null;
-    return prior.scoringVersion !== SCORING_VERSION ||
-      Number(prior.points) !== score.points ||
-      prior.category !== score.category ||
-      Number(prior.actualHomeGoals) !== match.homeGoals ||
-      Number(prior.actualAwayGoals) !== match.awayGoals ||
-      Boolean(prior.globalEligible) !== globalEligible ||
-      String(prior.clubIdAtLock ?? "") !== String(lockedClub ?? "") ||
-      prior.leagueCode !== match.leagueCode ||
-      Number(prior.seasonStartYear) !== match.seasonStartYear ||
-      Number(prior.matchday) !== match.matchday ||
-      new Date(prior.kickoffAt).getTime() !== new Date(match.kickoffAt).getTime();
+    return hasScoredPredictionChanged(prior, {
+      scoringVersion: SCORING_VERSION,
+      points: score.points,
+      category: score.category,
+      predictedHomeGoals: prediction.homeGoals,
+      predictedAwayGoals: prediction.awayGoals,
+      actualHomeGoals: match.homeGoals,
+      actualAwayGoals: match.awayGoals,
+      globalEligible,
+      clubIdAtLock: lockedClub,
+      leagueCode: match.leagueCode,
+      seasonStartYear: match.seasonStartYear,
+      matchday: match.matchday,
+      roundId: match.roundId ?? null,
+      kickoffAt: match.kickoffAt,
+      predictionCreatedAt: prediction.createdAt ?? null,
+    });
   });
   const updatedMatchIds = [...new Set(scoredPredictions.map((prediction) => prediction.matchId))];
   // Tournament, membership, year, or global-eligibility corrections affect
