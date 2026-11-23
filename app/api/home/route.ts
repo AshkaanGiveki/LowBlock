@@ -6,7 +6,7 @@ import {
   getLeaderboardSummary,
   getCachedCanonicalLeaderboard,
 } from "@/lib/domain/leaderboards";
-import { getLatestSeasonStartYear, getMatchesPage } from "@/lib/football/data";
+import { getMatchesPage } from "@/lib/football/data";
 import { getViewerH2HTodayMatch } from "@/lib/domain/h2h";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,6 @@ export async function GET(request: Request) {
     // Optional dashboard data must never prevent the prediction feed from loading.
     try {
       const db = await getDb();
-      const year = await getLatestSeasonStartYear();
       const [user, membership, todayMatch, mine, rows] = await Promise.all([
         db
           .collection<any>("users")
@@ -55,8 +54,8 @@ export async function GET(request: Request) {
           .collection<any>("clubMemberships")
           .findOne({ userId, leftAt: null }, { projection: { clubId: 1 } }),
         getViewerH2HTodayMatch(db, userId).catch(() => null),
-        getLeaderboardSummary(db, userId, { seasonStartYear: year }),
-        getCachedCanonicalLeaderboard(db, { seasonStartYear: year }, 7),
+        getLeaderboardSummary(db, userId, { weekly: true }),
+        getCachedCanonicalLeaderboard(db, { weekly: true }, 7),
       ]);
       let clubName: string | null = null;
       if (membership && ObjectId.isValid(String(membership.clubId))) {
