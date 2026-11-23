@@ -40,10 +40,32 @@ type Prediction = {
 };
 
 // Kept for the existing Club views. Low Block awards use the canonical leaderboard below.
-async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
+async function rebuildRoundWinners(
+  db: Awaited<ReturnType<typeof getDb>>,
+  affectedMatchIds?: string[],
+) {
+  let filter: any = { status: "FINAL" };
+  if (affectedMatchIds) {
+    if (!affectedMatchIds.length) return 0;
+    const matches = await db.collection<any>("matches").find(
+      { providerMatchId: { $in: affectedMatchIds } },
+      { projection: { leagueCode: 1, seasonStartYear: 1, matchday: 1 } },
+    ).toArray();
+    const unique = new Map<string, any>();
+    for (const match of matches) {
+      const number = Number(match.matchday);
+      const year = Number(match.seasonStartYear);
+      if (!match.leagueCode || !Number.isFinite(number) || !Number.isFinite(year)) continue;
+      unique.set(`${match.leagueCode}:${year}:${number}`, {
+        leagueCode: match.leagueCode, seasonId: String(year), number,
+      });
+    }
+    if (!unique.size) return 0;
+    filter = { status: "FINAL", $or: [...unique.values()] };
+  }
   const rounds = await db
     .collection<any>("rounds")
-    .find({ status: "FINAL" })
+    .find(filter)
     .toArray();
   for (const round of rounds) {
     const rows = await db
@@ -841,6 +863,10 @@ export async function runLeaderboardEngine(
     updatedMatchIds: pendingMatches,
     full: fullPublicationRequired,
   });
+  const roundWinners = await rebuildRoundWinners(db, pendingMatches);
+  // Awards are idempotent in their own service and should follow complete
+  // standings/round updates, not be recalculated on empty nightly passes.
+  const awards = pendingMatches.length ? await grantAutomaticAwards(db) : null;
   // Delete only queue revisions that were processed. Concurrent scoring runs
   // can update the same queue item without losing the newer dirty marker.
   for (let index = 0; index < pending.length; index += 100) {
@@ -872,8 +898,8 @@ export async function runLeaderboardEngine(
     publications,
     pendingProcessed: pending.length,
     fullPublicationRequired,
-    roundWinners: 0,
-    awards: null,
+    roundWinners,
+    awards,
     recoveryMode: "recent-three-days",
     batchIndex,
     batchSize,
