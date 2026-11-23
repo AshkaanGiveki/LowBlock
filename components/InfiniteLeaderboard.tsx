@@ -54,7 +54,7 @@ export function InfiniteLeaderboard({
   const [cursor, setCursor] = useState(initialRows.at(-1)?.cursor ?? null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(
-    initialRows.length === 0 || !initialRows.at(-1)?.cursor,
+    initialRows.length < 20 || !initialRows.at(-1)?.cursor,
   );
   const sentinel = useRef<HTMLDivElement>(null);
   const params = useMemo(() => {
@@ -93,7 +93,7 @@ export function InfiniteLeaderboard({
         return [...current, ...incoming.filter((row) => !ids.has(row.userId))];
       });
       setCursor(data.nextCursor ? JSON.parse(atob(data.nextCursor)) : null);
-      setDone(!data.nextCursor || incoming.length === 0);
+      setDone(!data.nextCursor || incoming.length < 40);
     } finally {
       setLoading(false);
     }
