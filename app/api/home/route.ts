@@ -6,7 +6,7 @@ import {
   getLeaderboardSummary,
   getCachedCanonicalLeaderboard,
 } from "@/lib/domain/leaderboards";
-import { getMatchesPage } from "@/lib/football/data";
+import { getMatchesPage, getPredictions } from "@/lib/football/data";
 import { getViewerH2HTodayMatch } from "@/lib/domain/h2h";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,30 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const userId = await currentUserId();
-    const page = await getMatchesPage(5, null, {
+    // Cache the shared upcoming list first; most signed-in users can be
+    // filtered with one indexed user-prediction query instead of a per-match
+    // lookup across the fixtures collection on every homepage refresh.
+    const sharedPage = await getMatchesPage(userId ? 30 : 5, null, {
       upcomingOnly: true,
-      unpredictedFor: userId ?? undefined,
     });
+    let page = sharedPage;
+    if (userId) {
+      const predicted = await getPredictions(
+        sharedPage.matches.map((match) => match.providerMatchId),
+        userId,
+      );
+      const available = sharedPage.matches.filter(
+        (match) => !predicted.has(match.providerMatchId),
+      );
+      if (available.length >= 5 || !sharedPage.hasMore) {
+        page = { ...sharedPage, matches: available.slice(0, 5) };
+      } else {
+        page = await getMatchesPage(5, null, {
+          upcomingOnly: true,
+          unpredictedFor: userId,
+        });
+      }
+    }
     const allPredicted =
       userId && page.matches.length === 0
         ? (await getMatchesPage(1, null, { upcomingOnly: true })).matches
