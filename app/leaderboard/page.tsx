@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db/mongo";
 import { currentUserId } from "@/lib/auth/session";
 import { LeaderboardView } from "@/components/LeaderboardView";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
-import { getLatestSeasonStartYear } from "@/lib/football/data";
+import { getCachedLeaderboardCounters } from "@/lib/domain/leaderboardCounters";
 
 export const metadata = {
   title: "Football Prediction Leaderboard",
@@ -30,14 +30,11 @@ async function leaderboard(): Promise<{
   roundsCount: number;
 }> {
   const db = await getDb();
-  const year = await getLatestSeasonStartYear();
-  const [rows, usersCount, picksCount, roundsCount] = await Promise.all([
-    getCanonicalLeaderboard(db, { seasonStartYear: year }, 20),
-    db.collection("users").countDocuments(),
-    db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
-    db.collection("rounds").countDocuments({ status: "FINAL" }),
+  const [rows, counts] = await Promise.all([
+    getCanonicalLeaderboard(db, { weekly: true }, 20),
+    getCachedLeaderboardCounters(),
   ]);
-  return { rows, usersCount, picksCount, roundsCount };
+  return { rows, ...counts };
 }
 
 function LeaderboardLoading() {

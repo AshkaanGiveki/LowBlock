@@ -139,7 +139,7 @@ function todayBounds() {
   return appMatchesPageBounds();
 }
 
-export async function getMatchesPage(
+async function getMatchesPageUncached(
   limit = 30,
   cursor?: MatchPageCursor | null,
   options: { upcomingOnly?: boolean; unpredictedFor?: string } = {},
@@ -327,6 +327,28 @@ export async function getMatchesPage(
         }
       : null,
   };
+}
+
+/**
+ * All users share the public fixture list. Cache that common list briefly,
+ * but never cache user-specific prediction exclusions or private predictions
+ * as public data. Scoring/lock validation always uses authoritative records.
+ */
+const getCachedPublicMatchesPage = unstable_cache(
+  (limit: number, cursor: MatchPageCursor | null, upcomingOnly: boolean) =>
+    getMatchesPageUncached(limit, cursor, { upcomingOnly }),
+  ["public-matches-page-v1"],
+  { revalidate: 15, tags: ["matches"] },
+);
+
+export async function getMatchesPage(
+  limit = 30,
+  cursor?: MatchPageCursor | null,
+  options: { upcomingOnly?: boolean; unpredictedFor?: string } = {},
+) {
+  if (options.unpredictedFor)
+    return getMatchesPageUncached(limit, cursor, options);
+  return getCachedPublicMatchesPage(limit, cursor ?? null, Boolean(options.upcomingOnly));
 }
 
 export async function getMatch(providerMatchId: string) {

@@ -89,7 +89,7 @@ export function DesktopHomeDashboard({
         <aside className="desktop-context-column">
           <DesktopPanel
             title="رده‌بندی جهانی"
-            enTitle="Global ranking"
+            enTitle="Weekly global ranking"
             icon={<Trophy size={16} />}
             action="/lowblock"
           >
@@ -292,8 +292,8 @@ function DesktopStats({
   upcoming: number;
 }) {
   const stats = [
-    ["رتبه جهانی", String(rank), "GLOBAL RANK", BarChart3],
-    ["امتیاز فصل", points.toLocaleString(), "SEASON POINTS", Trophy],
+    ["رتبه هفتگی", String(rank), "WEEKLY RANK", BarChart3],
+    ["امتیاز هفته", points.toLocaleString(), "WEEKLY POINTS", Trophy],
     ["پیش‌بینی دقیق", String(exact), "EXACT PICKS", Target],
     ["بازی پیش‌رو", String(upcoming), "UP NEXT", Flame],
   ] as const;
@@ -303,7 +303,7 @@ function DesktopStats({
         <div>
           <span className="desktop-kicker">
             <BarChart3 size={14} />
-            <T fa="آمار فصل شما" en="YOUR SEASON" />
+            <T fa="آمار این هفته شما" en="YOUR WEEK" />
           </span>
           <h2>
             <T fa="پیشرفت شما" en="Your progress" />

@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
-import { getCachedCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getCachedCanonicalLeaderboard, getLeaderboardSummary } from "@/lib/domain/leaderboards";
 import { LeaderboardExplorer } from "@/components/LeaderboardExplorer";
 import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
 import { getLatestSeasonStartYear } from "@/lib/football/data";
+import { getCachedLeaderboardCounters } from "@/lib/domain/leaderboardCounters";
 import { BarChart3, Sparkles, Trophy, Users } from "lucide-react";
 
 export const metadata = {
@@ -23,13 +24,13 @@ async function LowBlockData({
   searchParams: Promise<{ scope?: string; league?: string; week?: string }>;
 }) {
   const query = await searchParams;
-  const weekly = query.scope === "weekly";
+  const weekly = !query.scope || query.scope === "weekly";
   const weekOffset = weekly && query.week === "previous" ? 1 : 0;
   const lifetime = query.scope === "lifetime";
   const league = LEAGUES.find((item) => item.code === query.league);
   const db = await getDb();
   const year = await getLatestSeasonStartYear();
-  const [rows, usersCount, picksCount, roundsCount, me] = await Promise.all([
+  const [rows, metrics, me] = await Promise.all([
     getCachedCanonicalLeaderboard(
       db,
       {
@@ -40,12 +41,12 @@ async function LowBlockData({
       },
       20,
     ),
-    db.collection("users").countDocuments(),
-    db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
-    db.collection("rounds").countDocuments({ status: "FINAL" }),
+    getCachedLeaderboardCounters(),
     currentUserId(),
   ]);
 
+  const { usersCount, picksCount, roundsCount } = metrics;
+  const myWeeklySummary = me ? await getLeaderboardSummary(db, me, { weekly: true }) : null;
   return (
     <main className="desktop-lowblock-page min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-6xl">
@@ -63,12 +64,16 @@ async function LowBlockData({
                 fa={
                   lifetime
                     ? "از آغاز تا امروز"
-                    : `فصل ${year}/${String(year + 1).slice(-2)}`
+                    : weekly
+                      ? "این هفته، فرصتی تازه برای همه"
+                      : `فصل ${year}/${String(year + 1).slice(-2)}`
                 }
                 en={
                   lifetime
                     ? "From the beginning"
-                    : `Season ${year}/${String(year + 1).slice(-2)}`
+                    : weekly
+                      ? "A fresh competition for everyone, every week"
+                      : `Season ${year}/${String(year + 1).slice(-2)}`
                 }
               />
             </p>
@@ -110,6 +115,7 @@ async function LowBlockData({
             weekly={weekly}
             weekOffset={weekOffset}
             me={me}
+            myWeeklySummary={myWeeklySummary}
           />
         </Suspense>
       </div>

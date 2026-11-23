@@ -114,18 +114,20 @@ describe("competition mapping", () => {
     for (const entry of COMPETITION_MAPPINGS) {
       expect(entry.code).toBeTruthy();
       expect(getLeague(entry.code)).toBeTruthy();
-      expect(entry.apiSportsId).toBeGreaterThan(0);
+      // Some supported tournaments exist in SportsAPI but have no verified
+      // API-Sports mapping (represented by zero, never sent as a provider ID).
+      expect(entry.apiSportsId).toBeGreaterThanOrEqual(0);
       expect(entry.sportsApiUniqueTournamentId).toBeGreaterThan(0);
       expect(codes.has(entry.code)).toBe(false);
       expect(sportsApiIds.has(entry.sportsApiUniqueTournamentId)).toBe(false);
-      expect(apiSportsIds.has(entry.apiSportsId)).toBe(false);
+      if (entry.apiSportsId > 0) expect(apiSportsIds.has(entry.apiSportsId)).toBe(false);
       codes.add(entry.code);
       sportsApiIds.add(entry.sportsApiUniqueTournamentId);
-      apiSportsIds.add(entry.apiSportsId);
+      if (entry.apiSportsId > 0) apiSportsIds.add(entry.apiSportsId);
       expect(getSportsApiUniqueTournamentId(entry.code)).toBe(
         entry.sportsApiUniqueTournamentId,
       );
-      expect(getApiSportsId(entry.code)).toBe(entry.apiSportsId);
+      expect(getApiSportsId(entry.code)).toBe(entry.apiSportsId > 0 ? entry.apiSportsId : null);
     }
   });
 });

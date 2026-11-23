@@ -333,6 +333,22 @@ export async function ensureH2HIndexes() {
 export async function ensurePerformanceIndexes() {
   const db = await getDb();
   await Promise.all([
+    db.collection("leaderboardRebuildQueue").createIndex(
+      { updatedAt: 1 },
+      { name: "leaderboard_pending_oldest_first" },
+    ),
+    db.collection("predictionScores").createIndex(
+      { globalEligible: 1, kickoffAt: 1, userId: 1 },
+      { name: "prediction_scores_global_week" },
+    ),
+    db.collection("predictionScores").createIndex(
+      { clubIdAtLock: 1, kickoffAt: 1, leagueCode: 1, userId: 1 },
+      { name: "prediction_scores_club_week" },
+    ),
+    db.collection("predictionScores").createIndex(
+      { leagueCode: 1, seasonStartYear: 1, userId: 1 },
+      { name: "prediction_scores_tournament_edition" },
+    ),
     db
       .collection("predictionScores")
       .createIndex(

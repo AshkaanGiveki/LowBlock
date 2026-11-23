@@ -42,7 +42,8 @@ export async function GET(request: Request) {
       );
   }
   const weekly = url.searchParams.get("weekly") === "true";
-  const year = weekly
+  const lifetime = url.searchParams.get("lifetime") === "true";
+  const year = weekly || lifetime
     ? null
     : Number(
         url.searchParams.get("seasonStartYear") ??

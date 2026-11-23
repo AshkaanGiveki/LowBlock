@@ -51,6 +51,7 @@ type Props = {
   clubName?: string;
   seasonStartYear?: number;
   weekly?: boolean;
+  lifetime?: boolean;
   weekOffset?: number;
 };
 
@@ -72,6 +73,7 @@ export function DetailedLeaderboard({
   clubName,
   seasonStartYear,
   weekly = false,
+  lifetime = false,
   weekOffset = 0,
 }: Props) {
   const { language, t } = useLanguage();
@@ -94,13 +96,14 @@ export function DetailedLeaderboard({
       direction,
     });
     if (clubId) q.set("clubId", clubId);
+    if (lifetime) q.set("lifetime", "true");
     if (weekly) {
       q.set("weekly", "true");
       if (weekOffset) q.set("week", "previous");
     } else if (seasonStartYear)
       q.set("seasonStartYear", String(seasonStartYear));
     return q.toString();
-  }, [clubId, page, sort, direction, weekly, weekOffset, seasonStartYear]);
+  }, [clubId, page, sort, direction, weekly, lifetime, weekOffset, seasonStartYear]);
   useEffect(() => {
     setLoading(true);
     setError(false);
@@ -134,7 +137,9 @@ export function DetailedLeaderboard({
     ? clubName || t("جدول گروه", "Group standings")
     : weekly
       ? t("جدول هفتگی جهانی", "Global weekly standings")
-      : t("جدول کامل جهانی", "Complete global standings");
+      : lifetime
+        ? t("جدول تاریخی جهانی", "All-time global standings")
+        : t("جدول فصل جهانی", "Season global standings");
   const visibleStart = Math.max(0, Math.floor(scrollTop / 76) - 4);
   const visibleRows = rows.slice(visibleStart, visibleStart + 33);
   return (

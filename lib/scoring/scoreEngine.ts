@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { getDb, withMongoTransaction } from "@/lib/db/mongo";
 import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore";
+import { hasScoredPredictionChanged } from "@/lib/scoring/scoreChanges";
 import {
   createLockSnapshot,
   isPredictionLocked,
@@ -14,6 +15,7 @@ import {
   isFeaturedFixture,
 } from "@/lib/football/leagues";
 import { writeRankSnapshots } from "@/lib/domain/rankSnapshots";
+import { publishLeaderboardSnapshots } from "@/lib/domain/leaderboardPublisher";
 
 type Match = {
   _id?: unknown;
@@ -39,10 +41,32 @@ type Prediction = {
 };
 
 // Kept for the existing Club views. Low Block awards use the canonical leaderboard below.
-async function rebuildRoundWinners(db: Awaited<ReturnType<typeof getDb>>) {
+async function rebuildRoundWinners(
+  db: Awaited<ReturnType<typeof getDb>>,
+  affectedMatchIds?: string[],
+) {
+  let filter: any = { status: "FINAL" };
+  if (affectedMatchIds) {
+    if (!affectedMatchIds.length) return 0;
+    const matches = await db.collection<any>("matches").find(
+      { providerMatchId: { $in: affectedMatchIds } },
+      { projection: { leagueCode: 1, seasonStartYear: 1, matchday: 1 } },
+    ).toArray();
+    const unique = new Map<string, any>();
+    for (const match of matches) {
+      const number = Number(match.matchday);
+      const year = Number(match.seasonStartYear);
+      if (!match.leagueCode || !Number.isFinite(number) || !Number.isFinite(year)) continue;
+      unique.set(`${match.leagueCode}:${year}:${number}`, {
+        leagueCode: match.leagueCode, seasonId: String(year), number,
+      });
+    }
+    if (!unique.size) return 0;
+    filter = { status: "FINAL", $or: [...unique.values()] };
+  }
   const rounds = await db
     .collection<any>("rounds")
-    .find({ status: "FINAL" })
+    .find(filter)
     .toArray();
   for (const round of rounds) {
     const rows = await db
@@ -105,6 +129,17 @@ export async function runScoreEngine(
     ...new Set((options.matchIds ?? []).map(String).filter(Boolean)),
   ];
   const db = await getDb();
+  // An explicitly empty match batch means no work. Without this guard an
+  // empty recent-sync batch would accidentally rescore the entire database.
+  if (options.matchIds && requestedMatchIds.length === 0)
+    return {
+      matches: 0,
+      scores: 0,
+      leaderboards: 0,
+      touchedUsers: [] as string[],
+      updatedMatchIds: [] as string[],
+      awards: null,
+    };
   const matches = await db
     .collection<Match>("matches")
     .find({
@@ -123,6 +158,7 @@ export async function runScoreEngine(
       scores: 0,
       leaderboards: 0,
       touchedUsers: [] as string[],
+      updatedMatchIds: [] as string[],
       awards: rebuildLeaderboards ? await grantAutomaticAwards(db) : null,
     };
   const byMatch = new Map(
@@ -200,7 +236,88 @@ export async function runScoreEngine(
         : DEFAULT_CLUB_LEAGUE_CODES,
     ]),
   );
-  const scoreOps = predictions.map((prediction) => {
+  // The normal nightly run sees the same finished fixtures for several days.
+  // Only write a score when its stored result/eligibility actually changed.
+  // Explicit full rebuilds retain the original all-predictions behavior.
+  const previousScores = new Map<string, any>();
+  if (!rebuildLeaderboards) {
+    for (let index = 0; index < matchIds.length; index += 100) {
+      const rows = await db.collection<any>("predictionScores")
+        .find(
+          { matchId: { $in: matchIds.slice(index, index + 100) } },
+          { projection: {
+            userId: 1, matchId: 1, points: 1, category: 1,
+            actualHomeGoals: 1, actualAwayGoals: 1, globalEligible: 1,
+            clubIdAtLock: 1, seasonStartYear: 1, leagueCode: 1,
+            matchday: 1, kickoffAt: 1, scoringVersion: 1,
+            roundId: 1, predictionCreatedAt: 1,
+            predictedHomeGoals: 1, predictedAwayGoals: 1,
+          } },
+        ).toArray();
+      for (const row of rows)
+        previousScores.set(`${String(row.userId)}:${String(row.matchId)}`, row);
+    }
+  }
+  const scoredPredictions = rebuildLeaderboards ? predictions : predictions.filter((prediction) => {
+    const match = byMatch.get(prediction.matchId)!;
+    const prior = previousScores.get(`${prediction.userId}:${prediction.matchId}`);
+    if (!prior) return true;
+    const score = calculatePredictionScore(
+      prediction.homeGoals, prediction.awayGoals, match.homeGoals, match.awayGoals,
+    );
+    const globalEligible = isGlobalCompetition(match.leagueCode) &&
+      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
+        match.leagueCode === "NATIONS" ||
+        isFeaturedFixture(match.leagueCode, match.homeTeam.name, match.awayTeam.name));
+    const lockedClub = snapshots.get(`${prediction.userId}:${prediction.matchId}`)?.clubIdAtLock ?? null;
+    return hasScoredPredictionChanged(prior, {
+      scoringVersion: SCORING_VERSION,
+      points: score.points,
+      category: score.category,
+      predictedHomeGoals: prediction.homeGoals,
+      predictedAwayGoals: prediction.awayGoals,
+      actualHomeGoals: match.homeGoals,
+      actualAwayGoals: match.awayGoals,
+      globalEligible,
+      clubIdAtLock: lockedClub,
+      leagueCode: match.leagueCode,
+      seasonStartYear: match.seasonStartYear,
+      matchday: match.matchday,
+      roundId: match.roundId ?? null,
+      kickoffAt: match.kickoffAt,
+      predictionCreatedAt: prediction.createdAt ?? null,
+    });
+  });
+  const updatedMatchIds = [...new Set(scoredPredictions.map((prediction) => prediction.matchId))];
+  // Tournament, membership, year, or global-eligibility corrections affect
+  // the *old* as well as the new ranking. Trigger a full publication rather
+  // than leaving obsolete totals in a former scope.
+  const structuralRebuildRequired = !rebuildLeaderboards && scoredPredictions.some((prediction) => {
+    const previous = previousScores.get(`${prediction.userId}:${prediction.matchId}`);
+    if (!previous) return false;
+    const match = byMatch.get(prediction.matchId)!;
+    const currentGlobal = isGlobalCompetition(match.leagueCode) &&
+      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
+        match.leagueCode === "NATIONS" ||
+        isFeaturedFixture(match.leagueCode, match.homeTeam.name, match.awayTeam.name));
+    const currentClub = snapshots.get(`${prediction.userId}:${prediction.matchId}`)?.clubIdAtLock ?? null;
+    return previous.leagueCode !== match.leagueCode ||
+      Number(previous.seasonStartYear) !== match.seasonStartYear ||
+      Boolean(previous.globalEligible) !== currentGlobal ||
+      String(previous.clubIdAtLock ?? "") !== String(currentClub ?? "");
+  });
+  // Most nightly syncs find unchanged finished results. Avoid opening a
+  // transaction or constructing aggregate maps when there are no score deltas.
+  if (!rebuildLeaderboards && scoredPredictions.length === 0)
+    return {
+      matches: matches.length,
+      scores: 0,
+      leaderboards: 0,
+      touchedUsers: [] as string[],
+      updatedMatchIds: [] as string[],
+      awards: null,
+    };
+  const scoreOps = scoredPredictions.map((prediction) => {
     const match = byMatch.get(prediction.matchId)!;
     const globalEligible =
       isGlobalCompetition(match.leagueCode) &&
@@ -270,7 +387,7 @@ export async function runScoreEngine(
       earliestPredictionAt?: Date;
     }
   >();
-  for (const prediction of predictions) {
+  for (const prediction of scoredPredictions) {
     const match = byMatch.get(prediction.matchId)!;
     const globalEligible =
       isGlobalCompetition(match.leagueCode) &&
@@ -370,6 +487,36 @@ export async function runScoreEngine(
         .collection("leaderboardStats")
         .deleteMany({ userId: { $in: touchedUsers } }, { session });
     for (const chunk of rebuildLeaderboards ? chunks(statOps) : []) await transactionDb.collection("leaderboardStats").bulkWrite(chunk, { ordered: false, session });
+    // A crash after scoring but before rebuilding standings must not lose the
+    // update. Persist a retryable dirty queue in the SAME score transaction.
+    if (!rebuildLeaderboards) {
+      const dirtyOps = [
+        ...(structuralRebuildRequired ? [{
+          updateOne: {
+            filter: { _id: "RECONCILE_ALL" },
+            update: { $set: { kind: "ALL", updatedAt: now } },
+            upsert: true,
+          },
+        }] : []),
+        ...touchedUsers.map((userId) => ({
+          updateOne: {
+            filter: { _id: `USER:${userId}` },
+            update: { $set: { kind: "USER", userId, updatedAt: now } },
+            upsert: true,
+          },
+        })),
+        ...updatedMatchIds.map((matchId) => ({
+          updateOne: {
+            filter: { _id: `MATCH:${matchId}` },
+            update: { $set: { kind: "MATCH", matchId, updatedAt: now } },
+            upsert: true,
+          },
+        })),
+      ];
+      for (const chunk of chunks(dirtyOps))
+        await transactionDb.collection<any>("leaderboardRebuildQueue")
+          .bulkWrite(chunk, { ordered: false, session });
+    }
   });
   if (!rebuildLeaderboards)
     return {
@@ -377,6 +524,7 @@ export async function runScoreEngine(
       scores: scoreOps.length,
       leaderboards: 0,
       touchedUsers,
+      updatedMatchIds,
       awards: null,
     };
   await writeRankSnapshots(
@@ -393,13 +541,16 @@ export async function runScoreEngine(
   );
   const roundWinners = await rebuildRoundWinners(db);
   const awards = await grantAutomaticAwards(db);
+  const publications = await publishLeaderboardSnapshots(db, { full: true });
   return {
     matches: matches.length,
     scores: scoreOps.length,
     leaderboards: aggregates.size,
     touchedUsers,
+    updatedMatchIds,
     roundWinners,
     awards,
+    publications,
   };
 }
 
@@ -550,6 +701,74 @@ async function rebuildLeaderboardStatsForUsers(
   return { leaderboards: aggregates.size, scoreRows: scoreRows.length };
 }
 
+/**
+ * Reverse previously credited scores when a provider explicitly changes a
+ * finished fixture back to a non-final state. No provider request is made.
+ * Old scopes are unknown after removal, so request a full publication rebuild
+ * only when a real reversal has occurred.
+ */
+async function retractNonFinalScores(
+  db: Awaited<ReturnType<typeof getDb>>,
+  ids: string[],
+) {
+  const matchIds = [...new Set(ids.map(String).filter(Boolean))];
+  if (!matchIds.length) return { retracted: 0, fixtures: 0 };
+  const invalid = new Set<string>();
+  for (let i = 0; i < matchIds.length; i += 100) {
+    const matches = await db.collection<any>("matches").find(
+      { providerMatchId: { $in: matchIds.slice(i, i + 100) } },
+      { projection: { providerMatchId: 1, status: 1, homeGoals: 1, awayGoals: 1 } },
+    ).toArray();
+    for (const match of matches) {
+      if (match.status !== "FINISHED" ||
+          match.homeGoals == null || match.awayGoals == null) {
+        invalid.add(String(match.providerMatchId));
+      }
+    }
+  }
+  if (!invalid.size) return { retracted: 0, fixtures: 0 };
+  const affectedRows = await db.collection<any>("predictionScores").find(
+    { matchId: { $in: [...invalid] } },
+    { projection: { userId: 1, matchId: 1 } },
+  ).toArray();
+  if (!affectedRows.length) return { retracted: 0, fixtures: 0 };
+  const touchedUsers = [...new Set(affectedRows.map(row => String(row.userId)))];
+  const touchedMatches = [...new Set(affectedRows.map(row => String(row.matchId)))];
+  const updatedAt = new Date();
+  await withMongoTransaction(async (transactionDb, session) => {
+    await transactionDb.collection("predictionScores").deleteMany(
+      { matchId: { $in: touchedMatches } }, { session },
+    );
+    const operations: any[] = [
+      { updateOne: {
+        filter: { _id: "RECONCILE_ALL" },
+        update: { $set: { kind: "ALL", updatedAt } },
+        upsert: true,
+      } },
+      ...touchedUsers.map(userId => ({ updateOne: {
+        filter: { _id: `USER:${userId}` },
+        update: { $set: { kind: "USER", userId, updatedAt } },
+        upsert: true,
+      } })),
+      ...touchedMatches.map(matchId => ({ updateOne: {
+        filter: { _id: `MATCH:${matchId}` },
+        update: { $set: { kind: "MATCH", matchId, updatedAt } },
+        upsert: true,
+      } })),
+    ];
+    for (let i = 0; i < operations.length; i += 100) {
+      await transactionDb.collection<any>("leaderboardRebuildQueue")
+        .bulkWrite(operations.slice(i, i + 100), { ordered: false, session });
+    }
+  });
+  console.info(JSON.stringify({
+    type: "lowblock.scores_retracted",
+    fixtures: touchedMatches.length,
+    scoreRows: affectedRows.length,
+  }));
+  return { retracted: affectedRows.length, fixtures: touchedMatches.length };
+}
+
 export async function runLeaderboardEngine(
   options: {
     recentOnly?: boolean;
@@ -569,9 +788,6 @@ export async function runLeaderboardEngine(
     .find(
       {
         provider: { $in: ["football-api", "sportsapi"] },
-        status: "FINISHED",
-        homeGoals: { $ne: null },
-        awayGoals: { $ne: null },
         kickoffAt: { $gte: since },
       },
       { projection: { providerMatchId: 1 } },
@@ -585,19 +801,122 @@ export async function runLeaderboardEngine(
     batchIndex * batchSize,
     (batchIndex + 1) * batchSize,
   );
+  const retractedRecent = await retractNonFinalScores(
+    db, batch.map((match) => String(match.providerMatchId)),
+  );
   const scored = await runScoreEngine({
     rebuildLeaderboards: false,
     matchIds: batch.map((match) => String(match.providerMatchId)),
   });
-  const rebuilt = await rebuildLeaderboardStatsForUsers(
-    db,
-    scored.touchedUsers ?? [],
+
+  // Bounded rolling audit of older results, using ONLY stored fixtures (no
+  // additional provider quota). Catch older corrections that fall outside the
+  // nightly three-day window without repeatedly rebuilding all history.
+  const auditSize = Math.min(250, Math.max(1, Number(process.env.LEADERBOARD_AUDIT_BATCH_SIZE ?? 100) || 100));
+  const auditCollection = db.collection<any>("leaderboardAuditState");
+  // The worker can process many batches per sync job. Audit older fixtures
+  // once per sync cycle, never once per small recent-results batch.
+  const auditState = batchIndex === 0
+    ? await auditCollection.findOne({ _id: "historical" })
+    : null;
+  const auditFilter: any = {
+    provider: { $in: ["football-api", "sportsapi"] },
+    kickoffAt: { $lt: since },
+  };
+  if (auditState?.cursorKickoffAt && auditState?.cursorMatchId) {
+    auditFilter.$or = [
+      { kickoffAt: { $gt: auditState.cursorKickoffAt, $lt: since } },
+      {
+        kickoffAt: auditState.cursorKickoffAt,
+        providerMatchId: { $gt: auditState.cursorMatchId },
+      },
+    ];
+  }
+  const auditQuery = (filter: any) =>
+    db.collection<any>("matches")
+      .find(filter, { projection: { providerMatchId: 1, kickoffAt: 1 } })
+      .sort({ kickoffAt: 1, providerMatchId: 1 })
+      .limit(auditSize)
+      .toArray();
+  let auditMatches = batchIndex === 0 ? await auditQuery(auditFilter) : [];
+  if (!auditMatches.length && auditState?.cursorKickoffAt)
+    auditMatches = await auditQuery({
+      provider: { $in: ["football-api", "sportsapi"] },
+      kickoffAt: { $lt: since },
+    });
+  const retractedHistorical = await retractNonFinalScores(
+    db, auditMatches.map((match) => String(match.providerMatchId)),
   );
+  const audited = auditMatches.length
+    ? await runScoreEngine({
+        rebuildLeaderboards: false,
+        matchIds: auditMatches.map((match) => String(match.providerMatchId)),
+      })
+    : { scores: 0 };
+  // Retry pending work even when this run finds no changed results.
+  const pending = await db.collection<any>("leaderboardRebuildQueue")
+    .find({}, { projection: { kind: 1, userId: 1, matchId: 1, updatedAt: 1 } })
+    .sort({ updatedAt: 1 })
+    .limit(10000)
+    .toArray();
+  const pendingUsers = pending
+    .filter((item) => item.kind === "USER" && item.userId)
+    .map((item) => String(item.userId));
+  const pendingMatches = pending
+    .filter((item) => item.kind === "MATCH" && item.matchId)
+    .map((item) => String(item.matchId));
+  const fullPublicationRequired = pending.some((item) => item.kind === "ALL");
+  if (pending.length === 10000) {
+    const backlog = await db.collection("leaderboardRebuildQueue").countDocuments();
+    if (backlog > pending.length)
+      throw new Error("LEADERBOARD_REBUILD_BACKLOG: queue exceeds safe atomic publication batch");
+  }
+  const rebuilt = await rebuildLeaderboardStatsForUsers(db, pendingUsers);
+  const publications = await publishLeaderboardSnapshots(db, {
+    updatedMatchIds: pendingMatches,
+    full: fullPublicationRequired,
+  });
+  // If a correction moved a fixture between tournaments/rounds, rebuild
+  // both its former and current award scopes rather than only the new round.
+  const roundWinners = await rebuildRoundWinners(
+    db, fullPublicationRequired ? undefined : pendingMatches,
+  );
+  // Awards are idempotent in their own service and should follow complete
+  // standings/round updates, not be recalculated on empty nightly passes.
+  const awards = pendingMatches.length ? await grantAutomaticAwards(db) : null;
+  // Delete only queue revisions that were processed. Concurrent scoring runs
+  // can update the same queue item without losing the newer dirty marker.
+  for (let index = 0; index < pending.length; index += 100) {
+    const batch = pending.slice(index, index + 100);
+    await db.collection<any>("leaderboardRebuildQueue").deleteMany({
+      $or: batch.map((item) => ({ _id: item._id, updatedAt: item.updatedAt })),
+    });
+  }
+  if (auditMatches.length) {
+    const last = auditMatches[auditMatches.length - 1];
+    await auditCollection.updateOne(
+      { _id: "historical" },
+      { $set: {
+        cursorKickoffAt: last.kickoffAt,
+        cursorMatchId: last.providerMatchId,
+        auditedAt: new Date(),
+        lastBatchCount: auditMatches.length,
+      } },
+      { upsert: true },
+    );
+  }
   return {
     ...scored,
+    auditedMatches: auditMatches.length,
+    auditScoreUpdates: audited.scores,
+    retractedRecent,
+    retractedHistorical,
     leaderboards: rebuilt.leaderboards,
-    roundWinners: 0,
-    awards: null,
+    publications,
+    pendingProcessed: pending.length,
+    fullPublicationRequired,
+    roundWinners,
+    awards,
     recoveryMode: "recent-three-days",
     batchIndex,
     batchSize,

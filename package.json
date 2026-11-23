@@ -41,7 +41,10 @@
     "audit:sportsapi-match-types": "tsx scripts/audit-sportsapi-match-types.ts",
     "explain:performance": "tsx scripts/explain-performance.ts",
     "ensure:performance-indexes": "tsx scripts/ensure-performance-indexes.ts",
-    "measure:performance": "tsx scripts/measure-performance.ts"
+    "measure:performance": "tsx scripts/measure-performance.ts",
+    "rebuild:leaderboard-publications": "tsx scripts/rebuild-leaderboard-publications.ts",
+    "verify:leaderboard-publications": "tsx scripts/verify-leaderboard-publications.ts",
+    "reconcile:global-stats": "tsx scripts/reconcile-global-stats.ts"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.5.0",

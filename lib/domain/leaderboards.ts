@@ -1,5 +1,7 @@
+import { lightweightLeaderboardAvatar } from "@/lib/domain/leaderboardAvatar";
 import { ObjectId, type Db } from "mongodb";
 import { unstable_cache } from "next/cache";
+import { readPublishedLeaderboard, MAX_PUBLISHED_ROWS } from "@/lib/domain/leaderboardPublications";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
@@ -149,7 +151,7 @@ async function getMaterializedLeaderboard(
       : undefined,
     predictions: Number(row.predictions ?? 0),
     username: byId.get(String(row.userId))?.username ?? "LowBlock Player",
-    avatarUrl: byId.get(String(row.userId))?.avatarUrl ?? null,
+    avatarUrl: lightweightLeaderboardAvatar(String(row.userId), byId.get(String(row.userId))?.avatarUrl),
     isDefendingChampion: String(row.userId) === championId,
   }));
 }
@@ -189,8 +191,15 @@ export async function getCanonicalLeaderboard(
     predictions: number;
     userId: string;
   },
+  fresh = false,
 ) {
-  const materialized = await getMaterializedLeaderboard(
+  // Normal requests read a completed, published ranking instead of computing
+  // standings again. Recovery and publication builds explicitly bypass it.
+  if (!fresh) {
+    const published = await readPublishedLeaderboard(db, scope, limit, cursor);
+    if (published !== null) return published;
+  }
+  const materialized = fresh ? null : await getMaterializedLeaderboard(
     db,
     scope,
     limit,
@@ -225,23 +234,12 @@ export async function getCanonicalLeaderboard(
     ? getIranWeeklyPeriod(new Date(), scope.weeklyOffset ?? 0)
     : null;
   const pipeline: any[] = [];
+  // The score ledger already stores the kickoff time. Rejoining every score
+  // to the fixtures collection for a weekly request was unnecessarily costly.
   if (period)
-    pipeline.push(
-      {
-        $lookup: {
-          from: "matches",
-          localField: "matchId",
-          foreignField: "providerMatchId",
-          as: "fixture",
-        },
-      },
-      { $unwind: "$fixture" },
-      {
-        $match: {
-          "fixture.kickoffAt": { $gte: period.start, $lt: period.end },
-        },
-      },
-    );
+    pipeline.push({
+      $match: { kickoffAt: { $gte: period.start, $lt: period.end } },
+    });
   pipeline.push(
     ...(!scope.clubId && !scope.leagueCode && scope.matchday == null
       ? [{ $match: { globalEligible: true } }]
@@ -251,27 +249,6 @@ export async function getCanonicalLeaderboard(
       : !scope.clubId && !scope.leagueCode && !scope.matchday
         ? [{ $match: { leagueCode: { $in: GLOBAL_LEAGUE_CODES } } }]
         : []),
-    {
-      $lookup: {
-        from: "predictions",
-        let: { uid: "$userId", mid: "$matchId" },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $eq: ["$userId", "$$uid"] },
-                  { $eq: ["$matchId", "$$mid"] },
-                ],
-              },
-            },
-          },
-          { $project: { createdAt: 1 } },
-        ],
-        as: "prediction",
-      },
-    },
-    { $unwind: { path: "$prediction", preserveNullAndEmptyArrays: true } },
     { $match: scoreMatch(scope) },
     {
       $group: {
@@ -280,7 +257,7 @@ export async function getCanonicalLeaderboard(
         exact: { $sum: { $cond: ["$exactScore", 1, 0] } },
         correctOutcome: { $sum: { $cond: ["$correctOutcome", 1, 0] } },
         predictions: { $sum: 1 },
-        earliestPredictionAt: { $min: "$prediction.createdAt" },
+        earliestPredictionAt: { $min: "$predictionCreatedAt" },
       },
     },
   );
@@ -351,7 +328,7 @@ export async function getCanonicalLeaderboard(
       : undefined,
     predictions: Number(row.predictions ?? 0),
     username: byId.get(String(row._id))?.username ?? "LowBlock Player",
-    avatarUrl: byId.get(String(row._id))?.avatarUrl ?? null,
+    avatarUrl: lightweightLeaderboardAvatar(String(row._id), byId.get(String(row._id))?.avatarUrl),
     isDefendingChampion: String(row._id) === championId,
   }));
   return attachSubmittedPredictionCounts(db, rankRows(mapped).map((row) => ({
@@ -377,7 +354,7 @@ export async function getCachedCanonicalLeaderboard(
   const cached = unstable_cache(
     () => getCanonicalLeaderboard(db, scope, limit),
     ["canonical-leaderboard-v1", JSON.stringify(scope), String(limit)],
-    { revalidate: 60, tags: ["leaderboards"] },
+    { revalidate: 15, tags: ["leaderboards"] },
   );
   return cached();
 }
@@ -387,6 +364,24 @@ export async function getLeaderboardSummary(
   userId: string,
   scope: LeaderboardScope,
 ) {
+  // The homepage needs one user's position, not a full ranking aggregation
+  // on every visit. Most users can be resolved directly from the publication.
+  const published = await readPublishedLeaderboard(db, scope, MAX_PUBLISHED_ROWS);
+  if (published !== null) {
+    const row = published.find((item) => item.userId === userId);
+    if (row) return {
+      userId,
+      rank: row.rank,
+      points: row.points,
+      exact: row.exact,
+      correctOutcome: row.correctOutcome ?? 0,
+      predictions: row.predictions,
+      scope: "PUBLISHED",
+    };
+    // A complete published table shorter than the cap proves this user has no
+    // scored predictions in this ranking. Only deep ranks need the legacy path.
+    if (published.length < MAX_PUBLISHED_ROWS) return null;
+  }
   const scopeKey = materializedScope(scope);
   if (!scopeKey) {
     const legacy = await getCanonicalLeaderboard(db, scope, 1000);
