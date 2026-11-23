@@ -670,6 +670,74 @@ async function rebuildLeaderboardStatsForUsers(
   return { leaderboards: aggregates.size, scoreRows: scoreRows.length };
 }
 
+/**
+ * Reverse previously credited scores when a provider explicitly changes a
+ * finished fixture back to a non-final state. No provider request is made.
+ * Old scopes are unknown after removal, so request a full publication rebuild
+ * only when a real reversal has occurred.
+ */
+async function retractNonFinalScores(
+  db: Awaited<ReturnType<typeof getDb>>,
+  ids: string[],
+) {
+  const matchIds = [...new Set(ids.map(String).filter(Boolean))];
+  if (!matchIds.length) return { retracted: 0, fixtures: 0 };
+  const invalid = new Set<string>();
+  for (let i = 0; i < matchIds.length; i += 100) {
+    const matches = await db.collection<any>("matches").find(
+      { providerMatchId: { $in: matchIds.slice(i, i + 100) } },
+      { projection: { providerMatchId: 1, status: 1, homeGoals: 1, awayGoals: 1 } },
+    ).toArray();
+    for (const match of matches) {
+      if (match.status !== "FINISHED" ||
+          match.homeGoals == null || match.awayGoals == null) {
+        invalid.add(String(match.providerMatchId));
+      }
+    }
+  }
+  if (!invalid.size) return { retracted: 0, fixtures: 0 };
+  const affectedRows = await db.collection<any>("predictionScores").find(
+    { matchId: { $in: [...invalid] } },
+    { projection: { userId: 1, matchId: 1 } },
+  ).toArray();
+  if (!affectedRows.length) return { retracted: 0, fixtures: 0 };
+  const touchedUsers = [...new Set(affectedRows.map(row => String(row.userId)))];
+  const touchedMatches = [...new Set(affectedRows.map(row => String(row.matchId)))];
+  const updatedAt = new Date();
+  await withMongoTransaction(async (transactionDb, session) => {
+    await transactionDb.collection("predictionScores").deleteMany(
+      { matchId: { $in: touchedMatches } }, { session },
+    );
+    const operations: any[] = [
+      { updateOne: {
+        filter: { _id: "RECONCILE_ALL" },
+        update: { $set: { kind: "ALL", updatedAt } },
+        upsert: true,
+      } },
+      ...touchedUsers.map(userId => ({ updateOne: {
+        filter: { _id: `USER:${userId}` },
+        update: { $set: { kind: "USER", userId, updatedAt } },
+        upsert: true,
+      } })),
+      ...touchedMatches.map(matchId => ({ updateOne: {
+        filter: { _id: `MATCH:${matchId}` },
+        update: { $set: { kind: "MATCH", matchId, updatedAt } },
+        upsert: true,
+      } })),
+    ];
+    for (let i = 0; i < operations.length; i += 100) {
+      await transactionDb.collection<any>("leaderboardRebuildQueue")
+        .bulkWrite(operations.slice(i, i + 100), { ordered: false, session });
+    }
+  });
+  console.info(JSON.stringify({
+    type: "lowblock.scores_retracted",
+    fixtures: touchedMatches.length,
+    scoreRows: affectedRows.length,
+  }));
+  return { retracted: affectedRows.length, fixtures: touchedMatches.length };
+}
+
 export async function runLeaderboardEngine(
   options: {
     recentOnly?: boolean;
@@ -689,9 +757,6 @@ export async function runLeaderboardEngine(
     .find(
       {
         provider: { $in: ["football-api", "sportsapi"] },
-        status: "FINISHED",
-        homeGoals: { $ne: null },
-        awayGoals: { $ne: null },
         kickoffAt: { $gte: since },
       },
       { projection: { providerMatchId: 1 } },
@@ -704,6 +769,9 @@ export async function runLeaderboardEngine(
   const batch = recentMatches.slice(
     batchIndex * batchSize,
     (batchIndex + 1) * batchSize,
+  );
+  const retractedRecent = await retractNonFinalScores(
+    db, batch.map((match) => String(match.providerMatchId)),
   );
   const scored = await runScoreEngine({
     rebuildLeaderboards: false,
@@ -718,9 +786,6 @@ export async function runLeaderboardEngine(
   const auditState = await auditCollection.findOne({ _id: "historical" });
   const auditFilter: any = {
     provider: { $in: ["football-api", "sportsapi"] },
-    status: "FINISHED",
-    homeGoals: { $ne: null },
-    awayGoals: { $ne: null },
     kickoffAt: { $lt: since },
   };
   if (auditState?.cursorKickoffAt && auditState?.cursorMatchId) {
@@ -742,11 +807,11 @@ export async function runLeaderboardEngine(
   if (!auditMatches.length && auditState?.cursorKickoffAt)
     auditMatches = await auditQuery({
       provider: { $in: ["football-api", "sportsapi"] },
-      status: "FINISHED",
-      homeGoals: { $ne: null },
-      awayGoals: { $ne: null },
       kickoffAt: { $lt: since },
     });
+  const retractedHistorical = await retractNonFinalScores(
+    db, auditMatches.map((match) => String(match.providerMatchId)),
+  );
   const audited = auditMatches.length
     ? await runScoreEngine({
         rebuildLeaderboards: false,
@@ -801,6 +866,8 @@ export async function runLeaderboardEngine(
     ...scored,
     auditedMatches: auditMatches.length,
     auditScoreUpdates: audited.scores,
+    retractedRecent,
+    retractedHistorical,
     leaderboards: rebuilt.leaderboards,
     publications,
     pendingProcessed: pending.length,
