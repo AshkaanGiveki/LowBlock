@@ -36,7 +36,8 @@ describe("defending champion", () => {
     };
     expect(await getDefendingChampionUserId(db as any)).toBe("first-week-winner");
     expect(pipeline?.[0]).toMatchObject({ $match: { globalEligible: true } });
-    expect(pipeline?.some((step: any) => step.$lookup)).toBe(false);
+    const observedPipeline: any[] = pipeline || [];
+    expect(observedPipeline.some((step: any) => step.$lookup)).toBe(false);
   });
 
   it("allows a week with no previous winner", async () => {
