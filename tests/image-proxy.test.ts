@@ -98,7 +98,8 @@ describe("player and team image proxy routes", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/png");
-      expect(res.headers.get("Cache-Control")).toContain("public, max-age=2592000");
+      // Team images are intentionally refreshed within a day, unlike player photos.
+      expect(res.headers.get("Cache-Control")).toContain("public, max-age=86400");
     });
   });
 });
