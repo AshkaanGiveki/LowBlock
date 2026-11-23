@@ -4,15 +4,22 @@ import { ArrowLeft, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { getLatestSeasonStartYear } from "@/lib/football/data";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Complete Global Football Prediction Standings",
   description:
     "Detailed LowBlock global standings with predictions, exact scores, correct results, points, averages, rank movement, and awards.",
 };
 
-export default async function GlobalStandingsPage() {
-  const year = await getLatestSeasonStartYear();
+export default async function GlobalStandingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string; week?: string }>;
+}) {
+  const query = await searchParams;
+  const weekly = !query.scope || query.scope === "weekly";
+  const lifetime = query.scope === "lifetime";
+  const year = weekly || lifetime ? null : await getLatestSeasonStartYear();
   return (
     <main className="min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-7xl">
@@ -33,18 +40,26 @@ export default async function GlobalStandingsPage() {
                 COMPLETE STANDINGS
               </p>
               <h1 className="mt-2 text-3xl font-black text-white sm:text-5xl">
-                <T fa="جدول کامل جهانی" en="Complete global standings" />
+                <T
+                  fa={weekly ? "جدول هفتگی جهانی" : lifetime ? "جدول تاریخی جهانی" : "جدول فصل جهانی"}
+                  en={weekly ? "Global weekly standings" : lifetime ? "All-time global standings" : "Global season standings"}
+                />
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/55">
                 <T
-                  fa={`فصل ${year}/${String(year + 1).slice(-2)} · همه جزئیات عملکرد بازیکنان`}
-                  en={`Season ${year}/${String(year + 1).slice(-2)} · every player-performance detail`}
+                  fa={weekly ? "عملکرد بازیکنان در هفته جاری" : lifetime ? "تمام امتیازها و افتخارات تاریخی" : `فصل ${year}/${String(Number(year) + 1).slice(-2)} · جزئیات عملکرد بازیکنان`}
+                  en={weekly ? "Every player's performance this week" : lifetime ? "Career points and historical performance" : `Season ${year}/${String(Number(year) + 1).slice(-2)} · every player's performance`}
                 />
               </p>
             </div>
           </div>
         </section>
-        <DetailedLeaderboard seasonStartYear={year} />
+        <DetailedLeaderboard
+          seasonStartYear={year ?? undefined}
+          weekly={weekly}
+          lifetime={lifetime}
+          weekOffset={weekly && query.week === "previous" ? 1 : 0}
+        />
       </div>
     </main>
   );
