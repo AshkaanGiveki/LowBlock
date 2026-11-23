@@ -872,7 +872,11 @@ export async function runLeaderboardEngine(
     updatedMatchIds: pendingMatches,
     full: fullPublicationRequired,
   });
-  const roundWinners = await rebuildRoundWinners(db, pendingMatches);
+  // If a correction moved a fixture between tournaments/rounds, rebuild
+  // both its former and current award scopes rather than only the new round.
+  const roundWinners = await rebuildRoundWinners(
+    db, fullPublicationRequired ? undefined : pendingMatches,
+  );
   // Awards are idempotent in their own service and should follow complete
   // standings/round updates, not be recalculated on empty nightly passes.
   const awards = pendingMatches.length ? await grantAutomaticAwards(db) : null;
