@@ -50,13 +50,20 @@ export function LeaderboardExplorer({
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const selectionFromState = useRef<LeaderboardSelection>({
+    lifetime, weekly, weekOffset, leagueCode,
+  });
   const requestSerial = useRef(0);
   const localCache = useRef(new Map<string, { at: number; rows: Row[] }>());
   useEffect(() => {
-    setSelection({ lifetime, weekly, weekOffset, leagueCode });
+    const original = { lifetime, weekly, weekOffset, leagueCode };
+    selectionFromState.current = original;
+    setSelection(original);
     setRows(initialRows);
   }, [initialRows, lifetime, weekly, weekOffset, leagueCode]);
   async function change(selection: LeaderboardSelection) {
+    const previousSelection = { ...selectionFromState.current };
+    selectionFromState.current = selection;
     setSelection(selection);
     setError(false);
     const requestId = ++requestSerial.current;
@@ -85,7 +92,11 @@ export function LeaderboardExplorer({
       localCache.current.set(key, { rows: nextRows, at: Date.now() });
       setRows(nextRows);
     } catch {
-      if (requestSerial.current === requestId) setError(true);
+      if (requestSerial.current === requestId) {
+        setError(true);
+        selectionFromState.current = previousSelection;
+        setSelection(previousSelection);
+      }
     } finally {
       if (requestSerial.current === requestId) setLoading(false);
     }
