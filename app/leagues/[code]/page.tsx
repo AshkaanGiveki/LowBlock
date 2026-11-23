@@ -11,9 +11,37 @@ import { LeagueStandings } from "@/components/LeagueStandings";
 import { LeagueLogo } from "@/components/LeagueLogo";
 import { LeaguePageSwitcher } from "@/components/LeaguePageSwitcher";
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { selectActiveRound } from "@/lib/football/rounds";
 
 export const dynamic = "force-dynamic";
+
+// Tournament fixtures and round metadata are the same for every visitor.
+// They can be safely reused, while player identity remains request-specific.
+const getCachedLeagueStructure = unstable_cache(async (code: string) => {
+  const db = await getDb();
+  const latest = await db.collection("matches").findOne(
+    { leagueCode: code },
+    { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } },
+  );
+  const year = Number(latest?.seasonStartYear ?? new Date().getUTCFullYear());
+  const [docs, storedRounds] = await Promise.all([
+    db.collection<any>("matches").find(
+      {
+        leagueCode: code,
+        seasonStartYear: year,
+        matchday: { $gt: 0 },
+        status: { $nin: ["VOID", "CANCELLED"] },
+      },
+      { projection: { matchday: 1, status: 1, kickoffAt: 1 } },
+    ).toArray(),
+    db.collection<any>("rounds")
+      .find({ leagueCode: code, seasonId: String(year) })
+      .sort({ number: 1 })
+      .toArray(),
+  ]);
+  return { year, docs, storedRounds };
+}, ["league-structure-v1"], { revalidate: 20, tags: ["matches", "rounds"] });
 
 export async function generateMetadata({
   params,
@@ -42,34 +70,13 @@ async function LeagueData({
   const { code } = await params;
   const league = getLeague(code);
   if (!league) notFound();
+  const { year, docs, storedRounds } = await getCachedLeagueStructure(code);
   const db = await getDb();
-  const year = Number(
-    (
-      await db
-        .collection("matches")
-        .findOne(
-          { leagueCode: code },
-          { sort: { seasonStartYear: -1 }, projection: { seasonStartYear: 1 } },
-        )
-    )?.seasonStartYear ?? new Date().getUTCFullYear(),
-  );
   const rows = await getCanonicalLeaderboard(
     db,
     { leagueCode: code, seasonStartYear: year },
     100,
   );
-  const docs = await db
-    .collection<any>("matches")
-    .find(
-      {
-        leagueCode: code,
-        seasonStartYear: year,
-        matchday: { $gt: 0 },
-        status: { $nin: ["VOID", "CANCELLED"] },
-      },
-      { projection: { matchday: 1, status: 1, kickoffAt: 1 } },
-    )
-    .toArray();
   const grouped = new Map<
     number,
     {
@@ -108,11 +115,6 @@ async function LeagueData({
     }
     grouped.set(match.matchday, item);
   }
-  const storedRounds = await db
-    .collection<any>("rounds")
-    .find({ leagueCode: code, seasonId: String(year) })
-    .sort({ number: 1 })
-    .toArray();
   const rounds = (
     storedRounds.length
       ? storedRounds.map((round) => ({
