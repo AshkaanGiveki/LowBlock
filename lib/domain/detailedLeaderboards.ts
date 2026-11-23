@@ -1,3 +1,4 @@
+import { lightweightLeaderboardAvatar } from "@/lib/domain/leaderboardAvatar";
 import { ObjectId, type Db } from "mongodb";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import {
@@ -265,7 +266,7 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
     return {
       userId,
       username: userMap.get(userId)?.username ?? "LowBlock Player",
-      avatarUrl: userMap.get(userId)?.avatarUrl ?? null,
+      avatarUrl: lightweightLeaderboardAvatar(userId, userMap.get(userId)?.avatarUrl),
       clubId,
       clubName: clubId ? (clubMap.get(clubId) ?? null) : null,
       predictions,
