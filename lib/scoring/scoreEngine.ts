@@ -674,6 +674,50 @@ export async function runLeaderboardEngine(
     rebuildLeaderboards: false,
     matchIds: batch.map((match) => String(match.providerMatchId)),
   });
+
+  // Bounded rolling audit of older results, using ONLY stored fixtures (no
+  // additional provider quota). Catch older corrections that fall outside the
+  // nightly three-day window without repeatedly rebuilding all history.
+  const auditSize = Math.min(250, Math.max(1, Number(process.env.LEADERBOARD_AUDIT_BATCH_SIZE ?? 100) || 100));
+  const auditCollection = db.collection<any>("leaderboardAuditState");
+  const auditState = await auditCollection.findOne({ _id: "historical" });
+  const auditFilter: any = {
+    provider: { $in: ["football-api", "sportsapi"] },
+    status: "FINISHED",
+    homeGoals: { $ne: null },
+    awayGoals: { $ne: null },
+    kickoffAt: { $lt: since },
+  };
+  if (auditState?.cursorKickoffAt && auditState?.cursorMatchId) {
+    auditFilter.$or = [
+      { kickoffAt: { $gt: auditState.cursorKickoffAt, $lt: since } },
+      {
+        kickoffAt: auditState.cursorKickoffAt,
+        providerMatchId: { $gt: auditState.cursorMatchId },
+      },
+    ];
+  }
+  const auditQuery = (filter: any) =>
+    db.collection<any>("matches")
+      .find(filter, { projection: { providerMatchId: 1, kickoffAt: 1 } })
+      .sort({ kickoffAt: 1, providerMatchId: 1 })
+      .limit(auditSize)
+      .toArray();
+  let auditMatches = await auditQuery(auditFilter);
+  if (!auditMatches.length && auditState?.cursorKickoffAt)
+    auditMatches = await auditQuery({
+      provider: { $in: ["football-api", "sportsapi"] },
+      status: "FINISHED",
+      homeGoals: { $ne: null },
+      awayGoals: { $ne: null },
+      kickoffAt: { $lt: since },
+    });
+  const audited = auditMatches.length
+    ? await runScoreEngine({
+        rebuildLeaderboards: false,
+        matchIds: auditMatches.map((match) => String(match.providerMatchId)),
+      })
+    : { scores: 0 };
   // Retry pending work even when this run finds no changed results.
   const pending = await db.collection<any>("leaderboardRebuildQueue")
     .find({}, { projection: { kind: 1, userId: 1, matchId: 1, updatedAt: 1 } })
@@ -686,6 +730,11 @@ export async function runLeaderboardEngine(
   const pendingMatches = pending
     .filter((item) => item.kind === "MATCH" && item.matchId)
     .map((item) => String(item.matchId));
+  if (pending.length === 10000) {
+    const backlog = await db.collection("leaderboardRebuildQueue").countDocuments();
+    if (backlog > pending.length)
+      throw new Error("LEADERBOARD_REBUILD_BACKLOG: queue exceeds safe atomic publication batch");
+  }
   const rebuilt = await rebuildLeaderboardStatsForUsers(db, pendingUsers);
   const publications = await publishLeaderboardSnapshots(db, {
     updatedMatchIds: pendingMatches,
@@ -698,8 +747,23 @@ export async function runLeaderboardEngine(
       $or: batch.map((item) => ({ _id: item._id, updatedAt: item.updatedAt })),
     });
   }
+  if (auditMatches.length) {
+    const last = auditMatches[auditMatches.length - 1];
+    await auditCollection.updateOne(
+      { _id: "historical" },
+      { $set: {
+        cursorKickoffAt: last.kickoffAt,
+        cursorMatchId: last.providerMatchId,
+        auditedAt: new Date(),
+        lastBatchCount: auditMatches.length,
+      } },
+      { upsert: true },
+    );
+  }
   return {
     ...scored,
+    auditedMatches: auditMatches.length,
+    auditScoreUpdates: audited.scores,
     leaderboards: rebuilt.leaderboards,
     publications,
     pendingProcessed: pending.length,
