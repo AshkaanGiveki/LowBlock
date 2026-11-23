@@ -131,7 +131,7 @@ export function LeaderboardExplorer({
       )}
       <div className="mt-4 flex justify-end">
         <Link
-          href="/lowblock/standings"
+          href={`/lowblock/standings?scope=${selection.weekly ? "weekly" : selection.lifetime ? "lifetime" : "season"}${selection.weekly && selection.weekOffset ? "&week=previous" : ""}`}
           className="rounded-xl border border-brand/30 bg-brand/10 px-4 py-2 text-xs font-black text-brand transition hover:bg-brand/20"
         >
           {selection.weekly
