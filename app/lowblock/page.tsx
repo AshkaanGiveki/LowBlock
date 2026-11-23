@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
-import { getCachedCanonicalLeaderboard } from "@/lib/domain/leaderboards";
+import { getCachedCanonicalLeaderboard, getLeaderboardSummary } from "@/lib/domain/leaderboards";
 import { LeaderboardExplorer } from "@/components/LeaderboardExplorer";
 import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
@@ -46,6 +46,7 @@ async function LowBlockData({
   ]);
 
   const { usersCount, picksCount, roundsCount } = metrics;
+  const myWeeklySummary = me ? await getLeaderboardSummary(db, me, { weekly: true }) : null;
   return (
     <main className="desktop-lowblock-page min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-6xl">
@@ -114,6 +115,7 @@ async function LowBlockData({
             weekly={weekly}
             weekOffset={weekOffset}
             me={me}
+            myWeeklySummary={myWeeklySummary}
           />
         </Suspense>
       </div>
