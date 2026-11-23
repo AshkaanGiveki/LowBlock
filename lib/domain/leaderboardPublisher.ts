@@ -126,12 +126,19 @@ export async function publishLeaderboardSnapshots(
   ]));
 
   const now = new Date();
+  const publicationStartedAt = Date.now();
   const writes: any[] = [];
   for (const [key, scope] of selected) {
     if (scope.clubId && !policies.has(scope.clubId)) continue;
     // Force an authoritative computation; never build a publication by reading
     // an older publication or a partially materialized legacy scope.
     const rows = await getCanonicalLeaderboard(db, scope, MAX_PUBLISHED_ROWS, undefined, true);
+    if (leaderboardPublicationKey(scope) !== key)
+      throw new Error("LEADERBOARD_WEEK_ROLLOVER: retry publication under the new week key");
+    const userIds = new Set(rows.map((row) => String(row.userId)));
+    if (rows.length > MAX_PUBLISHED_ROWS || userIds.size !== rows.length ||
+        rows.some((row) => !Number.isFinite(Number(row.points))))
+      throw new Error(`LEADERBOARD_PUBLICATION_INVALID: ${key}`);
     writes.push({
       updateOne: {
         filter: { _id: key },
@@ -156,13 +163,19 @@ export async function publishLeaderboardSnapshots(
       }
     });
   }
+  const publishedScopes = writes.map((op) => String(op.updateOne.filter._id));
+  const result = {
+    published: writes.length,
+    skipped: keys.length - writes.length,
+    publishedScopes,
+    durationMs: Date.now() - publicationStartedAt,
+  };
   console.info(JSON.stringify({
     type: "lowblock.leaderboard_publication",
     mode: full ? "full" : "incremental",
     changedMatchCount: matchIds.length,
-    published: writes.length,
-    skipped: keys.length - writes.length,
+    ...result,
     at: now.toISOString(),
   }));
-  return { published: writes.length, skipped: keys.length - writes.length };
+  return result;
 }
