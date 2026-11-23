@@ -14,6 +14,7 @@ import {
   isFeaturedFixture,
 } from "@/lib/football/leagues";
 import { writeRankSnapshots } from "@/lib/domain/rankSnapshots";
+import { publishLeaderboardSnapshots } from "@/lib/domain/leaderboardPublisher";
 
 type Match = {
   _id?: unknown;
@@ -427,6 +428,29 @@ export async function runScoreEngine(
         .collection("leaderboardStats")
         .deleteMany({ userId: { $in: touchedUsers } }, { session });
     for (const chunk of rebuildLeaderboards ? chunks(statOps) : []) await transactionDb.collection("leaderboardStats").bulkWrite(chunk, { ordered: false, session });
+    // A crash after scoring but before rebuilding standings must not lose the
+    // update. Persist a retryable dirty queue in the SAME score transaction.
+    if (!rebuildLeaderboards) {
+      const dirtyOps = [
+        ...touchedUsers.map((userId) => ({
+          updateOne: {
+            filter: { _id: `USER:${userId}` },
+            update: { $set: { kind: "USER", userId, updatedAt: now } },
+            upsert: true,
+          },
+        })),
+        ...updatedMatchIds.map((matchId) => ({
+          updateOne: {
+            filter: { _id: `MATCH:${matchId}` },
+            update: { $set: { kind: "MATCH", matchId, updatedAt: now } },
+            upsert: true,
+          },
+        })),
+      ];
+      for (const chunk of chunks(dirtyOps))
+        await transactionDb.collection<any>("leaderboardRebuildQueue")
+          .bulkWrite(chunk, { ordered: false, session });
+    }
   });
   if (!rebuildLeaderboards)
     return {
@@ -451,6 +475,7 @@ export async function runScoreEngine(
   );
   const roundWinners = await rebuildRoundWinners(db);
   const awards = await grantAutomaticAwards(db);
+  const publications = await publishLeaderboardSnapshots(db, { full: true });
   return {
     matches: matches.length,
     scores: scoreOps.length,
@@ -459,6 +484,7 @@ export async function runScoreEngine(
     updatedMatchIds,
     roundWinners,
     awards,
+    publications,
   };
 }
 
@@ -648,13 +674,35 @@ export async function runLeaderboardEngine(
     rebuildLeaderboards: false,
     matchIds: batch.map((match) => String(match.providerMatchId)),
   });
-  const rebuilt = await rebuildLeaderboardStatsForUsers(
-    db,
-    scored.touchedUsers ?? [],
-  );
+  // Retry pending work even when this run finds no changed results.
+  const pending = await db.collection<any>("leaderboardRebuildQueue")
+    .find({}, { projection: { kind: 1, userId: 1, matchId: 1, updatedAt: 1 } })
+    .sort({ updatedAt: 1 })
+    .limit(10000)
+    .toArray();
+  const pendingUsers = pending
+    .filter((item) => item.kind === "USER" && item.userId)
+    .map((item) => String(item.userId));
+  const pendingMatches = pending
+    .filter((item) => item.kind === "MATCH" && item.matchId)
+    .map((item) => String(item.matchId));
+  const rebuilt = await rebuildLeaderboardStatsForUsers(db, pendingUsers);
+  const publications = await publishLeaderboardSnapshots(db, {
+    updatedMatchIds: pendingMatches,
+  });
+  // Delete only queue revisions that were processed. Concurrent scoring runs
+  // can update the same queue item without losing the newer dirty marker.
+  for (let index = 0; index < pending.length; index += 100) {
+    const batch = pending.slice(index, index + 100);
+    await db.collection<any>("leaderboardRebuildQueue").deleteMany({
+      $or: batch.map((item) => ({ _id: item._id, updatedAt: item.updatedAt })),
+    });
+  }
   return {
     ...scored,
     leaderboards: rebuilt.leaderboards,
+    publications,
+    pendingProcessed: pending.length,
     roundWinners: 0,
     awards: null,
     recoveryMode: "recent-three-days",
