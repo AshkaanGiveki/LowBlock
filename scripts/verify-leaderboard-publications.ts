@@ -8,6 +8,16 @@ import { leaderboardPublicationKey, MAX_PUBLISHED_ROWS } from "../lib/domain/lea
  */
 async function main() {
   const db = await getDb();
+  const pending = await db.collection("leaderboardRebuildQueue").countDocuments();
+  if (pending > 0 && !process.argv.includes("--allow-pending")) {
+    console.error(JSON.stringify({
+      type: "lowblock.leaderboard_reconciliation",
+      status: "BLOCKED_PENDING_UPDATES",
+      pending,
+    }));
+    process.exitCode = 2;
+    return;
+  }
   const scopes: LeaderboardScope[] = [
     { weekly: true },
     { weekly: true, weeklyOffset: 1 },
@@ -67,6 +77,7 @@ async function main() {
     type: "lowblock.leaderboard_reconciliation",
     checked: scopes.length,
     verified,
+    pending,
     failures,
     at: new Date().toISOString(),
   }, null, 2));
