@@ -258,6 +258,23 @@ export async function runScoreEngine(
       new Date(prior.kickoffAt).getTime() !== new Date(match.kickoffAt).getTime();
   });
   const updatedMatchIds = [...new Set(scoredPredictions.map((prediction) => prediction.matchId))];
+  // Tournament, membership, year, or global-eligibility corrections affect
+  // the *old* as well as the new ranking. Trigger a full publication rather
+  // than leaving obsolete totals in a former scope.
+  const structuralRebuildRequired = !rebuildLeaderboards && scoredPredictions.some((prediction) => {
+    const previous = previousScores.get(`${prediction.userId}:${prediction.matchId}`);
+    if (!previous) return false;
+    const match = byMatch.get(prediction.matchId)!;
+    const currentGlobal = isGlobalCompetition(match.leagueCode) &&
+      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
+        match.leagueCode === "NATIONS" ||
+        isFeaturedFixture(match.leagueCode, match.homeTeam.name, match.awayTeam.name));
+    const currentClub = snapshots.get(`${prediction.userId}:${prediction.matchId}`)?.clubIdAtLock ?? null;
+    return previous.leagueCode !== match.leagueCode ||
+      Number(previous.seasonStartYear) !== match.seasonStartYear ||
+      Boolean(previous.globalEligible) !== currentGlobal ||
+      String(previous.clubIdAtLock ?? "") !== String(currentClub ?? "");
+  });
   // Most nightly syncs find unchanged finished results. Avoid opening a
   // transaction or constructing aggregate maps when there are no score deltas.
   if (!rebuildLeaderboards && scoredPredictions.length === 0)
@@ -443,6 +460,13 @@ export async function runScoreEngine(
     // update. Persist a retryable dirty queue in the SAME score transaction.
     if (!rebuildLeaderboards) {
       const dirtyOps = [
+        ...(structuralRebuildRequired ? [{
+          updateOne: {
+            filter: { _id: "RECONCILE_ALL" },
+            update: { $set: { kind: "ALL", updatedAt: now } },
+            upsert: true,
+          },
+        }] : []),
         ...touchedUsers.map((userId) => ({
           updateOne: {
             filter: { _id: `USER:${userId}` },
@@ -741,6 +765,7 @@ export async function runLeaderboardEngine(
   const pendingMatches = pending
     .filter((item) => item.kind === "MATCH" && item.matchId)
     .map((item) => String(item.matchId));
+  const fullPublicationRequired = pending.some((item) => item.kind === "ALL");
   if (pending.length === 10000) {
     const backlog = await db.collection("leaderboardRebuildQueue").countDocuments();
     if (backlog > pending.length)
@@ -749,6 +774,7 @@ export async function runLeaderboardEngine(
   const rebuilt = await rebuildLeaderboardStatsForUsers(db, pendingUsers);
   const publications = await publishLeaderboardSnapshots(db, {
     updatedMatchIds: pendingMatches,
+    full: fullPublicationRequired,
   });
   // Delete only queue revisions that were processed. Concurrent scoring runs
   // can update the same queue item without losing the newer dirty marker.
@@ -778,6 +804,7 @@ export async function runLeaderboardEngine(
     leaderboards: rebuilt.leaderboards,
     publications,
     pendingProcessed: pending.length,
+    fullPublicationRequired,
     roundWinners: 0,
     awards: null,
     recoveryMode: "recent-three-days",
