@@ -151,7 +151,7 @@ export async function workerStatus() {
   const heartbeat = await db.collection("workerHeartbeats").findOne({ worker: "lowblock" });
   const [leaderboardPendingCount, latestLeaderboardPublication] = await Promise.all([
     db.collection("leaderboardRebuildQueue").countDocuments(),
-    db.collection("leaderboardPublications").findOne(
+    db.collection<any>("leaderboardPublications").findOne(
       { _id: "GLOBAL:HISTORY" },
       { projection: { _id: 1, publishedAt: 1, rowLimit: 1, version: 1 } },
     ),
