@@ -98,7 +98,7 @@ describe("sportsapi normalizer", () => {
     expect(normalizeSportsApiMatch(unmappedEvent)).toBeNull();
   });
 
-  it("filters international fixtures unless one side is an important national team", () => {
+  it("keeps all Nations League fixtures while filtering other international matches by featured teams", () => {
     const base = {
       ...sampleRawEvent,
       tournament: {
@@ -108,7 +108,8 @@ describe("sportsapi normalizer", () => {
       homeTeam: { id: 1, name: "Luxembourg" },
       awayTeam: { id: 2, name: "Faroe Islands" },
     };
-    expect(normalizeSportsApiMatch(base)).toBeNull();
+    expect(normalizeSportsApiMatch(base)).not.toBeNull();
+    expect(normalizeSportsApiMatch({ ...base, tournament: { uniqueTournament: { id: 851, name: "International Friendlies" }, category: { name: "World" } } })).toBeNull();
     expect(
       normalizeSportsApiMatch({
         ...base,
