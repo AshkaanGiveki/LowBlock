@@ -9,6 +9,7 @@ import {
 import { DEFAULT_CLUB_LEAGUE_CODES } from "@/lib/football/leagues";
 
 type ScoredFixture = {
+  matchId?: string;
   userId?: string;
   leagueCode?: string;
   seasonStartYear?: number;
@@ -96,7 +97,7 @@ export async function publishLeaderboardSnapshots(
 
   const keys = [...targets.keys()];
   if (!keys.length) return { published: 0, skipped: 0 };
-  const existing = await db.collection("leaderboardPublications")
+  const existing = await db.collection<any>("leaderboardPublications")
     .find({ _id: { $in: keys } }, { projection: { _id: 1 } }).toArray();
   const existingKeys = new Set(existing.map((doc) => String(doc._id)));
   const affectedGlobal = full || changedScores.some((row) => row.globalEligible);
@@ -150,7 +151,7 @@ export async function publishLeaderboardSnapshots(
   if (writes.length) {
     await withMongoTransaction(async (transactionDb, session) => {
       for (let index = 0; index < writes.length; index += 25) {
-        await transactionDb.collection("leaderboardPublications")
+        await transactionDb.collection<any>("leaderboardPublications")
           .bulkWrite(writes.slice(index, index + 25), { ordered: false, session });
       }
     });
