@@ -414,7 +414,8 @@ const byAlias = new Map<string, CompetitionMappingEntry>();
 for (const entry of COMPETITION_MAPPINGS) {
   byCode.set(entry.code, entry);
   byUniqueTournamentId.set(entry.sportsApiUniqueTournamentId, entry);
-  byApiSportsId.set(entry.apiSportsId, entry);
+  // Zero denotes an unavailable API-Sports mapping; never register it as a valid ID.
+  if (entry.apiSportsId > 0) byApiSportsId.set(entry.apiSportsId, entry);
   for (const slug of entry.slugs) {
     bySlug.set(slug.toLowerCase(), entry);
   }
@@ -536,7 +537,8 @@ export function getSportsApiUniqueTournamentId(code: string): number | null {
  * Maps an internal leagueCode to API-Sports apiLeagueId.
  */
 export function getApiSportsId(code: string): number | null {
-  return byCode.get(code)?.apiSportsId ?? null;
+  const id = byCode.get(code)?.apiSportsId;
+  return id && id > 0 ? id : null;
 }
 
 /**
