@@ -1,3 +1,4 @@
+import { lightweightLeaderboardAvatar } from "@/lib/domain/leaderboardAvatar";
 import { ObjectId, type Db } from "mongodb";
 import { unstable_cache } from "next/cache";
 import { readPublishedLeaderboard, MAX_PUBLISHED_ROWS } from "@/lib/domain/leaderboardPublications";
@@ -150,7 +151,7 @@ async function getMaterializedLeaderboard(
       : undefined,
     predictions: Number(row.predictions ?? 0),
     username: byId.get(String(row.userId))?.username ?? "LowBlock Player",
-    avatarUrl: byId.get(String(row.userId))?.avatarUrl ?? null,
+    avatarUrl: lightweightLeaderboardAvatar(String(row.userId), byId.get(String(row.userId))?.avatarUrl),
     isDefendingChampion: String(row.userId) === championId,
   }));
 }
@@ -327,7 +328,7 @@ export async function getCanonicalLeaderboard(
       : undefined,
     predictions: Number(row.predictions ?? 0),
     username: byId.get(String(row._id))?.username ?? "LowBlock Player",
-    avatarUrl: byId.get(String(row._id))?.avatarUrl ?? null,
+    avatarUrl: lightweightLeaderboardAvatar(String(row._id), byId.get(String(row._id))?.avatarUrl),
     isDefendingChampion: String(row._id) === championId,
   }));
   return attachSubmittedPredictionCounts(db, rankRows(mapped).map((row) => ({
