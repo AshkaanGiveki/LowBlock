@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { unstable_cache } from "next/cache";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { getCachedCanonicalLeaderboard } from "@/lib/domain/leaderboards";
@@ -7,6 +6,7 @@ import { LeaderboardExplorer } from "@/components/LeaderboardExplorer";
 import { T } from "@/components/LanguageProvider";
 import { LEAGUES } from "@/lib/football/leagues";
 import { getLatestSeasonStartYear } from "@/lib/football/data";
+import { getCachedLeaderboardCounters } from "@/lib/domain/leaderboardCounters";
 import { BarChart3, Sparkles, Trophy, Users } from "lucide-react";
 
 export const metadata = {
@@ -17,18 +17,6 @@ export const metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-// Public counters are informational, not a reason to query three collections
-// on every leaderboard visit. The ranking data itself is separately published.
-const getCachedLeaderboardCounters = unstable_cache(async () => {
-  const db = await getDb();
-  const [usersCount, picksCount, roundsCount] = await Promise.all([
-    db.collection("users").countDocuments(),
-    db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
-    db.collection("rounds").countDocuments({ status: "FINAL" }),
-  ]);
-  return { usersCount, picksCount, roundsCount };
-}, ["lowblock-leaderboard-counters-v1"], { revalidate: 120 });
 
 async function LowBlockData({
   searchParams,
