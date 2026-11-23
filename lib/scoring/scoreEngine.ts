@@ -814,7 +814,11 @@ export async function runLeaderboardEngine(
   // nightly three-day window without repeatedly rebuilding all history.
   const auditSize = Math.min(250, Math.max(1, Number(process.env.LEADERBOARD_AUDIT_BATCH_SIZE ?? 100) || 100));
   const auditCollection = db.collection<any>("leaderboardAuditState");
-  const auditState = await auditCollection.findOne({ _id: "historical" });
+  // The worker can process many batches per sync job. Audit older fixtures
+  // once per sync cycle, never once per small recent-results batch.
+  const auditState = batchIndex === 0
+    ? await auditCollection.findOne({ _id: "historical" })
+    : null;
   const auditFilter: any = {
     provider: { $in: ["football-api", "sportsapi"] },
     kickoffAt: { $lt: since },
@@ -834,7 +838,7 @@ export async function runLeaderboardEngine(
       .sort({ kickoffAt: 1, providerMatchId: 1 })
       .limit(auditSize)
       .toArray();
-  let auditMatches = await auditQuery(auditFilter);
+  let auditMatches = batchIndex === 0 ? await auditQuery(auditFilter) : [];
   if (!auditMatches.length && auditState?.cursorKickoffAt)
     auditMatches = await auditQuery({
       provider: { $in: ["football-api", "sportsapi"] },
