@@ -178,9 +178,9 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
     ...(scope.clubId ? { clubIdAtLock: scope.clubId } : {}),
     ...(scope.clubId
       ? { leagueCode: matchFilter.leagueCode }
-      : { leagueCode: GLOBAL_LEAGUE_CODES }),
+      : { globalEligible: true }),
   };
-  let rows = await db
+  const rows = await db
     .collection<any>("predictionScores")
     .aggregate([
       { $match: directScoreMatch },
@@ -195,31 +195,6 @@ async function aggregateRows(db: Db, scope: DetailedScope, cutoff: Date) {
       },
     ])
     .toArray();
-  if (!rows.length)
-    rows = await db
-      .collection<any>("predictionScores")
-      .aggregate([
-        {
-          $lookup: {
-            from: "matches",
-            localField: "matchId",
-            foreignField: "providerMatchId",
-            as: "fixture",
-          },
-        },
-        { $unwind: "$fixture" },
-        { $match: match },
-        {
-          $group: {
-            _id: "$userId",
-            points: { $sum: "$points" },
-            predictions: { $sum: 1 },
-            exact: { $sum: { $cond: ["$exactScore", 1, 0] } },
-            correct: { $sum: { $cond: ["$correctOutcome", 1, 0] } },
-          },
-        },
-      ])
-      .toArray();
   const ids = rows.map((row) => String(row._id));
   if (!ids.length)
     return [] as Array<
