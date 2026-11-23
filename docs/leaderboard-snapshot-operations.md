@@ -9,7 +9,8 @@ This document describes the proposed snapshot pipeline. It is isolated on this b
 3. Score changes and pending **USER** / **MATCH** rebuild markers are written in the same MongoDB transaction.
 4. On each run, pending users are reconciled from the authoritative `predictionScores` ledger; the publisher then computes affected standings and atomically publishes their top 100 rows in `leaderboardPublications`.
 5. Queue markers are deleted **only after** the rank aggregates and publications succeed. In the event of a crash, the next run can replay the remaining markers.
-6. A rotating daily audit checks up to 100 older, already stored finished fixtures for scoring corrections without new football-provider requests.
+6. A rotating daily audit checks up to 100 older, already stored fixtures for scoring corrections without new football-provider requests. If a previously scored fixture becomes non-final, its credited score rows are retracted transactionally and all affected scopes are reconciled.
+7. After successful publication, only affected final-round winner tables and related automatic award checks are refreshed before queued work is acknowledged.
 
 ### Exactly which ranking scopes are refreshed?
 
@@ -68,7 +69,8 @@ Never discard `predictionScores` or lifetime totals while deploying a ranking ca
 - The first snapshot build can be expensive. Run once outside peak traffic; the daily path should only rebuild affected scopes.
 - A weekly period rollover creates a new scope key rather than modifying the prior period's identity.
 - The historical audit checks **stored** fixtures and detects score disagreements with those stored fixture results. It cannot detect provider corrections never fetched into the local fixture database. Add a separate bounded provider correction pass where the provider supports one.
-- The historical audit currently filters `FINISHED` fixtures. A result later changed to void/cancelled requires a dedicated score-retraction policy and verification.
+- The historical audit now includes non-final fixtures and retracts previously credited scores when an already stored fixture becomes non-final. Tests against real fixture status transitions are still required before rollout.
+- Automatic award *grants* are recalculated after affected results. Historical award revocation after a provider correction needs a separate explicit policy, since permanent trophies should not be deleted silently.
 - Club selection updates currently recompute affected club history using present eligibility rules, matching the existing implementation. If rules must apply only prospectively, preserve and enforce eligibility snapshots per competition and change version.
 - Previous week's scores, rankings, ties, and winner awards must be verified against legacy code before rollout. Existing Friday UTC boundary semantics were not changed here.
 - There is no production database latency benchmark or live reconciliation yet.
