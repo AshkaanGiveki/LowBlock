@@ -105,6 +105,17 @@ export async function runScoreEngine(
     ...new Set((options.matchIds ?? []).map(String).filter(Boolean)),
   ];
   const db = await getDb();
+  // An explicitly empty match batch means no work. Without this guard an
+  // empty recent-sync batch would accidentally rescore the entire database.
+  if (options.matchIds && requestedMatchIds.length === 0)
+    return {
+      matches: 0,
+      scores: 0,
+      leaderboards: 0,
+      touchedUsers: [] as string[],
+      updatedMatchIds: [] as string[],
+      awards: null,
+    };
   const matches = await db
     .collection<Match>("matches")
     .find({
@@ -123,6 +134,7 @@ export async function runScoreEngine(
       scores: 0,
       leaderboards: 0,
       touchedUsers: [] as string[],
+      updatedMatchIds: [] as string[],
       awards: rebuildLeaderboards ? await grantAutomaticAwards(db) : null,
     };
   const byMatch = new Map(
@@ -200,7 +212,52 @@ export async function runScoreEngine(
         : DEFAULT_CLUB_LEAGUE_CODES,
     ]),
   );
-  const scoreOps = predictions.map((prediction) => {
+  // The normal nightly run sees the same finished fixtures for several days.
+  // Only write a score when its stored result/eligibility actually changed.
+  // Explicit full rebuilds retain the original all-predictions behavior.
+  const previousScores = new Map<string, any>();
+  if (!rebuildLeaderboards) {
+    for (let index = 0; index < matchIds.length; index += 100) {
+      const rows = await db.collection<any>("predictionScores")
+        .find(
+          { matchId: { $in: matchIds.slice(index, index + 100) } },
+          { projection: {
+            userId: 1, matchId: 1, points: 1, category: 1,
+            actualHomeGoals: 1, actualAwayGoals: 1, globalEligible: 1,
+            clubIdAtLock: 1, seasonStartYear: 1, leagueCode: 1,
+            matchday: 1, kickoffAt: 1, scoringVersion: 1,
+          } },
+        ).toArray();
+      for (const row of rows)
+        previousScores.set(`${String(row.userId)}:${String(row.matchId)}`, row);
+    }
+  }
+  const scoredPredictions = rebuildLeaderboards ? predictions : predictions.filter((prediction) => {
+    const match = byMatch.get(prediction.matchId)!;
+    const prior = previousScores.get(`${prediction.userId}:${prediction.matchId}`);
+    if (!prior) return true;
+    const score = calculatePredictionScore(
+      prediction.homeGoals, prediction.awayGoals, match.homeGoals, match.awayGoals,
+    );
+    const globalEligible = isGlobalCompetition(match.leagueCode) &&
+      (getLeague(match.leagueCode)?.kind !== "INTERNATIONAL" ||
+        match.leagueCode === "NATIONS" ||
+        isFeaturedFixture(match.leagueCode, match.homeTeam.name, match.awayTeam.name));
+    const lockedClub = snapshots.get(`${prediction.userId}:${prediction.matchId}`)?.clubIdAtLock ?? null;
+    return prior.scoringVersion !== SCORING_VERSION ||
+      Number(prior.points) !== score.points ||
+      prior.category !== score.category ||
+      Number(prior.actualHomeGoals) !== match.homeGoals ||
+      Number(prior.actualAwayGoals) !== match.awayGoals ||
+      Boolean(prior.globalEligible) !== globalEligible ||
+      String(prior.clubIdAtLock ?? "") !== String(lockedClub ?? "") ||
+      prior.leagueCode !== match.leagueCode ||
+      Number(prior.seasonStartYear) !== match.seasonStartYear ||
+      Number(prior.matchday) !== match.matchday ||
+      new Date(prior.kickoffAt).getTime() !== new Date(match.kickoffAt).getTime();
+  });
+  const updatedMatchIds = [...new Set(scoredPredictions.map((prediction) => prediction.matchId))];
+  const scoreOps = scoredPredictions.map((prediction) => {
     const match = byMatch.get(prediction.matchId)!;
     const globalEligible =
       isGlobalCompetition(match.leagueCode) &&
@@ -270,7 +327,7 @@ export async function runScoreEngine(
       earliestPredictionAt?: Date;
     }
   >();
-  for (const prediction of predictions) {
+  for (const prediction of scoredPredictions) {
     const match = byMatch.get(prediction.matchId)!;
     const globalEligible =
       isGlobalCompetition(match.leagueCode) &&
@@ -377,6 +434,7 @@ export async function runScoreEngine(
       scores: scoreOps.length,
       leaderboards: 0,
       touchedUsers,
+      updatedMatchIds,
       awards: null,
     };
   await writeRankSnapshots(
@@ -398,6 +456,7 @@ export async function runScoreEngine(
     scores: scoreOps.length,
     leaderboards: aggregates.size,
     touchedUsers,
+    updatedMatchIds,
     roundWinners,
     awards,
   };
