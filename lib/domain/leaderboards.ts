@@ -1,6 +1,6 @@
 import { ObjectId, type Db } from "mongodb";
 import { unstable_cache } from "next/cache";
-import { readPublishedLeaderboard } from "@/lib/domain/leaderboardPublications";
+import { readPublishedLeaderboard, MAX_PUBLISHED_ROWS } from "@/lib/domain/leaderboardPublications";
 import { rankRows, type Rankable } from "@/lib/domain/ranking";
 import { getIranWeeklyPeriod } from "@/lib/domain/leaderboardPeriods";
 import { getDefendingChampionUserId } from "@/lib/awards/defendingChampion";
@@ -363,6 +363,24 @@ export async function getLeaderboardSummary(
   userId: string,
   scope: LeaderboardScope,
 ) {
+  // The homepage needs one user's position, not a full ranking aggregation
+  // on every visit. Most users can be resolved directly from the publication.
+  const published = await readPublishedLeaderboard(db, scope, MAX_PUBLISHED_ROWS);
+  if (published !== null) {
+    const row = published.find((item) => item.userId === userId);
+    if (row) return {
+      userId,
+      rank: row.rank,
+      points: row.points,
+      exact: row.exact,
+      correctOutcome: row.correctOutcome ?? 0,
+      predictions: row.predictions,
+      scope: "PUBLISHED",
+    };
+    // A complete published table shorter than the cap proves this user has no
+    // scored predictions in this ranking. Only deep ranks need the legacy path.
+    if (published.length < MAX_PUBLISHED_ROWS) return null;
+  }
   const scopeKey = materializedScope(scope);
   if (!scopeKey) {
     const legacy = await getCanonicalLeaderboard(db, scope, 1000);
