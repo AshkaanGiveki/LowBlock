@@ -47,19 +47,25 @@ async function main() {
 
   let verified = 0;
   const failures: string[] = [];
+  const timings: Array<{ scope: string; publishedReadMs: number; canonicalMs: number }> = [];
   for (const scope of scopes) {
     const key = leaderboardPublicationKey(scope);
     if (!key) continue;
+    const publishedStart = performance.now();
     const published = await db.collection<any>("leaderboardPublications").findOne(
       { _id: key }, { projection: { rows: 1, publishedAt: 1 } },
     );
+    const publishedReadMs = Math.round((performance.now() - publishedStart) * 100) / 100;
     if (!published || !Array.isArray(published.rows)) {
       failures.push(`${key}: missing snapshot`);
       continue;
     }
+    const canonicalStart = performance.now();
     const canonical = await getCanonicalLeaderboard(
       db, scope, MAX_PUBLISHED_ROWS, undefined, true,
     );
+    const canonicalMs = Math.round((performance.now() - canonicalStart) * 100) / 100;
+    timings.push({ scope: key, publishedReadMs, canonicalMs });
     const rows = published.rows as Array<any>;
     if (rows.length !== canonical.length) {
       failures.push(`${key}: length ${rows.length} != ${canonical.length}`);
@@ -78,6 +84,7 @@ async function main() {
     checked: scopes.length,
     verified,
     pending,
+    timings,
     failures,
     at: new Date().toISOString(),
   }, null, 2));
