@@ -183,6 +183,7 @@ export async function publishLeaderboardSnapshots(
         update: {
           $set: {
             rows,
+            scope,
             rowLimit: MAX_PUBLISHED_ROWS,
             policyKey: scope.clubId ? policies.get(scope.clubId) : null,
             publishedAt: now,
