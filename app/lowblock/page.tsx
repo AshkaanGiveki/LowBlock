@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { currentUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/mongo";
 import { getCachedCanonicalLeaderboard } from "@/lib/domain/leaderboards";
@@ -17,19 +18,31 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+// Public counters are informational, not a reason to query three collections
+// on every leaderboard visit. The ranking data itself is separately published.
+const getCachedLeaderboardCounters = unstable_cache(async () => {
+  const db = await getDb();
+  const [usersCount, picksCount, roundsCount] = await Promise.all([
+    db.collection("users").countDocuments(),
+    db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
+    db.collection("rounds").countDocuments({ status: "FINAL" }),
+  ]);
+  return { usersCount, picksCount, roundsCount };
+}, ["lowblock-leaderboard-counters-v1"], { revalidate: 120 });
+
 async function LowBlockData({
   searchParams,
 }: {
   searchParams: Promise<{ scope?: string; league?: string; week?: string }>;
 }) {
   const query = await searchParams;
-  const weekly = query.scope === "weekly";
+  const weekly = !query.scope || query.scope === "weekly";
   const weekOffset = weekly && query.week === "previous" ? 1 : 0;
   const lifetime = query.scope === "lifetime";
   const league = LEAGUES.find((item) => item.code === query.league);
   const db = await getDb();
   const year = await getLatestSeasonStartYear();
-  const [rows, usersCount, picksCount, roundsCount, me] = await Promise.all([
+  const [rows, metrics, me] = await Promise.all([
     getCachedCanonicalLeaderboard(
       db,
       {
@@ -40,12 +53,11 @@ async function LowBlockData({
       },
       20,
     ),
-    db.collection("users").countDocuments(),
-    db.collection("predictions").countDocuments({ userId: { $ne: "guest" } }),
-    db.collection("rounds").countDocuments({ status: "FINAL" }),
+    getCachedLeaderboardCounters(),
     currentUserId(),
   ]);
 
+  const { usersCount, picksCount, roundsCount } = metrics;
   return (
     <main className="desktop-lowblock-page min-h-screen px-4 pb-28 pt-24 md:px-8 md:pt-32">
       <div className="mx-auto max-w-6xl">
@@ -63,12 +75,16 @@ async function LowBlockData({
                 fa={
                   lifetime
                     ? "از آغاز تا امروز"
-                    : `فصل ${year}/${String(year + 1).slice(-2)}`
+                    : weekly
+                      ? "این هفته، فرصتی تازه برای همه"
+                      : `فصل ${year}/${String(year + 1).slice(-2)}`
                 }
                 en={
                   lifetime
                     ? "From the beginning"
-                    : `Season ${year}/${String(year + 1).slice(-2)}`
+                    : weekly
+                      ? "A fresh competition for everyone, every week"
+                      : `Season ${year}/${String(year + 1).slice(-2)}`
                 }
               />
             </p>
