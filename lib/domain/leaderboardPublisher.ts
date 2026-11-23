@@ -74,6 +74,41 @@ export async function publishLeaderboardSnapshots(
       if (club._id && ObjectId.isValid(String(club._id))) clubs.add(String(club._id));
   }
 
+  // Club rules can change without any match being scored. Inspect only
+  // published club histories for a policy mismatch, then rebuild the affected
+  // club scopes on the next worker pass (never on a visitor's request).
+  const allClubConfigs = await db.collection<any>("clubs").find(
+    {}, { projection: { _id: 1, leaderboardCompetitionCodes: 1 } },
+  ).toArray();
+  const historyKeys = allClubConfigs.map((club) => `CLUB:${String(club._id)}:HISTORY`);
+  const publishedHistories = historyKeys.length
+    ? await db.collection<any>("leaderboardPublications").find(
+        { _id: { $in: historyKeys } },
+        { projection: { _id: 1, policyKey: 1 } },
+      ).toArray()
+    : [];
+  const historyPolicyByKey = new Map(publishedHistories.map((doc) => [String(doc._id), doc.policyKey]));
+  const policyChangedClubs = new Set<string>();
+  for (const club of allClubConfigs) {
+    const id = String(club._id);
+    if (!ObjectId.isValid(id)) continue;
+    const prior = historyPolicyByKey.get(`CLUB:${id}:HISTORY`);
+    if (prior === undefined) continue; // Unpublished clubs bootstrap with first scored result.
+    const actualPolicy = clubPublicationPolicy(
+      Array.isArray(club.leaderboardCompetitionCodes)
+        ? club.leaderboardCompetitionCodes : DEFAULT_CLUB_LEAGUE_CODES,
+    );
+    if (prior !== actualPolicy) {
+      policyChangedClubs.add(id);
+      clubs.add(id);
+      const clubYears = await db.collection("predictionScores").distinct(
+        "seasonStartYear", { clubIdAtLock: id },
+      );
+      for (const year of clubYears)
+        if (Number.isFinite(Number(year))) years.add(Number(year));
+    }
+  }
+
   // These two are always needed: a new week can start with no scored games.
   add({ weekly: true });
   add({ weekly: true, weeklyOffset: 1 });
@@ -101,7 +136,10 @@ export async function publishLeaderboardSnapshots(
     .find({ _id: { $in: keys } }, { projection: { _id: 1 } }).toArray();
   const existingKeys = new Set(existing.map((doc) => String(doc._id)));
   const affectedGlobal = full || changedScores.some((row) => row.globalEligible);
-  const changedClubIds = new Set(changedScores.map((r) => String(r.clubIdAtLock ?? "")));
+  const changedClubIds = new Set([
+    ...changedScores.map((r) => String(r.clubIdAtLock ?? "")),
+    ...policyChangedClubs,
+  ]);
   const changedEditions = new Set(changedScores
     .filter((r) => r.leagueCode && r.seasonStartYear != null)
     .map((r) => `${r.leagueCode}:${r.seasonStartYear}`));
@@ -174,6 +212,7 @@ export async function publishLeaderboardSnapshots(
     type: "lowblock.leaderboard_publication",
     mode: full ? "full" : "incremental",
     changedMatchCount: matchIds.length,
+    clubPoliciesChanged: policyChangedClubs.size,
     ...result,
     at: now.toISOString(),
   }));
