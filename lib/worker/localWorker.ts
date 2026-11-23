@@ -149,6 +149,13 @@ export async function workerStatus() {
   const latestDailyRun = await db.collection("workerRuns").findOne({ runKey: { $regex: /^daily-football:/ } }, { sort: { updatedAt: -1 } });
   const latestSync = await db.collection("syncRuns").findOne({}, { sort: { startedAt: -1 } });
   const heartbeat = await db.collection("workerHeartbeats").findOne({ worker: "lowblock" });
+  const [leaderboardPendingCount, latestLeaderboardPublication] = await Promise.all([
+    db.collection("leaderboardRebuildQueue").countDocuments(),
+    db.collection("leaderboardPublications").findOne(
+      { _id: "GLOBAL:HISTORY" },
+      { projection: { _id: 1, publishedAt: 1, rowLimit: 1, version: 1 } },
+    ),
+  ]);
   const requestSince = new Date(Date.now() - 24 * 60 * 60_000);
   return {
     notificationsEnabled: Boolean(process.env.TELEGRAM_BOT_TOKEN || process.env.BALE_BOT_TOKEN),
@@ -156,6 +163,11 @@ export async function workerStatus() {
     latestDailyRun,
     heartbeat,
     latestSync,
+    leaderboardHealth: {
+      pendingRebuildItems: leaderboardPendingCount,
+      globalHistoricalPublishedAt: latestLeaderboardPublication?.publishedAt ?? null,
+      publicationVersion: latestLeaderboardPublication?.version ?? null,
+    },
     notificationJobs: await localNotificationQueueStatus(),
     sportsApiRequestsLast24h: await db.collection("sportsApiRequests").countDocuments({
       timestamp: { $gte: requestSince },
