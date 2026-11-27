@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { appScheduleDateKey, appLocalDateTimeToUtc, providerWeekDateKeys, appMatchesPageBounds } from "@/lib/football/scheduleWindow";
 import { isH2HCompetition } from "@/lib/football/leagues";
 import { h2hCompetitionBaseline, H2H_STRENGTH_VERSION } from "@/lib/domain/h2hTeamStrength";
+import { refreshH2HTeamRatings } from "@/lib/domain/h2hRatingEngine";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
 import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
@@ -291,6 +292,9 @@ export async function materializeH2HLeague(db: Db, league: any) {
 export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: number; batchSize?: number; sourceDate?: string } = {}) {
   if (!isH2HEnabled()) return { enabled: false, created: 0 };
   await ensureH2HIndexes();
+  // All entry points (nightly worker, admin sync, GitHub recovery) must
+  // select with the same calibrated ratings, rather than a stale static file.
+  await refreshH2HTeamRatings(db);
   const week = getH2HWeek();
   // At the beginning of a new H2H week, finish the previous week's leagues.
   await settleH2HLeagues(db, getH2HWeek(new Date(), -1).key);
@@ -388,7 +392,7 @@ export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: st
       homeRating: h2hTeamRating(row.match, "home", ratingMap),
       awayRating: h2hTeamRating(row.match, "away", ratingMap),
       tournamentWeight: effectiveH2HTournamentWeight(String(row.match.leagueCode)),
-      ratingVersion: "h2h-team-ratings-review", selectionReason: "top-five-rated-matches-for-fetched-date",
+      ratingVersion: H2H_STRENGTH_VERSION, selectionReason: "top-five-rated-matches-for-fetched-date",
     })),
     firstKickoffAt, goldDeadline: firstKickoffAt,
   };
