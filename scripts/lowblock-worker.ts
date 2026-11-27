@@ -3,13 +3,23 @@ import { runWorkerCycle } from "../lib/worker/localWorker";
 
 const once = process.argv.includes("--once");
 const intervalMs = Math.max(15_000, Number(process.env.WORKER_INTERVAL_MS || 60_000));
+let cycleInProgress = false;
 
 async function cycle() {
+  // A slow external provider or logo request must not launch overlapping
+  // worker passes that race SuperLeague publication or overwhelm MongoDB.
+  if (cycleInProgress) {
+    console.info(JSON.stringify({ type: "lowblock.worker.cycle_skipped", reason: "previous_cycle_running" }));
+    return;
+  }
+  cycleInProgress = true;
   try {
     const result = await runWorkerCycle();
     console.log(JSON.stringify({ worker: "lowblock", at: new Date().toISOString(), ...result }));
   } catch (error) {
     console.error("lowblock_worker_cycle_failed", error);
+  } finally {
+    cycleInProgress = false;
   }
 }
 
