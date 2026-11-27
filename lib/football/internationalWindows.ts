@@ -32,16 +32,22 @@ export function isSeniorFriendlyAllowedForMatch(
  * Gate already-imported records at the match-list query layer. That prevents
  * a stale provider response from reintroducing a questionable fixture.
  */
-export function excludedUnverifiedFriendliesForWindow(
+export function unverifiedSeniorFriendlyRanges(
   start: Date,
   end: Date,
-): boolean {
-  // All dates in the current request window must be verified, otherwise
-  // conservative filtering applies. This can only hide (never invent) matches.
-  const day = new Date(start);
+): Array<{ start: Date; end: Date }> {
+  // Partition UTC days so a request crossing the window's final day doesn't
+  // accidentally hide valid friendlies before the exact boundary.
+  const ranges: Array<{ start: Date; end: Date }> = [];
+  const day = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
   while (day < end) {
-    if (!isVerifiedSeniorFriendlyDate(day)) return true;
+    const next = new Date(day.getTime() + 86_400_000);
+    if (!isVerifiedSeniorFriendlyDate(day)) {
+      const lower = new Date(Math.max(start.getTime(), day.getTime()));
+      const upper = new Date(Math.min(end.getTime(), next.getTime()));
+      if (lower < upper) ranges.push({ start: lower, end: upper });
+    }
     day.setUTCDate(day.getUTCDate() + 1);
   }
-  return false;
+  return ranges;
 }
