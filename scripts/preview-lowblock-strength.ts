@@ -1,5 +1,5 @@
 import { getDb, closeMongo } from "/app/lib/db/mongo";
-import { calibrateH2HTeamRatings, type ResultMatch, type TeamRatingInput } from "./preview-lowblock-strength-helper";
+import { calibrateH2HTeamRatings, type ResultMatch, type TeamRatingInput } from "@/lib/domain/h2hTeamStrength";
 const BASE_FACTOR: Record<string,number>={UCL:1.2,GB1:1.18,ES1:1.16,IT1:1.14,L1:1.12,UEL:1.12,WC_U17:1.08,FR1:1.10,TR1:1.07,GB2:1.05,IR1:1.04};
 const score=(r1:number,r2:number,code:string)=>Math.round(
  (0.55*(r1+r2)/2+0.30*Math.min(r1,r2)+0.15*(100-Math.abs(r1-r2)))*
