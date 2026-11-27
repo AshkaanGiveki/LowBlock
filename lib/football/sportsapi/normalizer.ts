@@ -1,3 +1,4 @@
+import { isSeniorFriendlyAllowedForMatch } from "@/lib/football/internationalWindows";
 import { getLeagueCodeFromSportsApi } from "../competitionMapping";
 import { getLeague, isFeaturedFixture } from "../leagues";
 import { getCanonicalTeamSync } from "../teams";
@@ -114,6 +115,8 @@ export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   } else {
     kickoff = new Date();
   }
+
+  if (!isSeniorFriendlyAllowedForMatch(leagueCode, kickoff)) return null;
 
   const matchday = Number(rawEvent.roundInfo?.round ?? 0);
 
