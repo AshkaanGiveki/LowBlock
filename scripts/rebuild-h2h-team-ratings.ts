@@ -35,8 +35,10 @@ async function main() {
     }),
     db.collection("centralTeams").countDocuments({
       centralTeamId: { $exists: true },
-      $or: [{ h2hRating: { $not: { $gte: 35, $lte: 95 } } },
-        { h2hRatingConfidence: { $not: { $gte: 0.2, $lte: 0.95 } } }],
+      $nor: [{
+        h2hRating: { $gte: 35, $lte: 95 },
+        h2hRatingConfidence: { $gte: 0.2, $lte: 0.95 },
+      }],
     }),
     db.collection<any>("centralTeams").find(
       { h2hRatingVersion: H2H_STRENGTH_VERSION },
