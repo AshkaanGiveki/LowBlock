@@ -38,7 +38,9 @@ export async function refreshH2HTeamRatings(
     const old = byId.get(row.centralTeamId);
     return !old || old.h2hRatingVersion !== H2H_STRENGTH_VERSION ||
       !Number.isFinite(old.h2hRating) ||
-      Math.abs(Number(old.h2hRating) - row.rating) >= 0.1;
+      Math.abs(Number(old.h2hRating) - row.rating) >= 0.1 ||
+      Math.abs(Number(old.h2hRatingConfidence ?? 0) - row.confidence) >= 0.01 ||
+      Number(old.h2hRatedMatchCount ?? -1) !== row.matchesUsed;
   }).map(row => {
     const old = byId.get(row.centralTeamId);
     const firstCalibration = old?.h2hRatingVersion !== H2H_STRENGTH_VERSION;
