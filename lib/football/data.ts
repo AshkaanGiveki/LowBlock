@@ -1,3 +1,4 @@
+import { excludedUnverifiedFriendliesForWindow } from "@/lib/football/internationalWindows";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { centralTeamLogo } from "./centralTeams";
@@ -160,6 +161,11 @@ async function getMatchesPageUncached(
       { "awayTeam.name": { $in: IMPORTANT_NATIONAL_TEAM_QUERY_NAMES } },
     ],
   };
+  // Existing provider records can predate today's FIFA calendar validation.
+  // Exclude them before pagination so they cannot occupy a visible match slot.
+  if (excludedUnverifiedFriendliesForWindow(bounds.start, bounds.end)) {
+    query.$nor.push({ leagueCode: { $in: ["FRIENDLY", "INTL_OTHER"] } });
+  }
   // Apply eligibility before pagination so finished/already-predicted fixtures
   // cannot consume the home feed's first page.
   if (options.upcomingOnly) {
