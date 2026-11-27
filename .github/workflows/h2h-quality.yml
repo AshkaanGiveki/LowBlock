@@ -1,0 +1,33 @@
+name: H2H strength and schedule quality gate
+on:
+  push:
+    branches:
+      - fix/h2h-team-strength-friendlies-weekly-20261127
+  pull_request:
+    paths:
+      - "lib/domain/h2h*.ts"
+      - "lib/football/**"
+      - "lib/worker/**"
+      - "components/LeaderboardExplorer.tsx"
+      - "tests/h2h*.ts"
+      - "tests/international-windows.test.ts"
+      - ".github/workflows/h2h-quality.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
