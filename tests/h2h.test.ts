@@ -75,14 +75,14 @@ describe("H2H schedule rules", () => {
     expect(buildH2HPairings(seeded, 6)[0]).toEqual({ playerA: "1", playerB: "2" });
   });
 
-  it("scores every competition when at least one team is rated", () => {
+  it("scores supported competitions with balanced estimates even for unseeded teams", () => {
     expect(scoreH2HFixture(fixture(1, 0))).toBeGreaterThan(0);
     expect(scoreH2HFixture({ ...fixture(2, 0), leagueCode: "GB_FA" })).toBeGreaterThan(0);
     expect(scoreH2HFixture({
       ...fixture(3, 0),
       homeTeam: { centralTeamId: "unrated-home" },
       awayTeam: { centralTeamId: "unrated-away" },
-    })).toBeNull();
+    })).toBeGreaterThan(0);
   });
 
   it("excludes Saudi Pro League fixtures from H2H slates", () => {
