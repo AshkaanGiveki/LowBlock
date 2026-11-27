@@ -1,0 +1,42 @@
+name: SuperLeague page reliability and production build
+on:
+  push:
+    branches: [fix/superleague-intermittent-details-week-rollover]
+  pull_request:
+    paths:
+      - components/SuperLeagueBoard.tsx
+      - lib/domain/superLeagueView.ts
+      - lib/worker/h2hPublishSchedule.ts
+      - lib/worker/localWorker.ts
+      - scripts/lowblock-worker.ts
+      - tests/superleague-view.test.ts
+      - tests/h2h-publish-schedule.test.ts
+      - .github/workflows/superleague-reliability.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      mongo:
+        image: mongo:4.4
+        ports:
+          - 27017:27017
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/lowblock
+      APP_TIMEZONE: Asia/Tehran
+      H2H_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm exec next build
