@@ -10,6 +10,7 @@ import { downloadMissingTeamLogos } from "@/lib/football/teamLogos";
 
 const DAILY_LEASE_MS = 90 * 60_000;
 let lastTeamLogoSyncAt = 0;
+let lastH2HPublishCheckAt = 0;
 
 async function claimRun(db: Db, runKey: string) {
   const now = new Date();
@@ -58,10 +59,22 @@ async function finishRun(db: Db, runKey: string, status: "DONE" | "FAILED", resu
 export async function runH2HCycle() {
   if (!isH2HEnabled()) return { enabled: false };
   const db = await getDb();
-  const tomorrow = appDateKey(new Date(Date.now() + 86_400_000));
-  const schedule = await ensureCurrentH2HLeagues(db, { sourceDate: tomorrow, batchIndex: 0, batchSize: 1000 });
-  const results = await refreshActiveH2HResults(db, getH2HWeek().key);
-  return { enabled: true, tomorrow, schedule, results };
+  const now = new Date();
+  const currentWeek = getH2HWeek(now);
+  const localToday = appDateKey(now);
+  const localTomorrow = appDateKey(new Date(now.getTime() + 86_400_000));
+  const scheduled = [] as any[];
+  // A published fixture list is immutable. The existing H2H publication guard
+  // will only append an unpublished slate for a currently valid matchday.
+  // This catches Friday's new-week rollover and Saturday's fixtures when
+  // they enter the public matches-page window after local midnight.
+  for (const date of [localToday, localTomorrow]) {
+    const schedule = await ensureCurrentH2HLeagues(db, {
+      sourceDate: date, batchIndex: 0, batchSize: 1000,
+    });
+    scheduled.push({ date, schedule });
+  }
+  return { enabled: true, weekKey: currentWeek.key, scheduled };
 }
 
 export async function runWorkerCycle() {
@@ -120,6 +133,18 @@ export async function runWorkerCycle() {
       console.info(JSON.stringify({ type: "lowblock.worker.daily_skipped", cycleId, runKey: dailyRunKey, reason: "already-claimed-or-terminal" }));
     }
     h2h = (daily as any)?.h2h ?? null;
+  }
+  // Publishing is not restricted to the early daily data-sync window.
+  // At Friday noon the competition week rolls over, and the next day only
+  // becomes eligible for preview once its matches enter the public window.
+  if (isH2HEnabled() && Date.now() - lastH2HPublishCheckAt >= 60 * 60_000) {
+    lastH2HPublishCheckAt = Date.now();
+    try {
+      h2h = await runH2HCycle();
+    } catch (error) {
+      console.error("lowblock.h2h.publication_cycle_failed",
+        error instanceof Error ? error.message : String(error));
+    }
   }
   let teamLogos = null;
   if (Date.now() - lastTeamLogoSyncAt >= 15 * 60_000) {

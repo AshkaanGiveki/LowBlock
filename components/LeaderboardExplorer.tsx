@@ -126,6 +126,20 @@ export function LeaderboardExplorer({
           </Link>
         </div>
       )}
+      {selection.weekly && selection.weekOffset === 0 && !selection.leagueCode && rows.length === 0 && !loading && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.04] px-4 py-3">
+          <p className="text-xs text-white/75">
+            {t(
+              "جدول هفته تازه شروع شده است. امتیاز مسابقات پایان هفته قبل، در جدول «هفته قبل» و آمار فصل و تمام دوران محفوظ است.",
+              "The new weekly table has just started. Thursday's scores remain in Previous Week, Season and All-Time.",
+            )}
+          </p>
+          <button type="button" className="rounded-xl border border-brand/30 px-3 py-2 text-xs font-black text-brand"
+            onClick={() => change({ ...selection, weekOffset: 1 })}>
+            {t("مشاهده هفته قبل", "View previous week")}
+          </button>
+        </div>
+      )}
       {selection.weekly && selection.weekOffset === 0 && !selection.leagueCode && myWeeklySummary && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[.04] px-4 py-3">
           <p className="text-sm font-semibold text-white">

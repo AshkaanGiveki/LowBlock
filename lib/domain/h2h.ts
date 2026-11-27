@@ -4,7 +4,10 @@ import { calculatePredictionScore } from "@/lib/scoring/calculatePredictionScore
 import { getCanonicalLeaderboard, getLeaderboardSummary } from "@/lib/domain/leaderboards";
 import { currentUserId } from "@/lib/auth/session";
 import { env } from "@/lib/env";
-import { appScheduleDateKey, appLocalDateTimeToUtc, providerWeekDateKeys } from "@/lib/football/scheduleWindow";
+import { appScheduleDateKey, appLocalDateTimeToUtc, providerWeekDateKeys, appMatchesPageBounds } from "@/lib/football/scheduleWindow";
+import { isH2HCompetition } from "@/lib/football/leagues";
+import { h2hCompetitionBaseline, H2H_STRENGTH_VERSION } from "@/lib/domain/h2hTeamStrength";
+import { refreshH2HTeamRatings } from "@/lib/domain/h2hRatingEngine";
 import { ensureH2HIndexes } from "@/lib/db/mongo";
 import { centralTeamLogo } from "@/lib/football/centralTeams";
 import { publishH2HSlateOnce } from "@/lib/domain/h2hSlateLock";
@@ -109,19 +112,29 @@ function h2hTeamRating(
   const id = String(team?.centralTeamId ?? team?.teamId ?? "");
   const rating = id ? ratingMap.get(id) : undefined;
   if (rating !== undefined && Number.isFinite(rating) && rating > 0) return rating;
-  // Youth national sides have little comparable club-form data. A restrained
-  // baseline keeps U-17 World Cup fixtures eligible without outranking elite
-  // senior competitions by default.
-  return String(match.leagueCode ?? "") === "WC_U17" ? 45 : 0;
+  // Never score unseeded teams as zero. Every team gets a documented league
+  // prior, with actual match history calibrated separately in centralTeams.
+  return h2hCompetitionBaseline(String(match.leagueCode ?? ""));
+}
+
+export function effectiveH2HTournamentWeight(code: string): number {
+  // Domestic and continental prestige is a modest modifier. In the previous
+  // formula it could outweigh the actual strength of both teams.
+  return 1 + ((H2H_TOURNAMENT_WEIGHTS[code] ?? 1) - 1) * 0.30;
 }
 
 export function scoreH2HFixture(match: any, ratingMap: Map<string, number> = ratings): number | null {
   const code = String(match.leagueCode ?? "");
   const home = h2hTeamRating(match, "home", ratingMap);
   const away = h2hTeamRating(match, "away", ratingMap);
-  const weight = H2H_TOURNAMENT_WEIGHTS[code] ?? 1;
-  const score = (home + away) * weight;
-  return score > 0 ? score : null;
+  if (!Number.isFinite(home) || !Number.isFinite(away)) return null;
+  const average = (home + away) / 2;
+  const lower = Math.min(home, away);
+  const competitiveBalance = 100 - Math.abs(home - away);
+  // One elite team against a much weaker side should not automatically
+  // outrank a closely contested matchup between two quality opponents.
+  const quality = 0.55 * average + 0.30 * lower + 0.15 * competitiveBalance;
+  return Math.round(quality * effectiveH2HTournamentWeight(code) * 100) / 100;
 }
 
 function selectable(match: any, week: H2HWeek, ratingMap: Map<string, number>) {
@@ -129,8 +142,9 @@ function selectable(match: any, week: H2HWeek, ratingMap: Map<string, number>) {
   const status = String(match.status ?? "").toUpperCase();
   return Boolean(
     !H2H_EXCLUDED_LEAGUE_CODES.has(String(match.leagueCode ?? "").toUpperCase()) &&
+    isH2HCompetition(String(match.leagueCode ?? "")) &&
     date && date >= week.start && date < week.end &&
-      !["FINISHED", "CANCELLED", "POSTPONED", "ABANDONED"].includes(status) &&
+      status === "SCHEDULED" && !match.duplicateOf &&
       scoreH2HFixture(match, ratingMap) !== null,
   );
 }
@@ -175,8 +189,8 @@ export function buildH2HSlates(matches: any[], week: H2HWeek, ratingMap: Map<str
         awayTeam: row.match.awayTeam,
         homeRating: h2hTeamRating(row.match, "home", ratingMap),
         awayRating: h2hTeamRating(row.match, "away", ratingMap),
-        tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(row.match.leagueCode)],
-        ratingVersion: "h2h-team-ratings-review",
+        tournamentWeight: effectiveH2HTournamentWeight(String(row.match.leagueCode)),
+        ratingVersion: H2H_STRENGTH_VERSION,
       selectionReason: "highest-score-with-four-to-five-daily-target",
       })),
       firstKickoffAt,
@@ -278,6 +292,9 @@ export async function materializeH2HLeague(db: Db, league: any) {
 export async function ensureCurrentH2HLeagues(db: Db, options: { batchIndex?: number; batchSize?: number; sourceDate?: string } = {}) {
   if (!isH2HEnabled()) return { enabled: false, created: 0 };
   await ensureH2HIndexes();
+  // All entry points (nightly worker, admin sync, GitHub recovery) must
+  // select with the same calibrated ratings, rather than a stale static file.
+  await refreshH2HTeamRatings(db);
   const week = getH2HWeek();
   // At the beginning of a new H2H week, finish the previous week's leagues.
   await settleH2HLeagues(db, getH2HWeek(new Date(), -1).key);
@@ -353,14 +370,18 @@ export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: st
   const matchday = providerWeekDateKeys(week.start).indexOf(sourceDate) + 1;
   if (matchday < 1) return null;
   const minimumLeadTime = Date.now() + 45 * 60 * 1000;
+  const visible = appMatchesPageBounds();
   const candidates = matches
     .filter((match) => selectable(match, week, ratingMap))
     .filter((match) => kickoff(match.kickoffAt)!.getTime() >= minimumLeadTime)
+    .filter((match) => kickoff(match.kickoffAt)! >= visible.start && kickoff(match.kickoffAt)! < visible.end)
     .filter((match) => appScheduleDateKey(kickoff(match.kickoffAt)!) === sourceDate)
     .map((match) => ({ match, date: kickoff(match.kickoffAt)!, score: scoreH2HFixture(match, ratingMap)!, id: String(match.providerMatchId) }))
     .filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index)
     .sort((a, b) => b.score - a.score || a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
-  if (!candidates.length) return null;
+  // Never publish the accidental two-match slate that previously became
+  // immutable before the provider had delivered five viable fixtures.
+  if (candidates.length < 5) return null;
   const chosen = candidates.slice(0, 5).sort((a, b) => a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
   const firstKickoffAt = chosen[0].date;
   return {
@@ -370,8 +391,8 @@ export function buildH2HDailySlate(matches: any[], week: H2HWeek, sourceDate: st
       homeTeam: row.match.homeTeam, awayTeam: row.match.awayTeam,
       homeRating: h2hTeamRating(row.match, "home", ratingMap),
       awayRating: h2hTeamRating(row.match, "away", ratingMap),
-      tournamentWeight: H2H_TOURNAMENT_WEIGHTS[String(row.match.leagueCode)] ?? 1,
-      ratingVersion: "h2h-team-ratings-review", selectionReason: "top-five-rated-matches-for-fetched-date",
+      tournamentWeight: effectiveH2HTournamentWeight(String(row.match.leagueCode)),
+      ratingVersion: H2H_STRENGTH_VERSION, selectionReason: "top-five-rated-matches-for-fetched-date",
     })),
     firstKickoffAt, goldDeadline: firstKickoffAt,
   };
