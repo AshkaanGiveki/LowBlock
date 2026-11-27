@@ -13,8 +13,16 @@ export async function refreshH2HTeamRatings(
   const state = db.collection<any>("h2hTeamRatingState");
   const priorRun = await state.findOne({ _id: "strength" });
   if (!options.force && priorRun?.updatedAt &&
-      Date.now() - new Date(priorRun.updatedAt).getTime() < 12 * 60 * 60_000)
-    return { skipped: true, reason: "fresh_calibration", version: H2H_STRENGTH_VERSION };
+      Date.now() - new Date(priorRun.updatedAt).getTime() < 12 * 60 * 60_000) {
+    // A provider sync can add brand-new teams during the 12-hour freshness
+    // window. Calibrate them before they enter the next H2H slate.
+    const unrated = await db.collection("centralTeams").findOne(
+      { centralTeamId: { $exists: true }, h2hRatingVersion: { $ne: H2H_STRENGTH_VERSION } },
+      { projection: { _id: 1 } },
+    );
+    if (!unrated)
+      return { skipped: true, reason: "fresh_calibration", version: H2H_STRENGTH_VERSION };
+  }
   const [teams, matches] = await Promise.all([
     db.collection<any>("centralTeams").find({ centralTeamId: { $exists: true } },
       { projection: { centralTeamId: 1, h2hRating: 1, h2hRatingVersion: 1,
