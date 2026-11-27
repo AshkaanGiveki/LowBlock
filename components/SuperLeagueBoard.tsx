@@ -181,7 +181,10 @@ export default function SuperLeagueBoard() {
       );
       selectedWeekRef.current = selection.selected;
       setWeekIndex(selection.index);
-      if (next.enabled && next.reason !== "NO_CLUB" && selection.selected)
+      // Historical weeks are immutable: avoid refetching their full pairings
+      // on every poll. Only the current week needs background updates.
+      if (next.enabled && next.reason !== "NO_CLUB" && selection.selected &&
+          (!quiet || selection.selected === next.weekKey))
         void loadDetail(selection.selected, { force: quiet, quiet });
     } catch (reason) {
       if (requestId !== overviewRequestRef.current) return;
