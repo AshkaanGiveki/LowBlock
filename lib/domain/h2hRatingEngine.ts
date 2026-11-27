@@ -57,6 +57,7 @@ export async function refreshH2HTeamRatings(
       update: {
         $set: {
           h2hRating: row.rating,
+          h2hRatingSource: "calibrated-competition-prior-and-recent-results-v2",
           h2hRatingConfidence: row.confidence,
           h2hRatedMatchCount: row.matchesUsed,
           h2hRatingPrior: row.prior,
