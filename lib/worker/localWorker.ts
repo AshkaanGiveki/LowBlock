@@ -7,10 +7,13 @@ import { processLocalNotificationJobs, localNotificationQueueStatus } from "@/li
 import { runCompleteDailyFootballCycle } from "./dailyRecovery";
 import { isDailyWorkerWindow, localWorkerClock } from "./schedule";
 import { downloadMissingTeamLogos } from "@/lib/football/teamLogos";
+import { shouldRunH2HPublication } from "./h2hPublishSchedule";
 
 const DAILY_LEASE_MS = 90 * 60_000;
 let lastTeamLogoSyncAt = 0;
 let lastH2HPublishCheckAt = 0;
+let lastSuccessfulH2HWeekKey = "";
+let lastH2HPublishFailed = false;
 
 async function claimRun(db: Db, runKey: string) {
   const now = new Date();
@@ -137,11 +140,21 @@ export async function runWorkerCycle() {
   // Publishing is not restricted to the early daily data-sync window.
   // At Friday noon the competition week rolls over, and the next day only
   // becomes eligible for preview once its matches enter the public window.
-  if (isH2HEnabled() && Date.now() - lastH2HPublishCheckAt >= 60 * 60_000) {
+  const publishWeekKey = getH2HWeek(cycleStartedAt).key;
+  if (isH2HEnabled() && shouldRunH2HPublication({
+    nowMs: Date.now(),
+    currentWeekKey: publishWeekKey,
+    lastAttemptAt: lastH2HPublishCheckAt,
+    lastSuccessfulWeekKey: lastSuccessfulH2HWeekKey,
+    lastAttemptFailed: lastH2HPublishFailed,
+  })) {
     lastH2HPublishCheckAt = Date.now();
     try {
       h2h = await runH2HCycle();
+      lastSuccessfulH2HWeekKey = publishWeekKey;
+      lastH2HPublishFailed = false;
     } catch (error) {
+      lastH2HPublishFailed = true;
       console.error("lowblock.h2h.publication_cycle_failed",
         error instanceof Error ? error.message : String(error));
     }
