@@ -372,7 +372,8 @@ export async function getMatch(providerMatchId: string) {
     $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }, ...WOMENS_FIXTURE_MONGO_EXCLUSIONS],
     status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
   });
-  if (!isSupportedMensFootballFixture(match)) return null;
+  // Type-narrow the nullable DB row before applying the gender guard.
+  if (!match || !isSupportedMensFootballFixture(match)) return null;
   const ids = [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId].filter(Boolean);
   const rows = ids.length
     ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1, "names.en": 1, isNational: 1, logoUrl: 1, providerIds: 1 } }).toArray()
