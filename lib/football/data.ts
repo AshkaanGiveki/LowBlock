@@ -1,4 +1,5 @@
 import { unverifiedSeniorFriendlyRanges } from "@/lib/football/internationalWindows";
+import { WOMENS_FIXTURE_MONGO_EXCLUSIONS, isSupportedMensFootballFixture } from "@/lib/football/fixtureEligibility";
 import { getFootballProvider } from "@/lib/football/providerRegistry";
 import { getDb } from "@/lib/db/mongo";
 import { centralTeamLogo } from "./centralTeams";
@@ -52,7 +53,7 @@ const getCachedMatches = unstable_cache(
       // Only expose records written from a verified Football API response.
       rawApiResponse: { $exists: true },
       // 207 is Switzerland's Super League, not Turkey's Super Cup (551).
-      $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
+      $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }, ...WOMENS_FIXTURE_MONGO_EXCLUSIONS],
       status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
       kickoffAt: { $gte: new Date(from), $lte: new Date(to) },
       ...(leagueCode ? { leagueCode } : {}),
@@ -72,12 +73,13 @@ const getCachedMatches = unstable_cache(
       .toArray();
     rows = rows
       .filter((row) =>
+        isSupportedMensFootballFixture(row) && (
         row.featuredNationalFixture === true ||
         isEligibleInternationalFixture(
           row.leagueCode,
           row.homeTeam.name,
           row.awayTeam.name,
-        ),
+        )),
       )
       .slice(0, limit);
 
@@ -151,7 +153,7 @@ async function getMatchesPageUncached(
     provider: getFootballProvider().name,
     duplicateOf: { $exists: false },
     rawApiResponse: { $exists: true },
-    $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
+    $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }, ...WOMENS_FIXTURE_MONGO_EXCLUSIONS],
     status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
     kickoffAt: { $gte: bounds.start, $lt: bounds.end },
     $or: [
@@ -367,10 +369,11 @@ export async function getMatch(providerMatchId: string) {
     providerMatchId,
     duplicateOf: { $exists: false },
     rawApiResponse: { $exists: true },
-    $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }],
+    $nor: [{ leagueCode: "TR_SC", "rawApiResponse.league.id": 207 }, ...WOMENS_FIXTURE_MONGO_EXCLUSIONS],
     status: { $nin: ["VOID", "CANCELLED", "POSTPONED"] },
   });
-  if (!match) return null;
+  // Type-narrow the nullable DB row before applying the gender guard.
+  if (!match || !isSupportedMensFootballFixture(match)) return null;
   const ids = [match.homeTeam.centralTeamId, match.awayTeam.centralTeamId].filter(Boolean);
   const rows = ids.length
     ? await db.collection<any>("centralTeams").find({ centralTeamId: { $in: ids } }, { projection: { centralTeamId: 1, "names.fa": 1, "names.en": 1, isNational: 1, logoUrl: 1, providerIds: 1 } }).toArray()

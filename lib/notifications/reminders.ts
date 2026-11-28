@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { teamName } from "@/lib/football/team-names";
 import { readableFa } from "@/lib/text";
 import { isGlobalCompetition } from "@/lib/football/leagues";
+import { isNotifiableFootballFixture } from "@/lib/football/fixtureEligibility";
 import { telegramApi, telegramEnabled } from "@/lib/telegram/client";
 
 type Provider = "TELEGRAM" | "BALE";
@@ -21,6 +22,7 @@ export async function scheduleUpcomingReminders() {
     .toArray();
   let scheduled = 0;
   for (const match of matches) {
+    if (!isNotifiableFootballFixture(match)) continue;
     const kickoff = new Date(match.kickoffAt);
     if (!Number.isFinite(kickoff.getTime())) {
       console.error("match_reminder_invalid_kickoff", {
@@ -54,7 +56,8 @@ export async function processMatchReminder(matchId: string) {
   const match = await db
     .collection<any>("matches")
     .findOne({ providerMatchId: matchId });
-  if (!match || match.status !== "SCHEDULED")
+  // Recheck at send time, including notifications queued by older versions.
+  if (!isNotifiableFootballFixture(match) || match.status !== "SCHEDULED")
     return { sent: 0, skipped: "match" };
   const centralIds = [match.homeTeam?.centralTeamId, match.awayTeam?.centralTeamId].filter(Boolean);
   const centralRows = centralIds.length

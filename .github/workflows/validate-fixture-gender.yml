@@ -1,0 +1,37 @@
+name: Prevent women's football import and alerts
+on:
+  push:
+    branches: [fix/exclude-womens-football-import-and-telegram-20261128]
+  pull_request:
+    paths:
+      - lib/football/fixtureEligibility.ts
+      - lib/football/sportsapi/normalizer.ts
+      - lib/football/sportsapi/provider.ts
+      - lib/football/sportsapi/rest.ts
+      - lib/football/data.ts
+      - lib/notifications/reminders.ts
+      - lib/notifications/channel.ts
+      - tests/womens-fixture-eligibility.test.ts
+      - .github/workflows/validate-fixture-gender.yml
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm exec next build
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/lowblock
+          APP_TIMEZONE: Asia/Tehran

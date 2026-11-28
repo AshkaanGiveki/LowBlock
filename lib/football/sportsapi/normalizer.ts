@@ -1,4 +1,5 @@
 import { isSeniorFriendlyAllowedForMatch } from "@/lib/football/internationalWindows";
+import { isWomensFootballFixture } from "@/lib/football/fixtureEligibility";
 import { getLeagueCodeFromSportsApi } from "../competitionMapping";
 import { getLeague, isFeaturedFixture } from "../leagues";
 import { getCanonicalTeamSync } from "../teams";
@@ -78,6 +79,10 @@ function resolveTeamLogo(team: any): string | null {
 export function normalizeSportsApiMatch(rawInput: any): CanonicalMatch | null {
   if (!rawInput) return null;
   const rawEvent = rawInput.event || rawInput;
+  // Reject before country-name fallback and before resolving canonical teams.
+  // SportsAPI identifies women's international fixtures via gender: "F"
+  // and a female-specific tournament, even when team names are "France" etc.
+  if (isWomensFootballFixture(rawEvent)) return null;
 
   const rawTournament =
     rawEvent.tournament ||
