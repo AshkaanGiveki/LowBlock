@@ -1,3 +1,4 @@
+import { isSeniorFriendlyAllowedForMatch } from "@/lib/football/internationalWindows";
 /**
  * LowBlock currently supports men's football competitions only.
  *
@@ -45,3 +46,27 @@ export function isWomensFootballFixture(input: any): boolean {
 export function isSupportedMensFootballFixture(match: any): boolean {
   return Boolean(match) && !isWomensFootballFixture(match);
 }
+
+/** Apply the same import/calendar restrictions when scheduling or sending alerts. */
+export function isNotifiableFootballFixture(match: any): boolean {
+  if (!isSupportedMensFootballFixture(match) || !match.providerMatchId ||
+      match.duplicateOf) return false;
+  const kickoff = new Date(match.kickoffAt);
+  return Number.isFinite(kickoff.getTime()) &&
+    isSeniorFriendlyAllowedForMatch(String(match.leagueCode ?? ""), kickoff);
+}
+
+/**
+ * Conservative DB-side filter for records imported by older versions.
+ * This protects paginated lists before all legacy fixtures have been purged.
+ */
+export const WOMENS_FIXTURE_MONGO_EXCLUSIONS: Record<string, unknown>[] = [
+  { "rawApiResponse.homeTeam.gender": { $in: ["F", "female", "Female", "women", "Women"] } },
+  { "rawApiResponse.awayTeam.gender": { $in: ["F", "female", "Female", "women", "Women"] } },
+  { "rawApiResponse.tournament.gender": { $in: ["F", "female", "Female", "women", "Women"] } },
+  { "rawApiResponse.tournament.uniqueTournament.gender": { $in: ["F", "female", "Female", "women", "Women"] } },
+  { "rawApiResponse.tournament.name": { $regex: "women|female|feminine|frauen|femminile", $options: "i" } },
+  { "rawApiResponse.tournament.uniqueTournament.name": { $regex: "women|female|feminine|frauen|femminile", $options: "i" } },
+  { "rawApiResponse.tournament.slug": { $regex: "women|female|feminine|frauen|femminile", $options: "i" } },
+  { "rawApiResponse.tournament.uniqueTournament.slug": { $regex: "women|female|feminine|frauen|femminile", $options: "i" } },
+];
