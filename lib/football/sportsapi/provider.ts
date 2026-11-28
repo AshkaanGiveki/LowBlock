@@ -18,6 +18,7 @@ import {
 } from "./rest";
 import type { SportsApiDiscoveryManifest } from "./rest";
 import { normalizeSportsApiMatch } from "./normalizer";
+import { isSupportedMensFootballFixture } from "../fixtureEligibility";
 import { getSportsApiWsManager } from "./ws";
 import { env } from "@/lib/env";
 import { COMPETITION_MAPPINGS } from "../competitionMapping";
@@ -48,6 +49,9 @@ export class SportsApiFootballProvider implements FootballDataProvider {
   }
 
   private async saveMatches(db: any, matches: CanonicalMatch[]): Promise<number> {
+    // All importer paths flow through this method. Recheck records here so a
+    // bypassed normalizer cannot upsert women's matches or register teams.
+    matches = matches.filter(isSupportedMensFootballFixture);
     if (!matches.length) return 0;
 
     const centralIds = new Map<string, string>();
