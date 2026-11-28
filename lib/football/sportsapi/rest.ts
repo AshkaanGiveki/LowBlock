@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { providerDayBounds } from "../scheduleWindow";
 import { getDb } from "@/lib/db/mongo";
 import { appDateKey } from "../scheduleWindow";
+import { isWomensFootballFixture } from "../fixtureEligibility";
 
 // The production host intermittently prefers an unreachable IPv6 route for
 // api.sportsapipro.com. Prefer IPv4 so the scheduled worker does not spend
@@ -267,7 +268,7 @@ export async function getSportsApiDailyFixtures(
   const cached = dailyFixturesCache.get(dateString);
   if (cached && cached.expiresAt > now) {
     console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_cache_hit", date: dateString, source: "memory" }));
-    return cached.data;
+    return { ...cached.data, events: (cached.data.events ?? []).filter((ev) => !isWomensFootballFixture(ev)) };
   }
 
   // Persist the discovery cache so a restart or a second app instance does
@@ -286,7 +287,7 @@ export async function getSportsApiDailyFixtures(
         expiresAt: new Date(persisted.expiresAt).getTime(),
       });
       console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_cache_hit", date: dateString, source: "mongo" }));
-      return persisted.data;
+      return { ...persisted.data, events: (persisted.data.events ?? []).filter((ev: any) => !isWomensFootballFixture(ev)) };
     }
   } catch (err) {
     console.warn("[SportsAPI] Persistent discovery cache unavailable:", err);
@@ -325,7 +326,7 @@ export async function getSportsApiDailyFixtures(
         throw new Error(`SportsAPI schedule page ${page} has no events array`);
       for (const ev of events) {
         const id = ev.id ?? ev.eventId;
-        if (id != null && !eventsMap.has(String(id))) eventsMap.set(String(id), ev);
+        if (id != null && !isWomensFootballFixture(ev) && !eventsMap.has(String(id))) eventsMap.set(String(id), ev);
       }
       console.info(JSON.stringify({ type: "lowblock.sportsapi.daily_page_finished", date: dateString, page, totalPages, providerEvents: events.length, uniqueEvents: eventsMap.size }));
     }
@@ -398,7 +399,7 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
       Date.now() - persistedAt < DISCOVERY_CACHE_TTL_MS &&
       Array.isArray(persisted?.data?.events);
     if (reusableManifest) {
-      for (const event of persisted.data.events) {
+      for (const event of persisted.data.events.filter((row: any) => !isWomensFootballFixture(row))) {
         const id = String(event?.id ?? event?.eventId ?? "");
         if (id) allEvents.set(id, event);
       }
@@ -409,10 +410,10 @@ export async function discoverSportsApiWeek(dateStrings: string[], options: { at
     let selectedEvents: any[] = [];
     for (let attempt = 1; attempt <= attempts; attempt++) {
       const schedule = await fetchSportsApi<any>(`/schedule/${dateString}`);
-      const scheduleEvents = eventList(schedule);
+      const scheduleEvents = eventList(schedule).filter((row) => !isWomensFootballFixture(row));
       const todayAttempted = dateString === todayStr;
       const today = todayAttempted ? await fetchSportsApi<any>("/today") : null;
-      const todayEvents = today ? eventList(today) : [];
+      const todayEvents = today ? eventList(today).filter((row) => !isWomensFootballFixture(row)) : [];
       const scheduleIds = new Set(scheduleEvents.map((event) => String(event?.id ?? event?.eventId ?? "")).filter(Boolean));
       const merged = [...scheduleEvents, ...todayEvents].filter((event, index, rows) => {
         const id = String(event?.id ?? event?.eventId ?? "");
