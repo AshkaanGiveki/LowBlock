@@ -5,6 +5,7 @@ import { enqueueLocalNotificationJob } from "./localQueue";
 import { getCanonicalLeaderboard } from "@/lib/domain/leaderboards";
 import { scheduleMatchdayPolling } from "@/lib/notifications/matchday";
 import { telegramApi } from "@/lib/telegram/client";
+import { isNotifiableFootballFixture } from "@/lib/football/fixtureEligibility";
 
 const CHANNEL_ID = env.TELEGRAM_CHANNEL_ID || "@lowblockapp";
 const CHANNEL_PUBLICATION_TYPES = [
@@ -251,8 +252,9 @@ export async function publishChannelMatches(db: Db, date = new Date()) {
     })
     .sort({ kickoffAt: 1 })
     .toArray();
-  const rows = matches.length
-    ? matches
+  const eligibleMatches = matches.filter(isNotifiableFootballFixture);
+  const rows = eligibleMatches.length
+    ? eligibleMatches
         .map((match) => {
           const names = fixtureNames(match);
           const time = new Intl.DateTimeFormat("en-GB", {
@@ -275,7 +277,7 @@ export async function publishChannelMatches(db: Db, date = new Date()) {
       sent: true,
       messageId: messageIds[0],
       messageIds,
-      matches: matches.length,
+      matches: eligibleMatches.length,
     };
   } catch (error) {
     await markFailed(db, dateKey, "MATCHES", error);
@@ -289,21 +291,19 @@ export async function scheduleFirstMatchChannelReminder(
 ) {
   const dateKey = utcDateKey(date);
   const bounds = utcDayBounds(dateKey);
-  const match = await db
+  // Select the first eligible fixture, not merely the first database row.
+  const options = await db
     .collection<any>("matches")
-    .findOne(
-      {
-        kickoffAt: {
-          $gte: new Date(Math.max(Date.now(), bounds.start.getTime())),
-          $lt: bounds.end,
-        },
-        status: "SCHEDULED",
+    .find({
+      kickoffAt: {
+        $gte: new Date(Math.max(Date.now(), bounds.start.getTime())),
+        $lt: bounds.end,
       },
-      {
-        sort: { kickoffAt: 1 },
-        projection: { providerMatchId: 1, kickoffAt: 1 },
-      },
-    );
+      status: "SCHEDULED",
+    })
+    .sort({ kickoffAt: 1 })
+    .toArray();
+  const match = options.find(isNotifiableFootballFixture);
   if (!match) return false;
   const runAt = new Date(new Date(match.kickoffAt).getTime() - 1800000);
   if (runAt <= new Date()) return false;
@@ -356,7 +356,8 @@ export async function publishFirstMatchChannelReminder(
       kickoffAt: { $gt: new Date() },
       status: { $nin: ["VOID", "CANCELLED", "POSTPONED", "FINISHED"] },
     });
-  if (!match)
+  // Existing queued jobs may point to a fixture excluded since scheduling.
+  if (!isNotifiableFootballFixture(match))
     return {
       sent: false,
       reason: "match-unavailable",
